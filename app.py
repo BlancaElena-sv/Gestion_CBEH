@@ -118,7 +118,7 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. PANTALLA DE FINANZAS (CORREGIDA)
+# 4. PANTALLA DE FINANZAS (CORREGIDA SIN ERROR KEYERROR)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -127,16 +127,12 @@ elif opcion == "Finanzas":
     if 'recibo_temp' not in st.session_state:
         st.session_state.recibo_temp = None
 
-    # Si hay un recibo en memoria, mostramos SOLO el recibo (Modo Impresión)
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
-        
-        # Colores según tipo
         es_ingreso = r['tipo'] == 'ingreso'
-        color = "#2e7d32" if es_ingreso else "#c62828" # Verde o Rojo
+        color = "#2e7d32" if es_ingreso else "#c62828"
         titulo = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         
-        # CSS CRÍTICO PARA IMPRESIÓN EN 1 PÁGINA
         st.markdown("""
             <style>
             @media print {
@@ -144,17 +140,13 @@ elif opcion == "Finanzas":
                 body * { visibility: hidden; }
                 [data-testid="stSidebar"], header, footer { display: none !important; }
                 .ticket-print, .ticket-print * { visibility: visible !important; }
-                .ticket-print { 
-                    position: absolute; left: 0; top: 0; width: 100%; 
-                    margin: 0; padding: 40px; background-color: white; 
-                }
+                .ticket-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 40px; background-color: white; }
             }
             </style>
         """, unsafe_allow_html=True)
         
         st.success("✅ Transacción guardada. Imprime el comprobante abajo.")
 
-        # HTML SIN INDENTACIÓN (Para evitar el cuadro negro)
         html_ticket = f"""
 <div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
     <div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px;">
@@ -192,13 +184,11 @@ elif opcion == "Finanzas":
                 st.session_state.recibo_temp = None
                 st.rerun()
         with c2:
-            st.info("Presiona **Ctrl + P** (Windows) o **Cmd + P** (Mac) para imprimir.")
+            st.info("Presiona **Ctrl + P** para imprimir.")
 
     else:
-        # --- PANTALLA NORMAL DE FINANZAS ---
         tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte"])
         
-        # 1. INGRESOS
         with tab1:
             col_b, col_f = st.columns([1, 2])
             with col_b:
@@ -230,7 +220,6 @@ elif opcion == "Finanzas":
                             st.session_state.alumno_pago = None
                             st.rerun()
 
-        # 2. GASTOS
         with tab2:
             st.subheader("Registrar Salida de Dinero")
             with st.form("f_gasto"):
@@ -250,16 +239,33 @@ elif opcion == "Finanzas":
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE
+        # --- SECCIÓN DE REPORTE BLINDADA CONTRA ERRORES ---
         with tab3:
             st.subheader("Balance: Ingresos vs Egresos")
             if st.button("🔄 Actualizar"): st.rerun()
             
             docs = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).stream()
-            lista = [d.to_dict() for d in docs]
             
-            if lista:
-                df = pd.DataFrame(lista)
+            # --- NORMALIZACIÓN DE DATOS (AQUÍ ESTÁ LA SOLUCIÓN) ---
+            # Convertimos cada documento en un diccionario seguro, rellenando lo que falte
+            lista_final = []
+            for doc in docs:
+                d = doc.to_dict()
+                item_seguro = {
+                    "fecha_legible": d.get("fecha_legible", "Sin Fecha"), # Si no tiene fecha, pone "Sin fecha"
+                    "tipo": d.get("tipo", "Desconocido"),
+                    # Busca el nombre en varios campos posibles (para compatibilidad con datos viejos)
+                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
+                    "descripcion": d.get("descripcion", "-"),
+                    "monto": d.get("monto", 0.0),
+                    "observaciones": d.get("observaciones", "")
+                }
+                lista_final.append(item_seguro)
+            
+            if lista_final:
+                df = pd.DataFrame(lista_final)
+                
+                # Cálculos seguros
                 total_ing = df[df['tipo']=='ingreso']['monto'].sum()
                 total_egr = df[df['tipo']=='egreso']['monto'].sum()
                 
@@ -269,10 +275,12 @@ elif opcion == "Finanzas":
                 m3.metric("Disponible en Caja", f"${total_ing - total_egr:,.2f}")
                 
                 st.markdown("### Detalle de Movimientos")
+                
+                # Ahora seleccionamos las columnas sin miedo porque las creamos manualmente arriba
                 st.dataframe(
                     df[['fecha_legible', 'tipo', 'nombre_persona', 'descripcion', 'monto']],
                     column_config={
-                        "tipo": st.column_config.TextColumn("Tipo", help="Ingreso o Egreso"),
+                        "tipo": st.column_config.TextColumn("Tipo", width="small"),
                         "monto": st.column_config.NumberColumn("Monto", format="$%.2f")
                     },
                     use_container_width=True

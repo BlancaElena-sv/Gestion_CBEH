@@ -130,7 +130,7 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. FINANZAS (RECIBOS MEJORADOS - MEDIA PAGINA)
+# 4. FINANZAS (RECIBOS MEJORADOS)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -139,133 +139,66 @@ elif opcion == "Finanzas":
     if 'recibo_temp' not in st.session_state: st.session_state.recibo_temp = None
     if 'reporte_html' not in st.session_state: st.session_state.reporte_html = None
 
-    # --- 1. MODO IMPRESIÓN DE RECIBO INDIVIDUAL (DISEÑO MEDIA CARTA) ---
+    # --- 1. MODO IMPRESIÓN DE RECIBO INDIVIDUAL ---
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
         
         # Colores y Estilos
-        color_tema = "#2e7d32" if es_ingreso else "#c62828"  # Verde o Rojo
-        bg_header = "#e8f5e9" if es_ingreso else "#ffebee"   # Fondo suave
+        color_tema = "#2e7d32" if es_ingreso else "#c62828"
+        bg_header = "#e8f5e9" if es_ingreso else "#ffebee"
         titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         
         logo_img = get_image_base64("logo.png")
         img_html = f'<img src="{logo_img}" style="height: 70px; object-fit: contain;">' if logo_img else ""
 
-        # CSS: Forzamos altura máxima para media página (aprox 14cm / 5.5 in)
-        st.markdown("""
-            <style>
-            @media print {
-                @page { margin: 0; size: auto; }
-                body * { visibility: hidden; }
-                [data-testid="stSidebar"], header, footer { display: none !important; }
-                .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; }
-            }
-            /* Estilo en pantalla normal para que se vea bonito antes de imprimir */
-            .ticket-container {
-                width: 100%;
-                max-width: 850px;
-                margin: auto;
-                border: 1px solid #ddd;
-                font-family: 'Helvetica', 'Arial', sans-serif;
-                background-color: white;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            }
-            </style>
-        """, unsafe_allow_html=True)
+        # CSS
+        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .ticket-container { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: 'Helvetica', 'Arial', sans-serif; background-color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }</style>""", unsafe_allow_html=True)
         
         st.success("✅ Guardado. El recibo está optimizado para ocupar media página.")
 
-        # Lógica de datos extra
+        # Datos extra HTML (PEGADO A LA IZQUIERDA)
         datos_extra_html = ""
         if r.get('alumno_nie'):
             datos_extra_html = f"""
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 8px; font-weight: bold; color: #555;">Alumno:</td>
-                <td style="padding: 8px;">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td>
-                <td style="padding: 8px; font-weight: bold; color: #555;">Grado:</td>
-                <td style="padding: 8px;">{r.get('alumno_grado')}</td>
-            </tr>
-            """
+<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">Alumno:</td><td style="padding: 8px;">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td><td style="padding: 8px; font-weight: bold; color: #555;">Grado:</td><td style="padding: 8px;">{r.get('alumno_grado')}</td></tr>"""
         else:
-            # Para gastos o ingresos sin alumno específico
             datos_extra_html = f"""
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 8px; font-weight: bold; color: #555;">Beneficiario/Pagador:</td>
-                <td style="padding: 8px;" colspan="3">{r.get('nombre_persona', 'N/A')}</td>
-            </tr>
-            """
+<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">Beneficiario:</td><td style="padding: 8px;" colspan="3">{r.get('nombre_persona', 'N/A')}</td></tr>"""
 
-        # HTML DEL RECIBO COMPACTO (MEDIA PAGINA)
+        # HTML DEL RECIBO (SIN ESPACIOS A LA IZQUIERDA)
         html_ticket = f"""
-        <div class="ticket-container">
-            <div style="background-color: {color_tema}; color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="background: white; padding: 5px; border-radius: 4px;">{img_html}</div>
-                    <div>
-                        <h3 style="margin: 0; font-size: 18px;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3>
-                        <p style="margin: 0; font-size: 12px; opacity: 0.9;">San Felipe, El Salvador</p>
-                    </div>
-                </div>
-                <div style="text-align: right;">
-                    <h4 style="margin: 0; font-size: 16px;">{titulo_doc}</h4>
-                    <p style="margin: 0; font-size: 14px;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p>
-                </div>
-            </div>
-
-            <div style="padding: 20px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    {datos_extra_html}
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 8px; font-weight: bold; color: #555;">Fecha:</td>
-                        <td style="padding: 8px;">{r['fecha_legible']}</td>
-                        <td style="padding: 8px; font-weight: bold; color: #555;">Método Pago:</td>
-                        <td style="padding: 8px;">{r.get('metodo', 'Efectivo')}</td>
-                    </tr>
-                </table>
-
-                <br>
-
-                <table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px;">
-                    <thead style="background-color: #f9f9f9;">
-                        <tr>
-                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Descripción / Concepto</th>
-                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Observaciones</th>
-                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema}; width: 120px;">Monto</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="padding: 15px 10px;">{r['descripcion']}</td>
-                            <td style="padding: 15px 10px; color: #666;">{r.get('observaciones', '-')}</td>
-                            <td style="padding: 15px 10px; text-align: right; font-weight: bold; font-size: 16px;">${r['monto']:.2f}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
-                    <div style="font-size: 12px; color: #888;">
-                        <p>Recibo generado electrónicamente.<br>Conserve este documento para cualquier reclamo.</p>
-                    </div>
-                    <div style="text-align: right;">
-                         <p style="margin: 0; font-size: 14px; color: #666;">Total Pagado:</p>
-                         <h1 style="margin: 0; color: {color_tema}; font-size: 28px;">${r['monto']:.2f}</h1>
-                    </div>
-                </div>
-
-                <br><br>
-                
-                <div style="display: flex; justify-content: space-between; gap: 40px; margin-top: 10px;">
-                    <div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #444;">Firma y Sello Colegio</div>
-                    <div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #444;">Firma Conforme</div>
-                </div>
-            </div>
-            
-            <div style="border-top: 2px dashed #ccc; margin-top: 20px; padding-top: 10px; text-align: center; color: #ccc; font-size: 10px;">
-                ✂️ -- Corte aquí -- ✂️
-            </div>
-        </div>
-        """
+<div class="ticket-container">
+<div style="background-color: {color_tema}; color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
+<div style="display: flex; align-items: center; gap: 15px;">
+<div style="background: white; padding: 5px; border-radius: 4px;">{img_html}</div>
+<div><h3 style="margin: 0; font-size: 18px;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin: 0; font-size: 12px; opacity: 0.9;">San Felipe, El Salvador</p></div>
+</div>
+<div style="text-align: right;"><h4 style="margin: 0; font-size: 16px;">{titulo_doc}</h4><p style="margin: 0; font-size: 14px;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
+</div>
+<div style="padding: 20px;">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+{datos_extra_html}
+<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">Fecha:</td><td style="padding: 8px;">{r['fecha_legible']}</td><td style="padding: 8px; font-weight: bold; color: #555;">Método Pago:</td><td style="padding: 8px;">{r.get('metodo', 'Efectivo')}</td></tr>
+</table>
+<br>
+<table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px;">
+<thead style="background-color: #f9f9f9;"><tr><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Descripción / Concepto</th><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Observaciones</th><th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema}; width: 120px;">Monto</th></tr></thead>
+<tbody><tr><td style="padding: 15px 10px;">{r['descripcion']}</td><td style="padding: 15px 10px; color: #666;">{r.get('observaciones', '-')}</td><td style="padding: 15px 10px; text-align: right; font-weight: bold; font-size: 16px;">${r['monto']:.2f}</td></tr></tbody>
+</table>
+<div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+<div style="font-size: 12px; color: #888;"><p>Recibo generado electrónicamente.<br>Conserve este documento para cualquier reclamo.</p></div>
+<div style="text-align: right;"><p style="margin: 0; font-size: 14px; color: #666;">Total Pagado:</p><h1 style="margin: 0; color: {color_tema}; font-size: 28px;">${r['monto']:.2f}</h1></div>
+</div>
+<br><br>
+<div style="display: flex; justify-content: space-between; gap: 40px; margin-top: 10px;">
+<div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #444;">Firma y Sello Colegio</div>
+<div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #444;">Firma Conforme</div>
+</div>
+</div>
+<div style="border-top: 2px dashed #ccc; margin-top: 20px; padding-top: 10px; text-align: center; color: #ccc; font-size: 10px;">✂️ -- Corte aquí -- ✂️</div>
+</div>
+"""
         st.markdown(html_ticket, unsafe_allow_html=True)
         
         c1, c2 = st.columns([1, 4])
@@ -273,9 +206,9 @@ elif opcion == "Finanzas":
             if st.button("❌ Cerrar Recibo", type="primary"):
                 st.session_state.recibo_temp = None
                 st.rerun()
-        with c2: st.info("Presiona **Ctrl + P** para imprimir. Ocupará media hoja.")
+        with c2: st.info("Presiona **Ctrl + P** para imprimir.")
 
-    # --- 2. MODO REPORTE GENERAL (HTML LIMPIO) ---
+    # --- 2. MODO REPORTE GENERAL ---
     elif st.session_state.reporte_html:
         st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; } }</style>""", unsafe_allow_html=True)
         
@@ -289,7 +222,7 @@ elif opcion == "Finanzas":
         with c2: st.info("🖨️ Presiona **Ctrl + P** y selecciona 'Guardar como PDF'.")
 
     else:
-        # --- 3. PANTALLAS DE GESTIÓN (NORMAL) ---
+        # --- 3. PANTALLAS DE GESTIÓN ---
         tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte Formal"])
         
         # 1. INGRESOS
@@ -349,7 +282,7 @@ elif opcion == "Finanzas":
         with tab3:
             st.subheader("Generación de Reportes PDF")
             
-            # --- FILTROS ---
+            # FILTROS
             col_fil1, col_fil2, col_fil3 = st.columns(3)
             fecha_ini = col_fil1.date_input("Desde", value=date(datetime.now().year, 1, 1))
             fecha_fin = col_fil2.date_input("Hasta", value=datetime.now())
@@ -387,7 +320,7 @@ elif opcion == "Finanzas":
                 if df.empty:
                     st.warning("No hay datos para generar el reporte con esos filtros.")
                 else:
-                    # CONSTRUIR HTML DEL REPORTE (PEGADO A LA IZQUIERDA PARA EVITAR ERROR)
+                    # CONSTRUIR HTML DEL REPORTE (PEGADO A LA IZQUIERDA)
                     t_ing = df[df['tipo']=='ingreso']['monto'].sum()
                     t_egr = df[df['tipo']=='egreso']['monto'].sum()
                     balance = t_ing - t_egr

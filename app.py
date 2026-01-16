@@ -130,7 +130,7 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. FINANZAS
+# 4. FINANZAS (IMPRESIÓN CORREGIDA AL 100%)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -152,27 +152,75 @@ elif opcion == "Finanzas":
         logo_img = get_image_base64("logo.png")
         img_html = f'<img src="{logo_img}" style="height: 70px; object-fit: contain;">' if logo_img else ""
 
-        # CSS: Forzamos color NEGRO (#000) en el texto para que no salga blanco al imprimir
-        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .ticket-container { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: 'Helvetica', 'Arial', sans-serif; background-color: white; color: #000000 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }</style>""", unsafe_allow_html=True)
+        # CSS "CAPA SUPERIOR" Y CORRECCIÓN DE COLOR
+        st.markdown("""
+        <style>
+        @media print {
+            @page { margin: 0; size: auto; }
+            /* Ocultar interfaz de Streamlit */
+            header, footer, aside, .stDeployButton { display: none !important; }
+            
+            /* Forzar visualización de gráficos de fondo y colores exactos */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Contenedor principal: Se fija sobre toda la pantalla */
+            .ticket-container {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                background-color: white !important;
+                z-index: 999999 !important;
+                margin: 0 !important;
+                visibility: visible !important;
+            }
+            
+            /* FORZAR TEXTO NEGRO PURO (Solución a página en blanco) */
+            .ticket-container, .ticket-container p, .ticket-container h1, .ticket-container h2, .ticket-container h3, .ticket-container td, .ticket-container th, .ticket-container strong, .ticket-container div {
+                color: #000000 !important;
+            }
+            
+            /* Excepción para textos que deben ser blancos (como en el header de color) */
+            .header-text {
+                color: #ffffff !important;
+            }
+        }
+        
+        /* Estilo visual en pantalla */
+        .ticket-container {
+            width: 100%;
+            max-width: 850px;
+            margin: auto;
+            border: 1px solid #ddd;
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            background-color: white;
+            color: black; /* Texto negro por defecto en pantalla */
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
         st.success("✅ Guardado. El recibo está optimizado para ocupar media página.")
 
-        # HTML Extra
+        # Datos extra HTML
         datos_extra_html = ""
         if r.get('alumno_nie'):
             datos_extra_html = f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Alumno:</td><td style="padding: 8px; color: #000;">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td><td style="padding: 8px; font-weight: bold; color: #000;">Grado:</td><td style="padding: 8px; color: #000;">{r.get('alumno_grado')}</td></tr>"""
         else:
             datos_extra_html = f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Beneficiario:</td><td style="padding: 8px; color: #000;" colspan="3">{r.get('nombre_persona', 'N/A')}</td></tr>"""
 
-        # HTML RECIBO (Todo el texto forzado a negro o gris oscuro)
+        # HTML RECIBO (CLASES ESPECIFICAS PARA CONTROLAR COLOR)
         html_ticket = f"""
 <div class="ticket-container">
-<div style="background-color: {color_tema}; color: white !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
+<div style="background-color: {color_tema}; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
 <div style="display: flex; align-items: center; gap: 15px;">
 <div style="background: white; padding: 5px; border-radius: 4px;">{img_html}</div>
-<div><h3 style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin: 0; font-size: 12px; opacity: 0.9; color: white;">San Felipe, El Salvador</p></div>
+<div><h3 class="header-text" style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p class="header-text" style="margin: 0; font-size: 12px; opacity: 0.9; color: white;">San Felipe, El Salvador</p></div>
 </div>
-<div style="text-align: right;"><h4 style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4><p style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
+<div style="text-align: right;"><h4 class="header-text" style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4><p class="header-text" style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
 </div>
 <div style="padding: 20px;">
 <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #000;">
@@ -208,7 +256,20 @@ elif opcion == "Finanzas":
 
     # --- 2. MODO REPORTE GENERAL ---
     elif st.session_state.reporte_html:
-        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; color: black !important; } }</style>""", unsafe_allow_html=True)
+        st.markdown("""
+        <style>
+        @media print { 
+            @page { margin: 10mm; size: landscape; } 
+            header, footer, aside, .stDeployButton { display: none !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .report-print { 
+                position: fixed !important; left: 0; top: 0; width: 100%; height: 100%; 
+                margin: 0; padding: 20px; background-color: white !important; z-index: 999999; 
+            }
+            .report-print * { color: #000000 !important; visibility: visible !important; }
+            .report-header-text { color: #ffffff !important; } /* Si hubiese texto blanco sobre fondo oscuro */
+        }
+        </style>""", unsafe_allow_html=True)
         
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
         
@@ -276,7 +337,7 @@ elif opcion == "Finanzas":
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE (SOLUCIÓN ERROR PANDAS + TEXTO BLANCO)
+        # 3. REPORTE (SOLUCIÓN DEFINITIVA A PANTALLA ROJA)
         with tab3:
             st.subheader("Generación de Reportes PDF")
             
@@ -291,19 +352,14 @@ elif opcion == "Finanzas":
                 lista_final = []
                 for doc in docs:
                     d = doc.to_dict()
-                    # --- FILTRO MANUAL SIN PANDAS PARA EVITAR ERROR ---
                     raw_date = d.get("fecha_dt") or d.get("fecha")
-                    fecha_valida = False
-                    
-                    # Convertimos a objeto date de Python
                     f_obj = None
+                    # Lógica de conversión de fechas robusta
                     if raw_date:
                         if hasattr(raw_date, "date"): f_obj = raw_date.date()
                         elif isinstance(raw_date, datetime): f_obj = raw_date.date()
                     
-                    # Filtramos fecha AQUÍ mismo
                     if f_obj and (fecha_ini <= f_obj <= fecha_fin):
-                        # Filtramos tipo AQUÍ mismo
                         if tipo_filtro == "Solo Ingresos" and d.get("tipo") != "ingreso": continue
                         if tipo_filtro == "Solo Egresos" and d.get("tipo") != "egreso": continue
                         
@@ -320,7 +376,6 @@ elif opcion == "Finanzas":
                 if not lista_final:
                     st.warning("No hay datos para generar el reporte con esos filtros.")
                 else:
-                    # CONSTRUIR HTML DEL REPORTE (TEXTO FORZADO A NEGRO)
                     df = pd.DataFrame(lista_final)
                     t_ing = df[df['tipo']=='ingreso']['monto'].sum()
                     t_egr = df[df['tipo']=='egreso']['monto'].sum()

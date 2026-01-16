@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime
 import json
+import base64
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
@@ -16,12 +17,8 @@ def conectar_firebase():
             key_dict = dict(st.secrets["firebase_key"])
             cred = credentials.Certificate(key_dict)
         else:
-            # Si estás en local y usas el archivo json
             cred = credentials.Certificate("credenciales.json") 
-            
-        firebase_admin.initialize_app(cred, {
-            'storageBucket': 'gestioncbeh.firebasestorage.app' 
-        })
+        firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
     return firestore.client()
 
 try:
@@ -31,7 +28,7 @@ except Exception as e:
     st.error(f"⚠️ Error conectando a Firebase: {e}")
     conexion_exitosa = False
 
-# --- FUNCIÓN AYUDANTE PARA SUBIR FOTOS ---
+# --- FUNCIÓN: SUBIR FOTOS ---
 def subir_archivo(archivo, ruta_carpeta):
     if archivo is None: return None
     try:
@@ -46,13 +43,20 @@ def subir_archivo(archivo, ruta_carpeta):
         st.error(f"Error subiendo archivo: {e}")
         return None
 
+# --- FUNCIÓN: LOGO A BASE64 (PARA IMPRESIÓN) ---
+def get_image_base64(path):
+    try:
+        with open(path, "rb") as image_file:
+            encoded = base64.b64encode(image_file.read()).decode()
+        return f"data:image/png;base64,{encoded}"
+    except:
+        return "" # Si no hay logo, no rompe el código
+
 # --- BARRA LATERAL ---
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.warning("⚠️ Falta 'logo.png'")
-    
     st.markdown("---")
-    st.header("Menú Principal")
     opcion = st.radio("Navegación:", ["Inicio", "Inscripción Alumnos", "Consulta Alumnos", "Finanzas", "Notas", "Configuración"])
     st.markdown("---")
     if conexion_exitosa: st.success("🟢 Conectado")
@@ -60,7 +64,7 @@ with st.sidebar:
 if not conexion_exitosa: st.stop() 
 
 # ==========================================
-# 1. PANTALLA DE INICIO
+# 1. INICIO
 # ==========================================
 if opcion == "Inicio":
     st.title("🍎 Panel de Control")
@@ -71,7 +75,7 @@ if opcion == "Inicio":
     c3.metric("Estado", "Activo")
 
 # ==========================================
-# 2. PANTALLA DE INSCRIPCIÓN
+# 2. INSCRIPCIÓN
 # ==========================================
 elif opcion == "Inscripción Alumnos":
     st.title("📝 Nueva Inscripción")
@@ -98,12 +102,8 @@ elif opcion == "Inscripción Alumnos":
             with st.spinner("Guardando..."):
                 ruta = f"expedientes/{nie}"
                 datos = {
-                    "nie": nie, 
-                    "nombre_completo": f"{nombres} {apellidos}", 
-                    "nombres": nombres,
-                    "apellidos": apellidos,
-                    "grado_actual": grado,
-                    "estado": estado,
+                    "nie": nie, "nombre_completo": f"{nombres} {apellidos}", "nombres": nombres, "apellidos": apellidos,
+                    "grado_actual": grado, "estado": estado,
                     "encargado": {"nombre": encargado, "telefono": telefono, "direccion": direccion},
                     "documentos": {"foto_url": subir_archivo(foto, ruta)},
                     "fecha_registro": firestore.SERVER_TIMESTAMP
@@ -112,13 +112,13 @@ elif opcion == "Inscripción Alumnos":
                 st.success("✅ Alumno registrado")
 
 # ==========================================
-# 3. PANTALLA DE CONSULTA
+# 3. CONSULTA
 # ==========================================
 elif opcion == "Consulta Alumnos":
     st.title("🔎 Expediente")
-    nie_busqueda = st.text_input("Buscar NIE:")
-    if st.button("Buscar") and nie_busqueda:
-        doc = db.collection("alumnos").document(nie_busqueda).get()
+    nie_bus = st.text_input("Buscar NIE:")
+    if st.button("Buscar") and nie_bus:
+        doc = db.collection("alumnos").document(nie_bus).get()
         if doc.exists:
             d = doc.to_dict()
             c1, c2 = st.columns([1, 3])
@@ -132,7 +132,7 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. PANTALLA DE FINANZAS (CORREGIDA)
+# 4. FINANZAS (CORREGIDO: LOGO, NOMBRE Y FILTROS)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -147,7 +147,10 @@ elif opcion == "Finanzas":
         color = "#2e7d32" if es_ingreso else "#c62828"
         titulo = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         
-        # CSS PARA IMPRESIÓN LIMPIA
+        # Obtenemos el logo en base64
+        logo_img = get_image_base64("logo.png")
+        img_html = f'<img src="{logo_img}" style="width: 80px; vertical-align: middle; margin-right: 15px;">' if logo_img else ""
+
         st.markdown("""
             <style>
             @media print {
@@ -162,22 +165,19 @@ elif opcion == "Finanzas":
         
         st.success("✅ Guardado. Listo para imprimir.")
 
-        # Preparamos HTML extra para NIE y Grado
         html_extra = ""
         if r.get('alumno_nie'):
-            html_extra = f"""
-            <div style="margin: 5px 0; font-size: 14px;">
-                <strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;&nbsp;|&nbsp;&nbsp; 
-                <strong>🎓 Grado:</strong> {r.get('alumno_grado')}
-            </div>
-            """
+            html_extra = f"""<div style="margin: 5px 0; font-size: 14px;"><strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;|&nbsp; <strong>🎓 Grado:</strong> {r.get('alumno_grado')}</div>"""
 
-        # --- HTML DEL RECIBO (PEGADO A LA IZQUIERDA PARA EVITAR PANTALLA NEGRA) ---
+        # HTML TOTALMENTE PEGADO A LA IZQUIERDA
         html_ticket = f"""
 <div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
-<div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px;">
-<h2 style="margin: 0; color: {color};">🏫 COLEGIO PROFA. BLANCA ELENA</h2>
+<div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px; display: flex; align-items: center; justify-content: center;">
+{img_html}
+<div>
+<h2 style="margin: 0; color: {color};">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
 <p style="color: gray; margin: 5px; font-size: 14px;">{titulo}</p>
+</div>
 </div>
 <br>
 <table style="width: 100%; border-collapse: collapse;">
@@ -214,7 +214,7 @@ elif opcion == "Finanzas":
             st.info("Presiona **Ctrl + P** para imprimir.")
 
     else:
-        # --- PANTALLAS DE GESTIÓN FINANCIERA ---
+        # --- PANTALLAS DE GESTIÓN ---
         tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte"])
         
         # 1. INGRESOS
@@ -248,6 +248,7 @@ elif opcion == "Finanzas":
                                 "metodo": met, 
                                 "observaciones": obs,
                                 "fecha": firestore.SERVER_TIMESTAMP,
+                                "fecha_dt": datetime.now(), # Para filtrar por fecha
                                 "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                             }
                             db.collection("finanzas").add(data)
@@ -272,53 +273,80 @@ elif opcion == "Finanzas":
                         "nombre_persona": prov, 
                         "observaciones": obs,
                         "fecha": firestore.SERVER_TIMESTAMP,
+                        "fecha_dt": datetime.now(),
                         "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                     }
                     db.collection("finanzas").add(data)
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE (BLINDADO CONTRA ERRORES KEYERROR)
+        # 3. REPORTE (CON FILTROS)
         with tab3:
             st.subheader("Balance: Ingresos vs Egresos")
-            if st.button("🔄 Actualizar"): st.rerun()
+            
+            # --- FILTROS ---
+            col_fil1, col_fil2, col_fil3 = st.columns(3)
+            fecha_ini = col_fil1.date_input("Desde", value=datetime(datetime.now().year, 1, 1))
+            fecha_fin = col_fil2.date_input("Hasta", value=datetime.now())
+            tipo_filtro = col_fil3.selectbox("Tipo Movimiento", ["Todos", "Ingresos", "Egresos"])
+
+            if st.button("🔄 Actualizar Reporte"): st.rerun()
             
             docs = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).stream()
             
             lista_final = []
             for doc in docs:
                 d = doc.to_dict()
-                # --- AQUÍ ESTÁ EL ARREGLO PARA KEYERROR ---
-                # Usamos .get() para todo, así si falta un dato, no se rompe
-                item_seguro = {
-                    "fecha_legible": d.get("fecha_legible", "Fecha desc."),
+                # Recuperar fecha real para filtrar
+                fecha_obj = d.get("fecha_dt")
+                if not fecha_obj and d.get("fecha"): 
+                     # Intento de compatibilidad con datos viejos
+                     fecha_obj = d.get("fecha").date() if hasattr(d.get("fecha"), "date") else None
+
+                item = {
+                    "fecha_obj": fecha_obj, # Campo oculto para filtrar
+                    "fecha_legible": d.get("fecha_legible", "Sin Fecha"),
                     "tipo": d.get("tipo", "Desconocido"),
-                    # Busca el nombre en cualquier campo posible
-                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "Desconocido",
+                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
                     "nie": d.get("alumno_nie", "-"),
                     "descripcion": d.get("descripcion", "-"),
                     "monto": d.get("monto", 0.0)
                 }
-                lista_final.append(item_seguro)
+                lista_final.append(item)
             
             if lista_final:
                 df = pd.DataFrame(lista_final)
                 
-                # Filtramos ingresos y egresos de forma segura
-                t_ing = df[df['tipo']=='ingreso']['monto'].sum()
-                t_egr = df[df['tipo']=='egreso']['monto'].sum()
-                
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Ingresos", f"${t_ing:,.2f}")
-                m2.metric("Gastos", f"${t_egr:,.2f}")
-                m3.metric("Balance", f"${t_ing - t_egr:,.2f}")
-                
-                st.dataframe(
-                    df[['fecha_legible', 'tipo', 'nie', 'nombre_persona', 'descripcion', 'monto']],
-                    use_container_width=True
-                )
+                # --- APLICAR FILTROS ---
+                # 1. Filtro de Fecha (convertimos todo a date para comparar)
+                if not df.empty and 'fecha_obj' in df.columns:
+                    # Normalizamos la columna fecha_obj para que sean objetos date
+                    df['fecha_obj'] = pd.to_datetime(df['fecha_obj'], errors='coerce').dt.date
+                    df = df[(df['fecha_obj'] >= fecha_ini) & (df['fecha_obj'] <= fecha_fin)]
+
+                # 2. Filtro de Tipo
+                if tipo_filtro == "Ingresos":
+                    df = df[df['tipo'] == 'ingreso']
+                elif tipo_filtro == "Egresos":
+                    df = df[df['tipo'] == 'egreso']
+
+                if not df.empty:
+                    t_ing = df[df['tipo']=='ingreso']['monto'].sum()
+                    t_egr = df[df['tipo']=='egreso']['monto'].sum()
+                    
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("Ingresos", f"${t_ing:,.2f}")
+                    m2.metric("Gastos", f"${t_egr:,.2f}")
+                    m3.metric("Balance (Periodo)", f"${t_ing - t_egr:,.2f}")
+                    
+                    st.dataframe(
+                        df[['fecha_legible', 'tipo', 'nie', 'nombre_persona', 'descripcion', 'monto']],
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No hay datos en este rango de fechas.")
             else:
-                st.info("No hay movimientos.")
+                st.info("No hay movimientos registrados.")
 
 # ==========================================
 # 5. NOTAS

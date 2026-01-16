@@ -3,13 +3,12 @@ import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime
-import json
 import base64
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
 
-# --- CONEXIÓN INTELIGENTE (NUBE Y LOCAL) ---
+# --- CONEXIÓN INTELIGENTE ---
 @st.cache_resource
 def conectar_firebase():
     if not firebase_admin._apps:
@@ -28,7 +27,7 @@ except Exception as e:
     st.error(f"⚠️ Error conectando a Firebase: {e}")
     conexion_exitosa = False
 
-# --- FUNCIÓN: SUBIR FOTOS ---
+# --- FUNCIONES AUXILIARES ---
 def subir_archivo(archivo, ruta_carpeta):
     if archivo is None: return None
     try:
@@ -43,21 +42,20 @@ def subir_archivo(archivo, ruta_carpeta):
         st.error(f"Error subiendo archivo: {e}")
         return None
 
-# --- FUNCIÓN: LOGO A BASE64 (PARA IMPRESIÓN) ---
 def get_image_base64(path):
     try:
         with open(path, "rb") as image_file:
             encoded = base64.b64encode(image_file.read()).decode()
         return f"data:image/png;base64,{encoded}"
     except:
-        return "" # Si no hay logo, no rompe el código
+        return "" 
 
-# --- BARRA LATERAL ---
+# --- MENÚ LATERAL ---
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.warning("⚠️ Falta 'logo.png'")
     st.markdown("---")
-    opcion = st.radio("Navegación:", ["Inicio", "Inscripción Alumnos", "Consulta Alumnos", "Finanzas", "Notas", "Configuración"])
+    opcion = st.radio("Menú Principal:", ["Inicio", "Inscripción Alumnos", "Consulta Alumnos", "Finanzas", "Notas", "Configuración"])
     st.markdown("---")
     if conexion_exitosa: st.success("🟢 Conectado")
 
@@ -132,12 +130,12 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. FINANZAS (CORREGIDO: LOGO, NOMBRE Y FILTROS)
+# 4. FINANZAS (CORREGIDO Y BLINDADO)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
     
-    # --- LÓGICA DE IMPRESIÓN ---
+    # --- PANTALLA DE IMPRESIÓN ---
     if 'recibo_temp' not in st.session_state:
         st.session_state.recibo_temp = None
 
@@ -147,7 +145,6 @@ elif opcion == "Finanzas":
         color = "#2e7d32" if es_ingreso else "#c62828"
         titulo = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         
-        # Obtenemos el logo en base64
         logo_img = get_image_base64("logo.png")
         img_html = f'<img src="{logo_img}" style="width: 80px; vertical-align: middle; margin-right: 15px;">' if logo_img else ""
 
@@ -165,11 +162,11 @@ elif opcion == "Finanzas":
         
         st.success("✅ Guardado. Listo para imprimir.")
 
+        # HTML EXTRA SIN ESPACIOS (SOLUCIÓN CUADRO NEGRO)
         html_extra = ""
         if r.get('alumno_nie'):
             html_extra = f"""<div style="margin: 5px 0; font-size: 14px;"><strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;|&nbsp; <strong>🎓 Grado:</strong> {r.get('alumno_grado')}</div>"""
 
-        # HTML TOTALMENTE PEGADO A LA IZQUIERDA
         html_ticket = f"""
 <div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
 <div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px; display: flex; align-items: center; justify-content: center;">
@@ -248,7 +245,7 @@ elif opcion == "Finanzas":
                                 "metodo": met, 
                                 "observaciones": obs,
                                 "fecha": firestore.SERVER_TIMESTAMP,
-                                "fecha_dt": datetime.now(), # Para filtrar por fecha
+                                "fecha_dt": datetime.now(),
                                 "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                             }
                             db.collection("finanzas").add(data)
@@ -280,15 +277,13 @@ elif opcion == "Finanzas":
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE (CON FILTROS)
+        # 3. REPORTE (SOLUCIÓN ERROR FECHAS)
         with tab3:
             st.subheader("Balance: Ingresos vs Egresos")
-            
-            # --- FILTROS ---
-            col_fil1, col_fil2, col_fil3 = st.columns(3)
-            fecha_ini = col_fil1.date_input("Desde", value=datetime(datetime.now().year, 1, 1))
-            fecha_fin = col_fil2.date_input("Hasta", value=datetime.now())
-            tipo_filtro = col_fil3.selectbox("Tipo Movimiento", ["Todos", "Ingresos", "Egresos"])
+            col_f1, col_f2, col_f3 = st.columns(3)
+            f_ini = col_f1.date_input("Desde", value=datetime(datetime.now().year, 1, 1))
+            f_fin = col_f2.date_input("Hasta", value=datetime.now())
+            tipo = col_f3.selectbox("Tipo", ["Todos", "Ingresos", "Egresos"])
 
             if st.button("🔄 Actualizar Reporte"): st.rerun()
             
@@ -297,14 +292,19 @@ elif opcion == "Finanzas":
             lista_final = []
             for doc in docs:
                 d = doc.to_dict()
-                # Recuperar fecha real para filtrar
-                fecha_obj = d.get("fecha_dt")
-                if not fecha_obj and d.get("fecha"): 
-                     # Intento de compatibilidad con datos viejos
-                     fecha_obj = d.get("fecha").date() if hasattr(d.get("fecha"), "date") else None
-
+                # --- NORMALIZACIÓN DE FECHAS SEGURA ---
+                raw_date = d.get("fecha_dt") or d.get("fecha")
+                fecha_obj = None
+                
+                # Intentamos convertir lo que venga a un objeto date
+                if raw_date:
+                    if hasattr(raw_date, "date"): 
+                        fecha_obj = raw_date.date()
+                    elif isinstance(raw_date, datetime):
+                        fecha_obj = raw_date.date()
+                
                 item = {
-                    "fecha_obj": fecha_obj, # Campo oculto para filtrar
+                    "fecha_obj": fecha_obj, # Objeto date puro para filtrar
                     "fecha_legible": d.get("fecha_legible", "Sin Fecha"),
                     "tipo": d.get("tipo", "Desconocido"),
                     "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
@@ -317,18 +317,14 @@ elif opcion == "Finanzas":
             if lista_final:
                 df = pd.DataFrame(lista_final)
                 
-                # --- APLICAR FILTROS ---
-                # 1. Filtro de Fecha (convertimos todo a date para comparar)
-                if not df.empty and 'fecha_obj' in df.columns:
-                    # Normalizamos la columna fecha_obj para que sean objetos date
-                    df['fecha_obj'] = pd.to_datetime(df['fecha_obj'], errors='coerce').dt.date
-                    df = df[(df['fecha_obj'] >= fecha_ini) & (df['fecha_obj'] <= fecha_fin)]
+                # Filtro por Rango de Fechas (Python puro, más seguro que Pandas)
+                # Eliminamos filas sin fecha válida para el filtro
+                df = df.dropna(subset=['fecha_obj'])
+                df = df[(df['fecha_obj'] >= f_ini) & (df['fecha_obj'] <= f_fin)]
 
-                # 2. Filtro de Tipo
-                if tipo_filtro == "Ingresos":
-                    df = df[df['tipo'] == 'ingreso']
-                elif tipo_filtro == "Egresos":
-                    df = df[df['tipo'] == 'egreso']
+                # Filtro por Tipo
+                if tipo == "Ingresos": df = df[df['tipo'] == 'ingreso']
+                elif tipo == "Egresos": df = df[df['tipo'] == 'egreso']
 
                 if not df.empty:
                     t_ing = df[df['tipo']=='ingreso']['monto'].sum()
@@ -337,16 +333,16 @@ elif opcion == "Finanzas":
                     m1, m2, m3 = st.columns(3)
                     m1.metric("Ingresos", f"${t_ing:,.2f}")
                     m2.metric("Gastos", f"${t_egr:,.2f}")
-                    m3.metric("Balance (Periodo)", f"${t_ing - t_egr:,.2f}")
+                    m3.metric("Balance", f"${t_ing - t_egr:,.2f}")
                     
                     st.dataframe(
                         df[['fecha_legible', 'tipo', 'nie', 'nombre_persona', 'descripcion', 'monto']],
                         use_container_width=True
                     )
                 else:
-                    st.warning("No hay datos en este rango de fechas.")
+                    st.warning("No hay datos en este rango.")
             else:
-                st.info("No hay movimientos registrados.")
+                st.info("No hay movimientos.")
 
 # ==========================================
 # 5. NOTAS

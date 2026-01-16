@@ -130,7 +130,7 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. FINANZAS (RECIBOS MEJORADOS)
+# 4. FINANZAS
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -144,7 +144,7 @@ elif opcion == "Finanzas":
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
         
-        # Colores y Estilos
+        # Colores
         color_tema = "#2e7d32" if es_ingreso else "#c62828"
         bg_header = "#e8f5e9" if es_ingreso else "#ffebee"
         titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
@@ -152,48 +152,46 @@ elif opcion == "Finanzas":
         logo_img = get_image_base64("logo.png")
         img_html = f'<img src="{logo_img}" style="height: 70px; object-fit: contain;">' if logo_img else ""
 
-        # CSS
-        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .ticket-container { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: 'Helvetica', 'Arial', sans-serif; background-color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }</style>""", unsafe_allow_html=True)
+        # CSS: Forzamos color NEGRO (#000) en el texto para que no salga blanco al imprimir
+        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .ticket-container { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: 'Helvetica', 'Arial', sans-serif; background-color: white; color: #000000 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }</style>""", unsafe_allow_html=True)
         
         st.success("✅ Guardado. El recibo está optimizado para ocupar media página.")
 
-        # Datos extra HTML (PEGADO A LA IZQUIERDA)
+        # HTML Extra
         datos_extra_html = ""
         if r.get('alumno_nie'):
-            datos_extra_html = f"""
-<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">Alumno:</td><td style="padding: 8px;">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td><td style="padding: 8px; font-weight: bold; color: #555;">Grado:</td><td style="padding: 8px;">{r.get('alumno_grado')}</td></tr>"""
+            datos_extra_html = f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Alumno:</td><td style="padding: 8px; color: #000;">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td><td style="padding: 8px; font-weight: bold; color: #000;">Grado:</td><td style="padding: 8px; color: #000;">{r.get('alumno_grado')}</td></tr>"""
         else:
-            datos_extra_html = f"""
-<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">Beneficiario:</td><td style="padding: 8px;" colspan="3">{r.get('nombre_persona', 'N/A')}</td></tr>"""
+            datos_extra_html = f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Beneficiario:</td><td style="padding: 8px; color: #000;" colspan="3">{r.get('nombre_persona', 'N/A')}</td></tr>"""
 
-        # HTML DEL RECIBO (SIN ESPACIOS A LA IZQUIERDA)
+        # HTML RECIBO (Todo el texto forzado a negro o gris oscuro)
         html_ticket = f"""
 <div class="ticket-container">
-<div style="background-color: {color_tema}; color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
+<div style="background-color: {color_tema}; color: white !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
 <div style="display: flex; align-items: center; gap: 15px;">
 <div style="background: white; padding: 5px; border-radius: 4px;">{img_html}</div>
-<div><h3 style="margin: 0; font-size: 18px;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin: 0; font-size: 12px; opacity: 0.9;">San Felipe, El Salvador</p></div>
+<div><h3 style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin: 0; font-size: 12px; opacity: 0.9; color: white;">San Felipe, El Salvador</p></div>
 </div>
-<div style="text-align: right;"><h4 style="margin: 0; font-size: 16px;">{titulo_doc}</h4><p style="margin: 0; font-size: 14px;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
+<div style="text-align: right;"><h4 style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4><p style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
 </div>
 <div style="padding: 20px;">
-<table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #000;">
 {datos_extra_html}
-<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">Fecha:</td><td style="padding: 8px;">{r['fecha_legible']}</td><td style="padding: 8px; font-weight: bold; color: #555;">Método Pago:</td><td style="padding: 8px;">{r.get('metodo', 'Efectivo')}</td></tr>
+<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Fecha:</td><td style="padding: 8px; color: #000;">{r['fecha_legible']}</td><td style="padding: 8px; font-weight: bold; color: #000;">Método Pago:</td><td style="padding: 8px; color: #000;">{r.get('metodo', 'Efectivo')}</td></tr>
 </table>
 <br>
-<table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px;">
-<thead style="background-color: #f9f9f9;"><tr><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Descripción / Concepto</th><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Observaciones</th><th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema}; width: 120px;">Monto</th></tr></thead>
-<tbody><tr><td style="padding: 15px 10px;">{r['descripcion']}</td><td style="padding: 15px 10px; color: #666;">{r.get('observaciones', '-')}</td><td style="padding: 15px 10px; text-align: right; font-weight: bold; font-size: 16px;">${r['monto']:.2f}</td></tr></tbody>
+<table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px; color: #000;">
+<thead style="background-color: #f9f9f9;"><tr><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema}; color: #000;">Descripción / Concepto</th><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema}; color: #000;">Observaciones</th><th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema}; width: 120px; color: #000;">Monto</th></tr></thead>
+<tbody><tr><td style="padding: 15px 10px; color: #000;">{r['descripcion']}</td><td style="padding: 15px 10px; color: #444;">{r.get('observaciones', '-')}</td><td style="padding: 15px 10px; text-align: right; font-weight: bold; font-size: 16px; color: #000;">${r['monto']:.2f}</td></tr></tbody>
 </table>
 <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
-<div style="font-size: 12px; color: #888;"><p>Recibo generado electrónicamente.<br>Conserve este documento para cualquier reclamo.</p></div>
-<div style="text-align: right;"><p style="margin: 0; font-size: 14px; color: #666;">Total Pagado:</p><h1 style="margin: 0; color: {color_tema}; font-size: 28px;">${r['monto']:.2f}</h1></div>
+<div style="font-size: 12px; color: #666;"><p>Recibo generado electrónicamente.<br>Conserve este documento para cualquier reclamo.</p></div>
+<div style="text-align: right;"><p style="margin: 0; font-size: 14px; color: #444;">Total Pagado:</p><h1 style="margin: 0; color: {color_tema}; font-size: 28px;">${r['monto']:.2f}</h1></div>
 </div>
 <br><br>
 <div style="display: flex; justify-content: space-between; gap: 40px; margin-top: 10px;">
-<div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #444;">Firma y Sello Colegio</div>
-<div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #444;">Firma Conforme</div>
+<div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #000;">Firma y Sello Colegio</div>
+<div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #000;">Firma Conforme</div>
 </div>
 </div>
 <div style="border-top: 2px dashed #ccc; margin-top: 20px; padding-top: 10px; text-align: center; color: #ccc; font-size: 10px;">✂️ -- Corte aquí -- ✂️</div>
@@ -210,7 +208,7 @@ elif opcion == "Finanzas":
 
     # --- 2. MODO REPORTE GENERAL ---
     elif st.session_state.reporte_html:
-        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; } }</style>""", unsafe_allow_html=True)
+        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; color: black !important; } }</style>""", unsafe_allow_html=True)
         
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
         
@@ -278,7 +276,7 @@ elif opcion == "Finanzas":
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE FORMAL (TABLA BONITA)
+        # 3. REPORTE (SOLUCIÓN ERROR PANDAS + TEXTO BLANCO)
         with tab3:
             st.subheader("Generación de Reportes PDF")
             
@@ -293,34 +291,37 @@ elif opcion == "Finanzas":
                 lista_final = []
                 for doc in docs:
                     d = doc.to_dict()
+                    # --- FILTRO MANUAL SIN PANDAS PARA EVITAR ERROR ---
                     raw_date = d.get("fecha_dt") or d.get("fecha")
-                    fecha_obj = None
-                    if raw_date:
-                        if hasattr(raw_date, "date"): fecha_obj = raw_date.date()
-                        elif isinstance(raw_date, datetime): fecha_obj = raw_date.date()
+                    fecha_valida = False
                     
-                    item = {
-                        "fecha_obj": fecha_obj, 
-                        "fecha": d.get("fecha_legible", "-"),
-                        "tipo": d.get("tipo", "Desconocido"),
-                        "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
-                        "nie": d.get("alumno_nie", "-"),
-                        "concepto": d.get("descripcion", "-"),
-                        "monto": d.get("monto", 0.0)
-                    }
-                    lista_final.append(item)
+                    # Convertimos a objeto date de Python
+                    f_obj = None
+                    if raw_date:
+                        if hasattr(raw_date, "date"): f_obj = raw_date.date()
+                        elif isinstance(raw_date, datetime): f_obj = raw_date.date()
+                    
+                    # Filtramos fecha AQUÍ mismo
+                    if f_obj and (fecha_ini <= f_obj <= fecha_fin):
+                        # Filtramos tipo AQUÍ mismo
+                        if tipo_filtro == "Solo Ingresos" and d.get("tipo") != "ingreso": continue
+                        if tipo_filtro == "Solo Egresos" and d.get("tipo") != "egreso": continue
+                        
+                        item = {
+                            "fecha": d.get("fecha_legible", "-"),
+                            "tipo": d.get("tipo", "Desconocido"),
+                            "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
+                            "nie": d.get("alumno_nie", "-"),
+                            "concepto": d.get("descripcion", "-"),
+                            "monto": d.get("monto", 0.0)
+                        }
+                        lista_final.append(item)
                 
-                df = pd.DataFrame(lista_final)
-                if not df.empty:
-                    df = df.dropna(subset=['fecha_obj'])
-                    df = df[(df['fecha_obj'] >= fecha_ini) & (df['fecha_obj'] <= fecha_fin)]
-                    if tipo_filtro == "Solo Ingresos": df = df[df['tipo'] == 'ingreso']
-                    elif tipo_filtro == "Solo Egresos": df = df[df['tipo'] == 'egreso']
-
-                if df.empty:
+                if not lista_final:
                     st.warning("No hay datos para generar el reporte con esos filtros.")
                 else:
-                    # CONSTRUIR HTML DEL REPORTE (PEGADO A LA IZQUIERDA)
+                    # CONSTRUIR HTML DEL REPORTE (TEXTO FORZADO A NEGRO)
+                    df = pd.DataFrame(lista_final)
                     t_ing = df[df['tipo']=='ingreso']['monto'].sum()
                     t_egr = df[df['tipo']=='egreso']['monto'].sum()
                     balance = t_ing - t_egr
@@ -331,24 +332,24 @@ elif opcion == "Finanzas":
                     filas_html = ""
                     for index, row in df.iterrows():
                         color_tipo = "green" if row['tipo'] == 'ingreso' else "red"
-                        filas_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px;">{row['fecha']}</td><td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td><td style="padding: 8px;">{row['persona']}</td><td style="padding: 8px;">{row['concepto']}</td><td style="padding: 8px; text-align: right;">${row['monto']:.2f}</td></tr>"""
+                        filas_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; color:#000;">{row['fecha']}</td><td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td><td style="padding: 8px; color:#000;">{row['persona']}</td><td style="padding: 8px; color:#000;">{row['concepto']}</td><td style="padding: 8px; text-align: right; color:#000;">${row['monto']:.2f}</td></tr>"""
 
                     html_reporte = f"""
-<div class="report-print" style="font-family: Arial, sans-serif; padding: 20px;">
+<div class="report-print" style="font-family: Arial, sans-serif; padding: 20px; color: black !important;">
 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
 <div style="display: flex; align-items: center; gap: 15px;">
 {logo_html}
-<div><h2 style="margin: 0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2><p style="margin: 0; color: gray;">Reporte Financiero Detallado</p></div>
+<div><h2 style="margin: 0; color:black;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2><p style="margin: 0; color: gray;">Reporte Financiero Detallado</p></div>
 </div>
-<div style="text-align: right;"><p style="margin: 0;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p><p style="margin: 0;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p></div>
+<div style="text-align: right;"><p style="margin: 0; color:black;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p><p style="margin: 0; color:black;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p></div>
 </div>
 <div style="display: flex; gap: 20px; margin: 20px 0;">
-<div style="flex: 1; background: #e8f5e9; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #2e7d32;">INGRESOS</h4><h2 style="margin:5px 0;">${t_ing:,.2f}</h2></div>
-<div style="flex: 1; background: #ffebee; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #c62828;">EGRESOS</h4><h2 style="margin:5px 0;">${t_egr:,.2f}</h2></div>
-<div style="flex: 1; background: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #1565c0;">BALANCE</h4><h2 style="margin:5px 0;">${balance:,.2f}</h2></div>
+<div style="flex: 1; background: #e8f5e9; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #2e7d32;">INGRESOS</h4><h2 style="margin:5px 0; color: #2e7d32;">${t_ing:,.2f}</h2></div>
+<div style="flex: 1; background: #ffebee; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #c62828;">EGRESOS</h4><h2 style="margin:5px 0; color: #c62828;">${t_egr:,.2f}</h2></div>
+<div style="flex: 1; background: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #1565c0;">BALANCE</h4><h2 style="margin:5px 0; color: #1565c0;">${balance:,.2f}</h2></div>
 </div>
 <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
-<thead style="background-color: #f5f5f5;"><tr><th style="padding: 10px; text-align: left;">Fecha</th><th style="padding: 10px; text-align: left;">Tipo</th><th style="padding: 10px; text-align: left;">Responsable / Proveedor</th><th style="padding: 10px; text-align: left;">Concepto</th><th style="padding: 10px; text-align: right;">Monto</th></tr></thead>
+<thead style="background-color: #f5f5f5;"><tr><th style="padding: 10px; text-align: left; color:black;">Fecha</th><th style="padding: 10px; text-align: left; color:black;">Tipo</th><th style="padding: 10px; text-align: left; color:black;">Responsable / Proveedor</th><th style="padding: 10px; text-align: left; color:black;">Concepto</th><th style="padding: 10px; text-align: right; color:black;">Monto</th></tr></thead>
 <tbody>{filas_html}</tbody>
 </table>
 <br><p style="text-align: center; color: gray; font-size: 12px; margin-top: 30px;">Reporte generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}</p>

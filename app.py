@@ -123,7 +123,7 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno {nombres} {apellidos} inscrito correctamente!")
 
 # ==========================================
-# 3. CONSULTA ALUMNOS (RENOVADO: LISTADOS Y FICHA)
+# 3. CONSULTA ALUMNOS (FOTO AJUSTADA)
 # ==========================================
 elif opcion == "Consulta Alumnos":
     st.title("🔎 Directorio de Estudiantes")
@@ -157,7 +157,6 @@ elif opcion == "Consulta Alumnos":
         lista_alumnos = [d.to_dict() for d in docs]
         
         if lista_alumnos:
-            # Crear diccionario para el selectbox: "NIE - Nombre"
             opciones = {f"{a['nie']} - {a['nombre_completo']}": a for a in lista_alumnos}
             seleccion = st.selectbox("Seleccione un alumno de la lista:", ["Seleccionar..."] + list(opciones.keys()))
             
@@ -166,30 +165,28 @@ elif opcion == "Consulta Alumnos":
         else:
             st.info("No hay alumnos registrados en este grado.")
 
-    # --- VISUALIZACIÓN DE LA FICHA (CARNET + TABS) ---
+    # --- VISUALIZACIÓN DE LA FICHA ---
     if alumno_seleccionado:
         st.markdown("---")
         
-        # Encabezado Tipo Carnet
         col_foto, col_info = st.columns([1, 4])
         
         with col_foto:
             foto_url = alumno_seleccionado.get("documentos", {}).get("foto_url")
             if foto_url:
-                st.image(foto_url, width=150, caption="Foto de Perfil")
+                # AJUSTE: Width 100 para que se vea tamaño carnet (más pequeña)
+                st.image(foto_url, width=100) 
             else:
-                st.image("https://via.placeholder.com/150?text=Sin+Foto", width=150)
+                st.image("https://via.placeholder.com/150?text=Sin+Foto", width=100)
         
         with col_info:
             st.title(alumno_seleccionado['nombre_completo'])
             st.markdown(f"#### 🎓 {alumno_seleccionado.get('grado_actual', 'Sin Grado')}")
             
-            # Badge de Estado
             est = alumno_seleccionado.get('estado', 'Activo')
             color_est = "green" if est == "Activo" else "red"
             st.markdown(f"<span style='background-color:{color_est}; color:white; padding:5px 10px; border-radius:5px;'>{est}</span>", unsafe_allow_html=True)
 
-        # Pestañas de Información Vinculada
         tab_gral, tab_fin, tab_acad = st.tabs(["📋 Información General", "💰 Estado Financiero", "📊 Historial Académico"])
         
         with tab_gral:
@@ -208,14 +205,11 @@ elif opcion == "Consulta Alumnos":
 
         with tab_fin:
             st.subheader(f"Historial de Pagos: {alumno_seleccionado['nombre_completo']}")
-            
-            # Consulta automática de Finanzas por NIE
             pagos_ref = db.collection("finanzas").where("alumno_nie", "==", alumno_seleccionado['nie']).where("tipo", "==", "ingreso").stream()
             lista_pagos = [p.to_dict() for p in pagos_ref]
             
             if lista_pagos:
                 df_pagos = pd.DataFrame(lista_pagos)
-                # Convertir fecha para ordenar
                 df_pagos = df_pagos.sort_values(by="fecha_legible", ascending=False)
                 
                 total_pagado = df_pagos['monto'].sum()
@@ -234,10 +228,10 @@ elif opcion == "Consulta Alumnos":
                 st.info("⚠️ Este alumno no tiene pagos registrados en el sistema aún.")
 
         with tab_acad:
-            st.info("🚧 Módulo de Notas en construcción. Aquí aparecerán las boletas y promedios.")
+            st.info("🚧 Módulo de Notas en construcción.")
 
 # ==========================================
-# 4. FINANZAS (CONSERVANDO TU VERSIÓN PERFECTA)
+# 4. FINANZAS
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -245,7 +239,6 @@ elif opcion == "Finanzas":
     if 'recibo_temp' not in st.session_state: st.session_state.recibo_temp = None
     if 'reporte_html' not in st.session_state: st.session_state.reporte_html = None
 
-    # MODO RECIBO
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
@@ -297,6 +290,7 @@ elif opcion == "Finanzas":
 </div>
 """
         st.markdown(html_ticket, unsafe_allow_html=True)
+        
         c1, c2 = st.columns([1, 4])
         with c1:
             if st.button("❌ Cerrar Recibo", type="primary"):
@@ -304,7 +298,6 @@ elif opcion == "Finanzas":
                 st.rerun()
         with c2: st.info("Presiona **Ctrl + P** para imprimir.")
 
-    # MODO REPORTE
     elif st.session_state.reporte_html:
         st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; color: black !important; } }</style>""", unsafe_allow_html=True)
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)

@@ -132,7 +132,7 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. PANTALLA DE FINANZAS (COMPLETA)
+# 4. PANTALLA DE FINANZAS (CORREGIDA)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -147,6 +147,7 @@ elif opcion == "Finanzas":
         color = "#2e7d32" if es_ingreso else "#c62828"
         titulo = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         
+        # CSS PARA IMPRESIÓN LIMPIA
         st.markdown("""
             <style>
             @media print {
@@ -161,7 +162,7 @@ elif opcion == "Finanzas":
         
         st.success("✅ Guardado. Listo para imprimir.")
 
-        # Lógica para mostrar NIE y Grado solo si existen
+        # Preparamos HTML extra para NIE y Grado
         html_extra = ""
         if r.get('alumno_nie'):
             html_extra = f"""
@@ -171,34 +172,35 @@ elif opcion == "Finanzas":
             </div>
             """
 
+        # --- HTML DEL RECIBO (PEGADO A LA IZQUIERDA PARA EVITAR PANTALLA NEGRA) ---
         html_ticket = f"""
 <div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
-    <div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px;">
-        <h2 style="margin: 0; color: {color};">🏫 COLEGIO PROFA. BLANCA ELENA</h2>
-        <p style="color: gray; margin: 5px; font-size: 14px;">{titulo}</p>
-    </div>
-    <br>
-    <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-            <td><strong>Fecha:</strong> {r['fecha_legible']}</td>
-            <td style="text-align: right;"><strong>Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</td>
-        </tr>
-    </table>
-    <div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
-        <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
-        {html_extra}
-        <p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
-        <p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
-    </div>
-    <div style="text-align: right; margin-top: 25px;">
-        <p style="margin: 0; font-size: 14px; color: #666;">Método: {r.get('metodo', 'Efectivo')}</p>
-        <h1 style="margin: 5px 0; color: {color};">Total: ${r['monto']:.2f}</h1>
-    </div>
-    <br><br><br>
-    <div style="display: flex; justify-content: space-between; margin-top: 50px;">
-        <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma y Sello Colegio</div>
-        <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma Conforme</div>
-    </div>
+<div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px;">
+<h2 style="margin: 0; color: {color};">🏫 COLEGIO PROFA. BLANCA ELENA</h2>
+<p style="color: gray; margin: 5px; font-size: 14px;">{titulo}</p>
+</div>
+<br>
+<table style="width: 100%; border-collapse: collapse;">
+<tr>
+<td><strong>Fecha:</strong> {r['fecha_legible']}</td>
+<td style="text-align: right;"><strong>Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</td>
+</tr>
+</table>
+<div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
+<p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
+{html_extra}
+<p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
+<p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
+</div>
+<div style="text-align: right; margin-top: 25px;">
+<p style="margin: 0; font-size: 14px; color: #666;">Método: {r.get('metodo', 'Efectivo')}</p>
+<h1 style="margin: 5px 0; color: {color};">Total: ${r['monto']:.2f}</h1>
+</div>
+<br><br><br>
+<div style="display: flex; justify-content: space-between; margin-top: 50px;">
+<div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma y Sello Colegio</div>
+<div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma Conforme</div>
+</div>
 </div>
 """
         st.markdown(html_ticket, unsafe_allow_html=True)
@@ -241,8 +243,8 @@ elif opcion == "Finanzas":
                                 "descripcion": f"{conc} - {mes}", 
                                 "monto": monto,
                                 "nombre_persona": alum['nombre_completo'],
-                                "alumno_nie": alum.get('nie', ''),       # Guardamos NIE
-                                "alumno_grado": alum.get('grado_actual', ''), # Guardamos Grado
+                                "alumno_nie": alum.get('nie', ''),
+                                "alumno_grado": alum.get('grado_actual', ''),
                                 "metodo": met, 
                                 "observaciones": obs,
                                 "fecha": firestore.SERVER_TIMESTAMP,
@@ -276,7 +278,7 @@ elif opcion == "Finanzas":
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE
+        # 3. REPORTE (BLINDADO CONTRA ERRORES KEYERROR)
         with tab3:
             st.subheader("Balance: Ingresos vs Egresos")
             if st.button("🔄 Actualizar"): st.rerun()
@@ -286,11 +288,14 @@ elif opcion == "Finanzas":
             lista_final = []
             for doc in docs:
                 d = doc.to_dict()
+                # --- AQUÍ ESTÁ EL ARREGLO PARA KEYERROR ---
+                # Usamos .get() para todo, así si falta un dato, no se rompe
                 item_seguro = {
-                    "fecha_legible": d.get("fecha_legible", "Sin Fecha"),
+                    "fecha_legible": d.get("fecha_legible", "Fecha desc."),
                     "tipo": d.get("tipo", "Desconocido"),
-                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
-                    "nie": d.get("alumno_nie", "-"), # Leemos NIE para el reporte
+                    # Busca el nombre en cualquier campo posible
+                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "Desconocido",
+                    "nie": d.get("alumno_nie", "-"),
                     "descripcion": d.get("descripcion", "-"),
                     "monto": d.get("monto", 0.0)
                 }
@@ -298,6 +303,8 @@ elif opcion == "Finanzas":
             
             if lista_final:
                 df = pd.DataFrame(lista_final)
+                
+                # Filtramos ingresos y egresos de forma segura
                 t_ing = df[df['tipo']=='ingreso']['monto'].sum()
                 t_egr = df[df['tipo']=='egreso']['monto'].sum()
                 

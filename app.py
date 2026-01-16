@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-from datetime import datetime
+from datetime import datetime, date
 import base64
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
@@ -130,15 +130,16 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. FINANZAS (CORREGIDO Y BLINDADO)
+# 4. FINANZAS (REPORTE DE IMPRESIÓN MEJORADO)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
     
-    # --- PANTALLA DE IMPRESIÓN ---
-    if 'recibo_temp' not in st.session_state:
-        st.session_state.recibo_temp = None
+    # Inicializar estados
+    if 'recibo_temp' not in st.session_state: st.session_state.recibo_temp = None
+    if 'reporte_html' not in st.session_state: st.session_state.reporte_html = None
 
+    # --- 1. MODO IMPRESIÓN DE RECIBO INDIVIDUAL ---
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
@@ -148,71 +149,59 @@ elif opcion == "Finanzas":
         logo_img = get_image_base64("logo.png")
         img_html = f'<img src="{logo_img}" style="width: 80px; vertical-align: middle; margin-right: 15px;">' if logo_img else ""
 
-        st.markdown("""
-            <style>
-            @media print {
-                @page { margin: 0; size: auto; }
-                body * { visibility: hidden; }
-                [data-testid="stSidebar"], header, footer { display: none !important; }
-                .ticket-print, .ticket-print * { visibility: visible !important; }
-                .ticket-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 40px; background-color: white; }
-            }
-            </style>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-print, .ticket-print * { visibility: visible !important; } .ticket-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 40px; background-color: white; } }</style>""", unsafe_allow_html=True)
         st.success("✅ Guardado. Listo para imprimir.")
 
-        # HTML EXTRA SIN ESPACIOS (SOLUCIÓN CUADRO NEGRO)
         html_extra = ""
         if r.get('alumno_nie'):
             html_extra = f"""<div style="margin: 5px 0; font-size: 14px;"><strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;|&nbsp; <strong>🎓 Grado:</strong> {r.get('alumno_grado')}</div>"""
 
         html_ticket = f"""
-<div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
-<div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px; display: flex; align-items: center; justify-content: center;">
-{img_html}
-<div>
-<h2 style="margin: 0; color: {color};">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
-<p style="color: gray; margin: 5px; font-size: 14px;">{titulo}</p>
-</div>
-</div>
-<br>
-<table style="width: 100%; border-collapse: collapse;">
-<tr>
-<td><strong>Fecha:</strong> {r['fecha_legible']}</td>
-<td style="text-align: right;"><strong>Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</td>
-</tr>
-</table>
-<div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
-<p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
-{html_extra}
-<p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
-<p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
-</div>
-<div style="text-align: right; margin-top: 25px;">
-<p style="margin: 0; font-size: 14px; color: #666;">Método: {r.get('metodo', 'Efectivo')}</p>
-<h1 style="margin: 5px 0; color: {color};">Total: ${r['monto']:.2f}</h1>
-</div>
-<br><br><br>
-<div style="display: flex; justify-content: space-between; margin-top: 50px;">
-<div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma y Sello Colegio</div>
-<div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma Conforme</div>
-</div>
-</div>
-"""
+        <div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
+        <div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px; display: flex; align-items: center; justify-content: center;">
+        {img_html}
+        <div><h2 style="margin: 0; color: {color};">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2><p style="color: gray; margin: 5px; font-size: 14px;">{titulo}</p></div>
+        </div><br>
+        <table style="width: 100%; border-collapse: collapse;"><tr><td><strong>Fecha:</strong> {r['fecha_legible']}</td><td style="text-align: right;"><strong>Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</td></tr></table>
+        <div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
+        <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
+        {html_extra}
+        <p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
+        <p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
+        </div>
+        <div style="text-align: right; margin-top: 25px;">
+        <p style="margin: 0; font-size: 14px; color: #666;">Método: {r.get('metodo', 'Efectivo')}</p>
+        <h1 style="margin: 5px 0; color: {color};">Total: ${r['monto']:.2f}</h1>
+        </div><br><br><br>
+        <div style="display: flex; justify-content: space-between; margin-top: 50px;">
+        <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma y Sello Colegio</div>
+        <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma Conforme</div>
+        </div></div>"""
         st.markdown(html_ticket, unsafe_allow_html=True)
-        
         c1, c2 = st.columns([1, 4])
         with c1:
             if st.button("❌ Cerrar Recibo", type="primary"):
                 st.session_state.recibo_temp = None
                 st.rerun()
-        with c2:
-            st.info("Presiona **Ctrl + P** para imprimir.")
+        with c2: st.info("Presiona **Ctrl + P** para imprimir.")
+
+    # --- 2. MODO REPORTE GENERAL (NUEVO) ---
+    elif st.session_state.reporte_html:
+        # ESTA ES LA VISTA DE IMPRESIÓN DEL REPORTE
+        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; } }</style>""", unsafe_allow_html=True)
+        
+        st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
+        
+        c1, c2 = st.columns([1, 4])
+        with c1:
+            if st.button("⬅️ Volver a Finanzas", type="primary"):
+                st.session_state.reporte_html = None
+                st.rerun()
+        with c2: st.info("🖨️ Presiona **Ctrl + P** y selecciona 'Guardar como PDF'.")
 
     else:
-        # --- PANTALLAS DE GESTIÓN ---
-        tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte"])
+        # --- 3. PANTALLAS DE GESTIÓN (NORMAL) ---
+        tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte Formal"])
         
         # 1. INGRESOS
         with tab1:
@@ -236,16 +225,10 @@ elif opcion == "Finanzas":
                         obs = st.text_area("Notas")
                         if st.form_submit_button("✅ Cobrar"):
                             data = {
-                                "tipo": "ingreso", 
-                                "descripcion": f"{conc} - {mes}", 
-                                "monto": monto,
-                                "nombre_persona": alum['nombre_completo'],
-                                "alumno_nie": alum.get('nie', ''),
-                                "alumno_grado": alum.get('grado_actual', ''),
-                                "metodo": met, 
-                                "observaciones": obs,
-                                "fecha": firestore.SERVER_TIMESTAMP,
-                                "fecha_dt": datetime.now(),
+                                "tipo": "ingreso", "descripcion": f"{conc} - {mes}", "monto": monto,
+                                "nombre_persona": alum['nombre_completo'], "alumno_nie": alum.get('nie', ''),
+                                "alumno_grado": alum.get('grado_actual', ''), "metodo": met, "observaciones": obs,
+                                "fecha": firestore.SERVER_TIMESTAMP, "fecha_dt": datetime.now(),
                                 "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                             }
                             db.collection("finanzas").add(data)
@@ -264,85 +247,129 @@ elif opcion == "Finanzas":
                 obs = st.text_area("Detalle del gasto")
                 if st.form_submit_button("🔴 Registrar Gasto"):
                     data = {
-                        "tipo": "egreso", 
-                        "descripcion": cat, 
-                        "monto": monto,
-                        "nombre_persona": prov, 
-                        "observaciones": obs,
-                        "fecha": firestore.SERVER_TIMESTAMP,
-                        "fecha_dt": datetime.now(),
+                        "tipo": "egreso", "descripcion": cat, "monto": monto,
+                        "nombre_persona": prov, "observaciones": obs,
+                        "fecha": firestore.SERVER_TIMESTAMP, "fecha_dt": datetime.now(),
                         "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                     }
                     db.collection("finanzas").add(data)
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE (SOLUCIÓN ERROR FECHAS)
+        # 3. REPORTE FORMAL (TABLA BONITA)
         with tab3:
-            st.subheader("Balance: Ingresos vs Egresos")
-            col_f1, col_f2, col_f3 = st.columns(3)
-            f_ini = col_f1.date_input("Desde", value=datetime(datetime.now().year, 1, 1))
-            f_fin = col_f2.date_input("Hasta", value=datetime.now())
-            tipo = col_f3.selectbox("Tipo", ["Todos", "Ingresos", "Egresos"])
+            st.subheader("Generación de Reportes PDF")
+            
+            # --- FILTROS ---
+            col_fil1, col_fil2, col_fil3 = st.columns(3)
+            fecha_ini = col_fil1.date_input("Desde", value=date(datetime.now().year, 1, 1))
+            fecha_fin = col_fil2.date_input("Hasta", value=datetime.now())
+            tipo_filtro = col_fil3.selectbox("Filtrar por", ["Todos los Movimientos", "Solo Ingresos", "Solo Egresos"])
 
-            if st.button("🔄 Actualizar Reporte"): st.rerun()
-            
-            docs = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).stream()
-            
-            lista_final = []
-            for doc in docs:
-                d = doc.to_dict()
-                # --- NORMALIZACIÓN DE FECHAS SEGURA ---
-                raw_date = d.get("fecha_dt") or d.get("fecha")
-                fecha_obj = None
+            if st.button("📄 Generar Vista de Impresión (PDF)"):
+                docs = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).stream()
+                lista_final = []
+                for doc in docs:
+                    d = doc.to_dict()
+                    raw_date = d.get("fecha_dt") or d.get("fecha")
+                    fecha_obj = None
+                    if raw_date:
+                        if hasattr(raw_date, "date"): fecha_obj = raw_date.date()
+                        elif isinstance(raw_date, datetime): fecha_obj = raw_date.date()
+                    
+                    item = {
+                        "fecha_obj": fecha_obj, 
+                        "fecha": d.get("fecha_legible", "-"),
+                        "tipo": d.get("tipo", "Desconocido"),
+                        "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
+                        "nie": d.get("alumno_nie", "-"),
+                        "concepto": d.get("descripcion", "-"),
+                        "monto": d.get("monto", 0.0)
+                    }
+                    lista_final.append(item)
                 
-                # Intentamos convertir lo que venga a un objeto date
-                if raw_date:
-                    if hasattr(raw_date, "date"): 
-                        fecha_obj = raw_date.date()
-                    elif isinstance(raw_date, datetime):
-                        fecha_obj = raw_date.date()
-                
-                item = {
-                    "fecha_obj": fecha_obj, # Objeto date puro para filtrar
-                    "fecha_legible": d.get("fecha_legible", "Sin Fecha"),
-                    "tipo": d.get("tipo", "Desconocido"),
-                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
-                    "nie": d.get("alumno_nie", "-"),
-                    "descripcion": d.get("descripcion", "-"),
-                    "monto": d.get("monto", 0.0)
-                }
-                lista_final.append(item)
-            
-            if lista_final:
                 df = pd.DataFrame(lista_final)
-                
-                # Filtro por Rango de Fechas (Python puro, más seguro que Pandas)
-                # Eliminamos filas sin fecha válida para el filtro
-                df = df.dropna(subset=['fecha_obj'])
-                df = df[(df['fecha_obj'] >= f_ini) & (df['fecha_obj'] <= f_fin)]
-
-                # Filtro por Tipo
-                if tipo == "Ingresos": df = df[df['tipo'] == 'ingreso']
-                elif tipo == "Egresos": df = df[df['tipo'] == 'egreso']
-
                 if not df.empty:
+                    df = df.dropna(subset=['fecha_obj'])
+                    df = df[(df['fecha_obj'] >= fecha_ini) & (df['fecha_obj'] <= fecha_fin)]
+                    if tipo_filtro == "Solo Ingresos": df = df[df['tipo'] == 'ingreso']
+                    elif tipo_filtro == "Solo Egresos": df = df[df['tipo'] == 'egreso']
+
+                if df.empty:
+                    st.warning("No hay datos para generar el reporte con esos filtros.")
+                else:
+                    # CONSTRUIR HTML DEL REPORTE
                     t_ing = df[df['tipo']=='ingreso']['monto'].sum()
                     t_egr = df[df['tipo']=='egreso']['monto'].sum()
+                    balance = t_ing - t_egr
                     
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("Ingresos", f"${t_ing:,.2f}")
-                    m2.metric("Gastos", f"${t_egr:,.2f}")
-                    m3.metric("Balance", f"${t_ing - t_egr:,.2f}")
+                    logo_img = get_image_base64("logo.png")
+                    logo_html = f'<img src="{logo_img}" style="height:60px;">' if logo_img else ""
                     
-                    st.dataframe(
-                        df[['fecha_legible', 'tipo', 'nie', 'nombre_persona', 'descripcion', 'monto']],
-                        use_container_width=True
-                    )
-                else:
-                    st.warning("No hay datos en este rango.")
-            else:
-                st.info("No hay movimientos.")
+                    filas_html = ""
+                    for index, row in df.iterrows():
+                        color_tipo = "green" if row['tipo'] == 'ingreso' else "red"
+                        filas_html += f"""
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 8px;">{row['fecha']}</td>
+                            <td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td>
+                            <td style="padding: 8px;">{row['persona']}</td>
+                            <td style="padding: 8px;">{row['concepto']}</td>
+                            <td style="padding: 8px; text-align: right;">${row['monto']:.2f}</td>
+                        </tr>
+                        """
+
+                    html_reporte = f"""
+                    <div class="report-print" style="font-family: Arial, sans-serif; padding: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                {logo_html}
+                                <div>
+                                    <h2 style="margin: 0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
+                                    <p style="margin: 0; color: gray;">Reporte Financiero Detallado</p>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <p style="margin: 0;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p>
+                                <p style="margin: 0;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 20px; margin: 20px 0;">
+                            <div style="flex: 1; background: #e8f5e9; padding: 15px; border-radius: 5px; text-align: center;">
+                                <h4 style="margin:0; color: #2e7d32;">INGRESOS</h4>
+                                <h2 style="margin:5px 0;">${t_ing:,.2f}</h2>
+                            </div>
+                            <div style="flex: 1; background: #ffebee; padding: 15px; border-radius: 5px; text-align: center;">
+                                <h4 style="margin:0; color: #c62828;">EGRESOS</h4>
+                                <h2 style="margin:5px 0;">${t_egr:,.2f}</h2>
+                            </div>
+                            <div style="flex: 1; background: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center;">
+                                <h4 style="margin:0; color: #1565c0;">BALANCE</h4>
+                                <h2 style="margin:5px 0;">${balance:,.2f}</h2>
+                            </div>
+                        </div>
+
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
+                            <thead style="background-color: #f5f5f5;">
+                                <tr>
+                                    <th style="padding: 10px; text-align: left;">Fecha</th>
+                                    <th style="padding: 10px; text-align: left;">Tipo</th>
+                                    <th style="padding: 10px; text-align: left;">Responsable / Proveedor</th>
+                                    <th style="padding: 10px; text-align: left;">Concepto</th>
+                                    <th style="padding: 10px; text-align: right;">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filas_html}
+                            </tbody>
+                        </table>
+                        <br>
+                        <p style="text-align: center; color: gray; font-size: 12px; margin-top: 30px;">Reporte generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}</p>
+                    </div>
+                    """
+                    st.session_state.reporte_html = html_reporte
+                    st.rerun()
 
 # ==========================================
 # 5. NOTAS

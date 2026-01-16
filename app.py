@@ -16,8 +16,12 @@ def conectar_firebase():
             key_dict = dict(st.secrets["firebase_key"])
             cred = credentials.Certificate(key_dict)
         else:
+            # Si estás en local y usas el archivo json
             cred = credentials.Certificate("credenciales.json") 
-        firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
+            
+        firebase_admin.initialize_app(cred, {
+            'storageBucket': 'gestioncbeh.firebasestorage.app' 
+        })
     return firestore.client()
 
 try:
@@ -46,8 +50,10 @@ def subir_archivo(archivo, ruta_carpeta):
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.warning("⚠️ Falta 'logo.png'")
+    
     st.markdown("---")
-    opcion = st.radio("Menú Principal:", ["Inicio", "Inscripción Alumnos", "Consulta Alumnos", "Finanzas", "Notas", "Configuración"])
+    st.header("Menú Principal")
+    opcion = st.radio("Navegación:", ["Inicio", "Inscripción Alumnos", "Consulta Alumnos", "Finanzas", "Notas", "Configuración"])
     st.markdown("---")
     if conexion_exitosa: st.success("🟢 Conectado")
 
@@ -82,29 +88,56 @@ elif opcion == "Inscripción Alumnos":
             grado = st.selectbox("Grado", grados)
             encargado = st.text_input("Encargado")
             telefono = st.text_input("Teléfono")
+            direccion = st.text_area("Dirección")
         
         st.markdown("---")
         foto = st.file_uploader("Foto Alumno", type=["jpg", "png"])
         enviado = st.form_submit_button("💾 Guardar", type="primary")
 
         if enviado and nie and nombres:
-            ruta = f"expedientes/{nie}"
-            datos = {
-                "nie": nie, "nombre_completo": f"{nombres} {apellidos}", "grado_actual": grado,
-                "encargado": {"nombre": encargado, "telefono": telefono},
-                "documentos": {"foto_url": subir_archivo(foto, ruta)},
-                "fecha_registro": firestore.SERVER_TIMESTAMP
-            }
-            db.collection("alumnos").document(nie).set(datos)
-            st.success("✅ Alumno registrado")
+            with st.spinner("Guardando..."):
+                ruta = f"expedientes/{nie}"
+                datos = {
+                    "nie": nie, 
+                    "nombre_completo": f"{nombres} {apellidos}", 
+                    "nombres": nombres,
+                    "apellidos": apellidos,
+                    "grado_actual": grado,
+                    "estado": estado,
+                    "encargado": {"nombre": encargado, "telefono": telefono, "direccion": direccion},
+                    "documentos": {"foto_url": subir_archivo(foto, ruta)},
+                    "fecha_registro": firestore.SERVER_TIMESTAMP
+                }
+                db.collection("alumnos").document(nie).set(datos)
+                st.success("✅ Alumno registrado")
 
 # ==========================================
-# 4. PANTALLA DE FINANZAS (CON NIE Y GRADO EN RECIBO)
+# 3. PANTALLA DE CONSULTA
+# ==========================================
+elif opcion == "Consulta Alumnos":
+    st.title("🔎 Expediente")
+    nie_busqueda = st.text_input("Buscar NIE:")
+    if st.button("Buscar") and nie_busqueda:
+        doc = db.collection("alumnos").document(nie_busqueda).get()
+        if doc.exists:
+            d = doc.to_dict()
+            c1, c2 = st.columns([1, 3])
+            with c1: st.image(d.get("documentos", {}).get("foto_url", "https://via.placeholder.com/150"))
+            with c2:
+                st.subheader(d['nombre_completo'])
+                st.write(f"**Grado:** {d.get('grado_actual')} | **Estado:** {d.get('estado', 'Activo')}")
+                enc = d.get('encargado', {})
+                st.write(f"**Encargado:** {enc.get('nombre')} - {enc.get('telefono')}")
+        else:
+            st.warning("No encontrado")
+
+# ==========================================
+# 4. PANTALLA DE FINANZAS (COMPLETA)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
     
-    # --- SISTEMA DE IMPRESIÓN ---
+    # --- LÓGICA DE IMPRESIÓN ---
     if 'recibo_temp' not in st.session_state:
         st.session_state.recibo_temp = None
 
@@ -126,14 +159,16 @@ elif opcion == "Finanzas":
             </style>
         """, unsafe_allow_html=True)
         
-        st.success("✅ Transacción guardada. Imprime el comprobante abajo.")
+        st.success("✅ Guardado. Listo para imprimir.")
 
-        # --- AQUÍ ESTÁ EL CAMBIO EN EL DISEÑO DEL RECIBO ---
-        # Agregamos lógica para mostrar NIE y Grado solo si existen
-        info_extra_alumno = ""
+        # Lógica para mostrar NIE y Grado solo si existen
+        html_extra = ""
         if r.get('alumno_nie'):
-            info_extra_alumno = f"""
-            <p style="margin: 5px 0;"><strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>🎓 Grado:</strong> {r.get('alumno_grado')}</p>
+            html_extra = f"""
+            <div style="margin: 5px 0; font-size: 14px;">
+                <strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;&nbsp;|&nbsp;&nbsp; 
+                <strong>🎓 Grado:</strong> {r.get('alumno_grado')}
+            </div>
             """
 
         html_ticket = f"""
@@ -151,8 +186,8 @@ elif opcion == "Finanzas":
     </table>
     <div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
         <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
-        
-        {info_extra_alumno} <p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
+        {html_extra}
+        <p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
         <p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
     </div>
     <div style="text-align: right; margin-top: 25px;">
@@ -177,6 +212,7 @@ elif opcion == "Finanzas":
             st.info("Presiona **Ctrl + P** para imprimir.")
 
     else:
+        # --- PANTALLAS DE GESTIÓN FINANCIERA ---
         tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte"])
         
         # 1. INGRESOS
@@ -200,7 +236,6 @@ elif opcion == "Finanzas":
                         met = st.radio("Pago", ["Efectivo", "Banco"], horizontal=True)
                         obs = st.text_area("Notas")
                         if st.form_submit_button("✅ Cobrar"):
-                            # --- AQUÍ GUARDAMOS EL NIE Y GRADO ---
                             data = {
                                 "tipo": "ingreso", 
                                 "descripcion": f"{conc} - {mes}", 
@@ -229,8 +264,11 @@ elif opcion == "Finanzas":
                 obs = st.text_area("Detalle del gasto")
                 if st.form_submit_button("🔴 Registrar Gasto"):
                     data = {
-                        "tipo": "egreso", "descripcion": cat, "monto": monto,
-                        "nombre_persona": prov, "observaciones": obs,
+                        "tipo": "egreso", 
+                        "descripcion": cat, 
+                        "monto": monto,
+                        "nombre_persona": prov, 
+                        "observaciones": obs,
                         "fecha": firestore.SERVER_TIMESTAMP,
                         "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                     }
@@ -238,7 +276,7 @@ elif opcion == "Finanzas":
                     st.session_state.recibo_temp = data
                     st.rerun()
 
-        # 3. REPORTE BLINDADO
+        # 3. REPORTE
         with tab3:
             st.subheader("Balance: Ingresos vs Egresos")
             if st.button("🔄 Actualizar"): st.rerun()
@@ -252,94 +290,35 @@ elif opcion == "Finanzas":
                     "fecha_legible": d.get("fecha_legible", "Sin Fecha"),
                     "tipo": d.get("tipo", "Desconocido"),
                     "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
-                    # Incluimos NIE en el reporte también si gustas verlo ahí
-                    "nie": d.get("alumno_nie", "-"),
+                    "nie": d.get("alumno_nie", "-"), # Leemos NIE para el reporte
                     "descripcion": d.get("descripcion", "-"),
-                    "monto": d.get("monto", 0.0),
-                    "observaciones": d.get("observaciones", "")
+                    "monto": d.get("monto", 0.0)
                 }
                 lista_final.append(item_seguro)
             
             if lista_final:
                 df = pd.DataFrame(lista_final)
-                
-                total_ing = df[df['tipo']=='ingreso']['monto'].sum()
-                total_egr = df[df['tipo']=='egreso']['monto'].sum()
+                t_ing = df[df['tipo']=='ingreso']['monto'].sum()
+                t_egr = df[df['tipo']=='egreso']['monto'].sum()
                 
                 m1, m2, m3 = st.columns(3)
-                m1.metric("Ingresos Totales", f"${total_ing:,.2f}")
-                m2.metric("Gastos Totales", f"${total_egr:,.2f}")
-                m3.metric("Disponible en Caja", f"${total_ing - total_egr:,.2f}")
-                
-                st.markdown("### Detalle de Movimientos")
+                m1.metric("Ingresos", f"${t_ing:,.2f}")
+                m2.metric("Gastos", f"${t_egr:,.2f}")
+                m3.metric("Balance", f"${t_ing - t_egr:,.2f}")
                 
                 st.dataframe(
                     df[['fecha_legible', 'tipo', 'nie', 'nombre_persona', 'descripcion', 'monto']],
-                    column_config={
-                        "tipo": st.column_config.TextColumn("Tipo", width="small"),
-                        "nie": st.column_config.TextColumn("NIE", width="small"),
-                        "monto": st.column_config.NumberColumn("Monto", format="$%.2f")
-                    },
                     use_container_width=True
                 )
             else:
-                st.info("No hay movimientos aún.")
-                
-        # --- SECCIÓN DE REPORTE BLINDADA CONTRA ERRORES ---
-        with tab3:
-            st.subheader("Balance: Ingresos vs Egresos")
-            if st.button("🔄 Actualizar"): st.rerun()
-            
-            docs = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).stream()
-            
-            # --- NORMALIZACIÓN DE DATOS (AQUÍ ESTÁ LA SOLUCIÓN) ---
-            # Convertimos cada documento en un diccionario seguro, rellenando lo que falte
-            lista_final = []
-            for doc in docs:
-                d = doc.to_dict()
-                item_seguro = {
-                    "fecha_legible": d.get("fecha_legible", "Sin Fecha"), # Si no tiene fecha, pone "Sin fecha"
-                    "tipo": d.get("tipo", "Desconocido"),
-                    # Busca el nombre en varios campos posibles (para compatibilidad con datos viejos)
-                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
-                    "descripcion": d.get("descripcion", "-"),
-                    "monto": d.get("monto", 0.0),
-                    "observaciones": d.get("observaciones", "")
-                }
-                lista_final.append(item_seguro)
-            
-            if lista_final:
-                df = pd.DataFrame(lista_final)
-                
-                # Cálculos seguros
-                total_ing = df[df['tipo']=='ingreso']['monto'].sum()
-                total_egr = df[df['tipo']=='egreso']['monto'].sum()
-                
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Ingresos Totales", f"${total_ing:,.2f}")
-                m2.metric("Gastos Totales", f"${total_egr:,.2f}")
-                m3.metric("Disponible en Caja", f"${total_ing - total_egr:,.2f}")
-                
-                st.markdown("### Detalle de Movimientos")
-                
-                # Ahora seleccionamos las columnas sin miedo porque las creamos manualmente arriba
-                st.dataframe(
-                    df[['fecha_legible', 'tipo', 'nombre_persona', 'descripcion', 'monto']],
-                    column_config={
-                        "tipo": st.column_config.TextColumn("Tipo", width="small"),
-                        "monto": st.column_config.NumberColumn("Monto", format="$%.2f")
-                    },
-                    use_container_width=True
-                )
-            else:
-                st.info("No hay movimientos aún.")
+                st.info("No hay movimientos.")
 
 # ==========================================
 # 5. NOTAS
 # ==========================================
 elif opcion == "Notas":
     st.title("📊 Notas")
-    st.write("Módulo de carga de notas en desarrollo.")
+    st.write("Módulo en desarrollo.")
 
 # ==========================================
 # 6. CONFIGURACIÓN

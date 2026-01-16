@@ -99,26 +99,7 @@ elif opcion == "Inscripción Alumnos":
             st.success("✅ Alumno registrado")
 
 # ==========================================
-# 3. PANTALLA DE CONSULTA
-# ==========================================
-elif opcion == "Consulta Alumnos":
-    st.title("🔎 Expediente")
-    nie = st.text_input("Buscar NIE:")
-    if st.button("Buscar") and nie:
-        doc = db.collection("alumnos").document(nie).get()
-        if doc.exists:
-            d = doc.to_dict()
-            c1, c2 = st.columns([1, 3])
-            with c1: st.image(d.get("documentos", {}).get("foto_url", "https://via.placeholder.com/150"))
-            with c2:
-                st.subheader(d['nombre_completo'])
-                st.write(f"**Grado:** {d.get('grado_actual')} | **Estado:** {d.get('estado', 'Activo')}")
-                st.write(f"**Encargado:** {d.get('encargado', {}).get('nombre')} ({d.get('encargado', {}).get('telefono')})")
-        else:
-            st.warning("No encontrado")
-
-# ==========================================
-# 4. PANTALLA DE FINANZAS (CORREGIDA SIN ERROR KEYERROR)
+# 4. PANTALLA DE FINANZAS (CON NIE Y GRADO EN RECIBO)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -147,6 +128,14 @@ elif opcion == "Finanzas":
         
         st.success("✅ Transacción guardada. Imprime el comprobante abajo.")
 
+        # --- AQUÍ ESTÁ EL CAMBIO EN EL DISEÑO DEL RECIBO ---
+        # Agregamos lógica para mostrar NIE y Grado solo si existen
+        info_extra_alumno = ""
+        if r.get('alumno_nie'):
+            info_extra_alumno = f"""
+            <p style="margin: 5px 0;"><strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>🎓 Grado:</strong> {r.get('alumno_grado')}</p>
+            """
+
         html_ticket = f"""
 <div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
     <div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px;">
@@ -162,7 +151,8 @@ elif opcion == "Finanzas":
     </table>
     <div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
         <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
-        <p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
+        
+        {info_extra_alumno} <p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
         <p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
     </div>
     <div style="text-align: right; margin-top: 25px;">
@@ -189,6 +179,7 @@ elif opcion == "Finanzas":
     else:
         tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte"])
         
+        # 1. INGRESOS
         with tab1:
             col_b, col_f = st.columns([1, 2])
             with col_b:
@@ -209,9 +200,16 @@ elif opcion == "Finanzas":
                         met = st.radio("Pago", ["Efectivo", "Banco"], horizontal=True)
                         obs = st.text_area("Notas")
                         if st.form_submit_button("✅ Cobrar"):
+                            # --- AQUÍ GUARDAMOS EL NIE Y GRADO ---
                             data = {
-                                "tipo": "ingreso", "descripcion": f"{conc} - {mes}", "monto": monto,
-                                "nombre_persona": alum['nombre_completo'], "metodo": met, "observaciones": obs,
+                                "tipo": "ingreso", 
+                                "descripcion": f"{conc} - {mes}", 
+                                "monto": monto,
+                                "nombre_persona": alum['nombre_completo'],
+                                "alumno_nie": alum.get('nie', ''),       # Guardamos NIE
+                                "alumno_grado": alum.get('grado_actual', ''), # Guardamos Grado
+                                "metodo": met, 
+                                "observaciones": obs,
                                 "fecha": firestore.SERVER_TIMESTAMP,
                                 "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                             }
@@ -220,6 +218,7 @@ elif opcion == "Finanzas":
                             st.session_state.alumno_pago = None
                             st.rerun()
 
+        # 2. GASTOS
         with tab2:
             st.subheader("Registrar Salida de Dinero")
             with st.form("f_gasto"):
@@ -239,6 +238,53 @@ elif opcion == "Finanzas":
                     st.session_state.recibo_temp = data
                     st.rerun()
 
+        # 3. REPORTE BLINDADO
+        with tab3:
+            st.subheader("Balance: Ingresos vs Egresos")
+            if st.button("🔄 Actualizar"): st.rerun()
+            
+            docs = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).stream()
+            
+            lista_final = []
+            for doc in docs:
+                d = doc.to_dict()
+                item_seguro = {
+                    "fecha_legible": d.get("fecha_legible", "Sin Fecha"),
+                    "tipo": d.get("tipo", "Desconocido"),
+                    "nombre_persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
+                    # Incluimos NIE en el reporte también si gustas verlo ahí
+                    "nie": d.get("alumno_nie", "-"),
+                    "descripcion": d.get("descripcion", "-"),
+                    "monto": d.get("monto", 0.0),
+                    "observaciones": d.get("observaciones", "")
+                }
+                lista_final.append(item_seguro)
+            
+            if lista_final:
+                df = pd.DataFrame(lista_final)
+                
+                total_ing = df[df['tipo']=='ingreso']['monto'].sum()
+                total_egr = df[df['tipo']=='egreso']['monto'].sum()
+                
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Ingresos Totales", f"${total_ing:,.2f}")
+                m2.metric("Gastos Totales", f"${total_egr:,.2f}")
+                m3.metric("Disponible en Caja", f"${total_ing - total_egr:,.2f}")
+                
+                st.markdown("### Detalle de Movimientos")
+                
+                st.dataframe(
+                    df[['fecha_legible', 'tipo', 'nie', 'nombre_persona', 'descripcion', 'monto']],
+                    column_config={
+                        "tipo": st.column_config.TextColumn("Tipo", width="small"),
+                        "nie": st.column_config.TextColumn("NIE", width="small"),
+                        "monto": st.column_config.NumberColumn("Monto", format="$%.2f")
+                    },
+                    use_container_width=True
+                )
+            else:
+                st.info("No hay movimientos aún.")
+                
         # --- SECCIÓN DE REPORTE BLINDADA CONTRA ERRORES ---
         with tab3:
             st.subheader("Balance: Ingresos vs Egresos")

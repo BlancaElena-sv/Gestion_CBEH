@@ -3,18 +3,27 @@ import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime
+import json
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
 
-# --- CONEXIÓN CON FIREBASE ---
+# --- CONEXIÓN INTELIGENTE (NUBE Y LOCAL) ---
 @st.cache_resource
 def conectar_firebase():
     # Evitar reinicializar si ya existe la app
     if not firebase_admin._apps:
-        # Asegúrate de que 'credenciales.json' esté en la misma carpeta
-        cred = credentials.Certificate("credenciales.json") 
+        # 1. Intentamos leer desde los SECRETOS de Streamlit (Para la Nube)
+        if "firebase_key" in st.secrets:
+            # Convertimos el objeto de secretos a un diccionario normal
+            key_dict = dict(st.secrets["firebase_key"])
+            cred = credentials.Certificate(key_dict)
         
+        # 2. Si no hay secretos, buscamos el archivo LOCAL (Para tu PC)
+        else:
+            # Asegúrate de tener este archivo si corres en local
+            cred = credentials.Certificate("credenciales.json") 
+            
         firebase_admin.initialize_app(cred, {
             'storageBucket': 'gestioncbeh.firebasestorage.app' 
         })
@@ -26,7 +35,7 @@ try:
     conexion_exitosa = True
 except Exception as e:
     st.error(f"⚠️ Error conectando a Firebase: {e}")
-    st.info("Verifica que el archivo 'credenciales.json' esté en la carpeta.")
+    st.info("Si estás en local, verifica 'credenciales.json'. Si estás en la nube, verifica los Secrets.")
     conexion_exitosa = False
 
 # --- FUNCIÓN AYUDANTE PARA SUBIR FOTOS ---
@@ -210,7 +219,7 @@ elif opcion == "Consulta Alumnos":
             st.warning(f"❌ No se encontró ningún alumno con el NIE: {nie_consulta}")
 
 # ==========================================
-# 4. PANTALLA DE FINANZAS (COMPLETA & CORREGIDA)
+# 4. PANTALLA DE FINANZAS
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Administración Financiera")
@@ -292,7 +301,7 @@ elif opcion == "Finanzas":
                         st.session_state.pago_alumno = None # Limpiar formulario
                         st.rerun()
 
-    # --- SECCIÓN DE RECIBO (VISUALIZACIÓN E IMPRESIÓN) ---
+    # --- SECCIÓN DE RECIBO (VISUALIZACIÓN E IMPRESIÓN CORREGIDA) ---
     if st.session_state.get("recibo_exitoso"):
         recibo = st.session_state.recibo_exitoso
         
@@ -300,31 +309,10 @@ elif opcion == "Finanzas":
         st.markdown("""
             <style>
             @media print {
-                /* Ocultar TODO el cuerpo de la aplicación por defecto */
-                body * {
-                    visibility: hidden;
-                }
-                /* Ocultar barra lateral, cabecera y footer explícitamente */
-                [data-testid="stSidebar"], header, footer, .stDeployButton {
-                    display: none !important;
-                }
-                
-                /* Hacer visible SOLO el contenedor del recibo */
-                .ticket-impresion, .ticket-impresion * {
-                    visibility: visible !important;
-                }
-                
-                /* Posicionar el recibo al inicio de la hoja en blanco */
-                .ticket-impresion {
-                    position: absolute !important;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                    margin: 0;
-                    padding: 20px;
-                    background-color: white;
-                    border: 2px solid black; 
-                }
+                body * { visibility: hidden; }
+                [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
+                .ticket-impresion, .ticket-impresion * { visibility: visible !important; }
+                .ticket-impresion { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; border: 2px solid black; }
             }
             </style>
         """, unsafe_allow_html=True)
@@ -332,61 +320,43 @@ elif opcion == "Finanzas":
         st.markdown("---")
         st.success("✅ ¡Pago registrado! Ahora puedes imprimir el recibo.")
 
-        # 2. ESTRUCTURA DEL RECIBO EN HTML
+        # 2. ESTRUCTURA DEL RECIBO (SIN INDENTACIÓN PARA EVITAR ERROR VISUAL)
         html_recibo = f"""
-        <div class="ticket-impresion" style="
-            border: 1px solid #ccc; 
-            padding: 30px; 
-            border-radius: 10px; 
-            background-color: #f9f9f9; 
-            max-width: 600px; 
-            margin: auto;">
-            
-            <div style="text-align: center;">
-                <h2 style="margin: 0;">🏫 COLEGIO PROFA. BLANCA ELENA</h2>
-                <p style="color: gray; margin-top: 5px;">Comprobante de Ingreso</p>
-            </div>
-            
-            <hr style="border-top: 2px dashed #bbb;">
-            
-            <div style="display: flex; justify-content: space-between;">
-                <p><strong>📅 Fecha:</strong> {recibo['fecha_legible']}</p>
-                <p><strong>🧾 Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</p>
-            </div>
-            
-            <p><strong>👤 Alumno:</strong> {recibo['alumno_nombre']}</p>
-            <p><strong>🆔 NIE:</strong> {recibo['alumno_nie']}</p>
-            <p><strong>🎓 Grado:</strong> {recibo['grado']}</p>
-            
-            <div style="background-color: #fff; border: 1px solid #eee; padding: 15px; margin-top: 10px;">
-                <p style="margin: 0;"><strong>Concepto:</strong> {recibo['descripcion']}</p>
-                <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #555;">
-                    <em>{recibo.get('observaciones', '')}</em>
-                </p>
-            </div>
-            
-            <div style="text-align: right; margin-top: 20px;">
-                <p>Método de Pago: {recibo['metodo']}</p>
-                <h1 style="color: #2e7d32; margin: 0;">Total: ${recibo['monto']:.2f}</h1>
-            </div>
-            
-            <hr style="margin-top: 30px;">
-            <p style="text-align: center; font-size: 0.8em; color: gray;">
-                Gracias por su pago puntual. Guarde este documento para cualquier reclamo.
-            </p>
-        </div>
-        """
+<div class="ticket-impresion" style="border: 1px solid #ccc; padding: 30px; border-radius: 10px; background-color: #f9f9f9; max-width: 600px; margin: auto;">
+    <div style="text-align: center;">
+        <h2 style="margin: 0;">🏫 COLEGIO PROFA. BLANCA ELENA</h2>
+        <p style="color: gray; margin-top: 5px;">Comprobante de Ingreso</p>
+    </div>
+    <hr style="border-top: 2px dashed #bbb;">
+    <div style="display: flex; justify-content: space-between;">
+        <p><strong>📅 Fecha:</strong> {recibo['fecha_legible']}</p>
+        <p><strong>🧾 Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</p>
+    </div>
+    <p><strong>👤 Alumno:</strong> {recibo['alumno_nombre']}</p>
+    <p><strong>🆔 NIE:</strong> {recibo['alumno_nie']}</p>
+    <p><strong>🎓 Grado:</strong> {recibo['grado']}</p>
+    <div style="background-color: #fff; border: 1px solid #eee; padding: 15px; margin-top: 10px;">
+        <p style="margin: 0;"><strong>Concepto:</strong> {recibo['descripcion']}</p>
+        <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #555;"><em>{recibo.get('observaciones', '')}</em></p>
+    </div>
+    <div style="text-align: right; margin-top: 20px;">
+        <p>Método de Pago: {recibo['metodo']}</p>
+        <h1 style="color: #2e7d32; margin: 0;">Total: ${recibo['monto']:.2f}</h1>
+    </div>
+    <hr style="margin-top: 30px;">
+    <p style="text-align: center; font-size: 0.8em; color: gray;">Gracias por su pago puntual.</p>
+</div>
+"""
         
         st.markdown(html_recibo, unsafe_allow_html=True)
         
-        # Botones de acción
         col_c1, col_c2 = st.columns([1, 4])
         with col_c1:
             if st.button("Cerrar Recibo"):
                 del st.session_state['recibo_exitoso']
                 st.rerun()
         with col_c2:
-            st.info("🖨️ Presiona **Ctrl + P** (o Cmd + P en Mac) para imprimir. Verás que ahora solo sale el ticket.")
+            st.info("🖨️ Presiona **Ctrl + P** (o Cmd + P en Mac) para imprimir.")
 
     # --- TAB 2: GASTOS (REGISTRO) ---
     with tab_gastos:

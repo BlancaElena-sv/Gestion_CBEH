@@ -130,7 +130,7 @@ elif opcion == "Consulta Alumnos":
             st.warning("No encontrado")
 
 # ==========================================
-# 4. FINANZAS (REPORTE DE IMPRESIÓN MEJORADO)
+# 4. FINANZAS (CORREGIDO: REPORTE HTML SIN ESPACIOS)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
@@ -156,27 +156,28 @@ elif opcion == "Finanzas":
         if r.get('alumno_nie'):
             html_extra = f"""<div style="margin: 5px 0; font-size: 14px;"><strong>🆔 NIE:</strong> {r.get('alumno_nie')} &nbsp;|&nbsp; <strong>🎓 Grado:</strong> {r.get('alumno_grado')}</div>"""
 
+        # HTML PEGADO A LA IZQUIERDA
         html_ticket = f"""
-        <div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
-        <div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px; display: flex; align-items: center; justify-content: center;">
-        {img_html}
-        <div><h2 style="margin: 0; color: {color};">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2><p style="color: gray; margin: 5px; font-size: 14px;">{titulo}</p></div>
-        </div><br>
-        <table style="width: 100%; border-collapse: collapse;"><tr><td><strong>Fecha:</strong> {r['fecha_legible']}</td><td style="text-align: right;"><strong>Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</td></tr></table>
-        <div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
-        <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
-        {html_extra}
-        <p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
-        <p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
-        </div>
-        <div style="text-align: right; margin-top: 25px;">
-        <p style="margin: 0; font-size: 14px; color: #666;">Método: {r.get('metodo', 'Efectivo')}</p>
-        <h1 style="margin: 5px 0; color: {color};">Total: ${r['monto']:.2f}</h1>
-        </div><br><br><br>
-        <div style="display: flex; justify-content: space-between; margin-top: 50px;">
-        <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma y Sello Colegio</div>
-        <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma Conforme</div>
-        </div></div>"""
+<div class="ticket-print" style="border: 2px solid {color}; padding: 30px; max-width: 800px; margin: auto; font-family: Arial, sans-serif; background: white;">
+<div style="text-align: center; border-bottom: 2px solid {color}; padding-bottom: 10px; display: flex; align-items: center; justify-content: center;">
+{img_html}
+<div><h2 style="margin: 0; color: {color};">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2><p style="color: gray; margin: 5px; font-size: 14px;">{titulo}</p></div>
+</div><br>
+<table style="width: 100%; border-collapse: collapse;"><tr><td><strong>Fecha:</strong> {r['fecha_legible']}</td><td style="text-align: right;"><strong>Folio:</strong> #{str(int(datetime.now().timestamp()))[-6:]}</td></tr></table>
+<div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #eee;">
+<p style="margin: 5px 0;"><strong>👤 Nombre:</strong> {r.get('nombre_persona', 'N/A')}</p>
+{html_extra}
+<p style="margin: 5px 0;"><strong>📝 Concepto:</strong> {r['descripcion']}</p>
+<p style="margin: 5px 0;"><strong>ℹ️ Detalle:</strong> {r.get('observaciones', '-')}</p>
+</div>
+<div style="text-align: right; margin-top: 25px;">
+<p style="margin: 0; font-size: 14px; color: #666;">Método: {r.get('metodo', 'Efectivo')}</p>
+<h1 style="margin: 5px 0; color: {color};">Total: ${r['monto']:.2f}</h1>
+</div><br><br><br>
+<div style="display: flex; justify-content: space-between; margin-top: 50px;">
+<div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma y Sello Colegio</div>
+<div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 5px; font-size: 12px;">Firma Conforme</div>
+</div></div>"""
         st.markdown(html_ticket, unsafe_allow_html=True)
         c1, c2 = st.columns([1, 4])
         with c1:
@@ -185,9 +186,8 @@ elif opcion == "Finanzas":
                 st.rerun()
         with c2: st.info("Presiona **Ctrl + P** para imprimir.")
 
-    # --- 2. MODO REPORTE GENERAL (NUEVO) ---
+    # --- 2. MODO REPORTE GENERAL (HTML PEGADO A LA IZQUIERDA) ---
     elif st.session_state.reporte_html:
-        # ESTA ES LA VISTA DE IMPRESIÓN DEL REPORTE
         st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; } }</style>""", unsafe_allow_html=True)
         
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
@@ -298,7 +298,7 @@ elif opcion == "Finanzas":
                 if df.empty:
                     st.warning("No hay datos para generar el reporte con esos filtros.")
                 else:
-                    # CONSTRUIR HTML DEL REPORTE
+                    # CONSTRUIR HTML DEL REPORTE (PEGADO A LA IZQUIERDA PARA EVITAR ERROR)
                     t_ing = df[df['tipo']=='ingreso']['monto'].sum()
                     t_egr = df[df['tipo']=='egreso']['monto'].sum()
                     balance = t_ing - t_egr
@@ -309,65 +309,28 @@ elif opcion == "Finanzas":
                     filas_html = ""
                     for index, row in df.iterrows():
                         color_tipo = "green" if row['tipo'] == 'ingreso' else "red"
-                        filas_html += f"""
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 8px;">{row['fecha']}</td>
-                            <td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td>
-                            <td style="padding: 8px;">{row['persona']}</td>
-                            <td style="padding: 8px;">{row['concepto']}</td>
-                            <td style="padding: 8px; text-align: right;">${row['monto']:.2f}</td>
-                        </tr>
-                        """
+                        filas_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px;">{row['fecha']}</td><td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td><td style="padding: 8px;">{row['persona']}</td><td style="padding: 8px;">{row['concepto']}</td><td style="padding: 8px; text-align: right;">${row['monto']:.2f}</td></tr>"""
 
                     html_reporte = f"""
-                    <div class="report-print" style="font-family: Arial, sans-serif; padding: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
-                            <div style="display: flex; align-items: center; gap: 15px;">
-                                {logo_html}
-                                <div>
-                                    <h2 style="margin: 0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
-                                    <p style="margin: 0; color: gray;">Reporte Financiero Detallado</p>
-                                </div>
-                            </div>
-                            <div style="text-align: right;">
-                                <p style="margin: 0;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p>
-                                <p style="margin: 0;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 20px; margin: 20px 0;">
-                            <div style="flex: 1; background: #e8f5e9; padding: 15px; border-radius: 5px; text-align: center;">
-                                <h4 style="margin:0; color: #2e7d32;">INGRESOS</h4>
-                                <h2 style="margin:5px 0;">${t_ing:,.2f}</h2>
-                            </div>
-                            <div style="flex: 1; background: #ffebee; padding: 15px; border-radius: 5px; text-align: center;">
-                                <h4 style="margin:0; color: #c62828;">EGRESOS</h4>
-                                <h2 style="margin:5px 0;">${t_egr:,.2f}</h2>
-                            </div>
-                            <div style="flex: 1; background: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center;">
-                                <h4 style="margin:0; color: #1565c0;">BALANCE</h4>
-                                <h2 style="margin:5px 0;">${balance:,.2f}</h2>
-                            </div>
-                        </div>
-
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
-                            <thead style="background-color: #f5f5f5;">
-                                <tr>
-                                    <th style="padding: 10px; text-align: left;">Fecha</th>
-                                    <th style="padding: 10px; text-align: left;">Tipo</th>
-                                    <th style="padding: 10px; text-align: left;">Responsable / Proveedor</th>
-                                    <th style="padding: 10px; text-align: left;">Concepto</th>
-                                    <th style="padding: 10px; text-align: right;">Monto</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filas_html}
-                            </tbody>
-                        </table>
-                        <br>
-                        <p style="text-align: center; color: gray; font-size: 12px; margin-top: 30px;">Reporte generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}</p>
-                    </div>
-                    """
+<div class="report-print" style="font-family: Arial, sans-serif; padding: 20px;">
+<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
+<div style="display: flex; align-items: center; gap: 15px;">
+{logo_html}
+<div><h2 style="margin: 0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2><p style="margin: 0; color: gray;">Reporte Financiero Detallado</p></div>
+</div>
+<div style="text-align: right;"><p style="margin: 0;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p><p style="margin: 0;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p></div>
+</div>
+<div style="display: flex; gap: 20px; margin: 20px 0;">
+<div style="flex: 1; background: #e8f5e9; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #2e7d32;">INGRESOS</h4><h2 style="margin:5px 0;">${t_ing:,.2f}</h2></div>
+<div style="flex: 1; background: #ffebee; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #c62828;">EGRESOS</h4><h2 style="margin:5px 0;">${t_egr:,.2f}</h2></div>
+<div style="flex: 1; background: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center;"><h4 style="margin:0; color: #1565c0;">BALANCE</h4><h2 style="margin:5px 0;">${balance:,.2f}</h2></div>
+</div>
+<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
+<thead style="background-color: #f5f5f5;"><tr><th style="padding: 10px; text-align: left;">Fecha</th><th style="padding: 10px; text-align: left;">Tipo</th><th style="padding: 10px; text-align: left;">Responsable / Proveedor</th><th style="padding: 10px; text-align: left;">Concepto</th><th style="padding: 10px; text-align: right;">Monto</th></tr></thead>
+<tbody>{filas_html}</tbody>
+</table>
+<br><p style="text-align: center; color: gray; font-size: 12px; margin-top: 30px;">Reporte generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}</p>
+</div>"""
                     st.session_state.reporte_html = html_reporte
                     st.rerun()
 

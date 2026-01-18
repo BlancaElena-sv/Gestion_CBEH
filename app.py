@@ -122,42 +122,106 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
 
 # ==========================================
-# 3. GESTIÓN DE MAESTROS
+# 3. GESTIÓN DE MAESTROS (REDISEÑADO: PERFIL + CARGA)
 # ==========================================
 elif opcion == "Gestión Maestros":
-    st.title("👩‍🏫 Plantilla Docente")
-    tab_reg, tab_ver = st.tabs(["➕ Registrar Maestro", "📋 Ver Plantilla"])
+    st.title("👩‍🏫 Plantilla Docente y Carga Académica")
     
-    lista_grados_sistema = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
+    tab_perfil, tab_carga, tab_ver = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Materias/Grados", "📋 Ver Planilla"])
+    
+    # Listas Maestras
+    LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
+    LISTA_MATERIAS = ["Matemáticas", "Lenguaje y Literatura", "Ciencias Salud y M.A.", "Estudios Sociales", "Inglés", "Educación Artística", "Educación Física", "Moral y Cívica", "Informática", "Ortografía", "Caligrafía"]
 
-    with tab_reg:
-        with st.form("form_maestro"):
+    # --- TAB 1: CREAR EL PERFIL DEL MAESTRO (SOLO UNA VEZ POR PERSONA) ---
+    with tab_perfil:
+        st.markdown("##### Paso 1: Crear expediente del personal")
+        with st.form("form_nuevo_docente"):
             c1, c2 = st.columns(2)
-            with c1:
-                nombre_m = st.text_input("Nombre Completo del Docente*")
-                rol = st.text_input("Rol / Cargo", placeholder="Ej: Maestra Guía, Coordinadora")
-                turno_m = st.selectbox("Turno Laboral", ["Matutino", "Vespertino", "Ambos Turnos"])
-            with c2:
-                materias = st.text_area("Materias que imparte", placeholder="Ej: Matemáticas, Ciencias")
-                grados_asig = st.multiselect("Grados Asignados", lista_grados_sistema)
+            nombre_m = c1.text_input("Nombre Completo*")
+            telefono_m = c2.text_input("Teléfono de Contacto")
+            email_m = c1.text_input("Correo Electrónico")
+            turno_base = c2.selectbox("Turno Principal", ["Matutino", "Vespertino", "Tiempo Completo"])
             
-            if st.form_submit_button("💾 Registrar Maestro", type="primary"):
-                datos_m = {
-                    "nombre": nombre_m, "rol": rol, "turno": turno_m,
-                    "materias": materias, "grados_asignados": grados_asig,
-                    "fecha_registro": firestore.SERVER_TIMESTAMP
-                }
-                db.collection("maestros").add(datos_m)
-                st.success(f"✅ Docente {nombre_m} registrado.")
+            if st.form_submit_button("💾 Guardar Perfil Docente"):
+                if nombre_m:
+                    # Guardamos solo los datos personales
+                    db.collection("maestros_perfil").add({
+                        "nombre": nombre_m,
+                        "contacto": {"tel": telefono_m, "email": email_m},
+                        "turno_base": turno_base,
+                        "activo": True
+                    })
+                    st.success(f"✅ Perfil de {nombre_m} creado. Ahora ve a la pestaña 'Asignar Materias'.")
+                else:
+                    st.error("El nombre es obligatorio")
 
-    with tab_ver:
-        docs = db.collection("maestros").stream()
-        lista_m = [d.to_dict() for d in docs]
-        if lista_m:
-            df_m = pd.DataFrame(lista_m)
-            st.dataframe(df_m[['nombre', 'rol', 'turno', 'materias', 'grados_asignados']], use_container_width=True)
+    # --- TAB 2: ASIGNAR CLASES (AQUÍ ESTÁ LA MAGIA) ---
+    with tab_carga:
+        st.markdown("##### Paso 2: ¿Qué clases da cada maestro?")
+        
+        # 1. Buscamos los maestros registrados para llenar el selectbox
+        docs_m = db.collection("maestros_perfil").stream()
+        lista_profes = {d.to_dict()['nombre']: d.id for d in docs_m} # Diccionario Nombre -> ID
+        
+        if lista_profes:
+            with st.form("form_carga"):
+                col_a, col_b = st.columns(2)
+                
+                # Seleccionar al Humano
+                nombre_seleccionado = col_a.selectbox("Seleccione Docente", list(lista_profes.keys()))
+                
+                # Seleccionar el Grado
+                grado_destino = col_b.selectbox("Grado a impartir", LISTA_GRADOS)
+                
+                # Seleccionar Materias (Multiselect)
+                materias_imparte = st.multiselect("Materias que imparte a ESTE grado específico:", LISTA_MATERIAS)
+                
+                # Nota extra (ej: "Solo los viernes")
+                nota_extra = st.text_input("Nota adicional (Opcional)", placeholder="Ej: Solo refuerzo, Encargado de Aula, etc.")
+
+                if st.form_submit_button("🔗 Vincular Carga Académica"):
+                    if materias_imparte:
+                        # Guardamos la ASIGNACIÓN en una colección separada pero vinculada
+                        datos_asignacion = {
+                            "id_docente": lista_profes[nombre_seleccionado],
+                            "nombre_docente": nombre_seleccionado,
+                            "grado": grado_destino,
+                            "materias": materias_imparte,
+                            "nota": nota_extra
+                        }
+                        db.collection("carga_academica").add(datos_asignacion)
+                        st.success(f"✅ Asignado: {nombre_seleccionado} dará {len(materias_imparte)} materias a {grado_destino}.")
+                    else:
+                        st.error("Seleccione al menos una materia.")
         else:
-            st.info("Aún no hay docentes registrados.")
+            st.warning("Primero debe registrar docentes en la pestaña 1.")
+
+    # --- TAB 3: VER RESUMEN ---
+    with tab_ver:
+        st.subheader("Planilla y Cargas")
+        
+        # Obtenemos las asignaciones
+        docs_carga = db.collection("carga_academica").stream()
+        data_carga = [d.to_dict() for d in docs_carga]
+        
+        if data_carga:
+            df = pd.DataFrame(data_carga)
+            # Ordenamos para que se vea bonito
+            df = df.sort_values(by=["grado", "nombre_docente"])
+            
+            st.dataframe(
+                df[['grado', 'nombre_docente', 'materias', 'nota']],
+                column_config={
+                    "grado": "Grado",
+                    "nombre_docente": "Docente",
+                    "materias": st.column_config.ListColumn("Materias Asignadas"),
+                    "nota": "Observaciones"
+                },
+                use_container_width=True
+            )
+        else:
+            st.info("No hay cargas académicas asignadas todavía.")
 
 # ==========================================
 # 4. CONSULTA ALUMNOS (CON BOLETA DE NOTAS)

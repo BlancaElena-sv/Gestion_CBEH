@@ -122,7 +122,7 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
 
 # ==========================================
-# 3. GESTIÓN DE MAESTROS (CON CÓDIGO EMPLEADO)
+# 3. GESTIÓN DE MAESTROS (CORREGIDO ERROR KEYERROR)
 # ==========================================
 elif opcion == "Gestión Maestros":
     st.title("👩‍🏫 Plantilla Docente")
@@ -137,19 +137,16 @@ elif opcion == "Gestión Maestros":
         st.markdown("##### Paso 1: Crear expediente del personal")
         with st.form("form_nuevo_docente"):
             c1, c2 = st.columns(2)
-            # NUEVO CAMPO: CÓDIGO
             codigo_emp = c1.text_input("Código de Empleado*", placeholder="Ej: DOC-001")
             nombre_m = c2.text_input("Nombre Completo*")
-            
             telefono_m = c1.text_input("Teléfono de Contacto")
             email_m = c2.text_input("Correo Electrónico")
             turno_base = c1.selectbox("Turno Principal", ["Matutino", "Vespertino", "Tiempo Completo"])
             
             if st.form_submit_button("💾 Guardar Perfil Docente"):
                 if nombre_m and codigo_emp:
-                    # Guardamos el perfil
                     db.collection("maestros_perfil").add({
-                        "codigo": codigo_emp, # GUARDAMOS EL CÓDIGO
+                        "codigo": codigo_emp,
                         "nombre": nombre_m,
                         "contacto": {"tel": telefono_m, "email": email_m},
                         "turno_base": turno_base,
@@ -163,8 +160,8 @@ elif opcion == "Gestión Maestros":
     with tab_carga:
         st.markdown("##### Paso 2: Asignación de Materias y Grados")
         docs_m = db.collection("maestros_perfil").stream()
-        # Creamos un diccionario para identificar al maestro por nombre -> id
-        lista_profes = {f"{d.to_dict().get('codigo','?')} - {d.to_dict()['nombre']}": d.id for d in docs_m}
+        # Creamos diccionario seguro usando .get para evitar error si falta código
+        lista_profes = {f"{d.to_dict().get('codigo', 'S/C')} - {d.to_dict()['nombre']}": d.id for d in docs_m}
         
         if lista_profes:
             with st.form("form_carga"):
@@ -176,7 +173,7 @@ elif opcion == "Gestión Maestros":
 
                 if st.form_submit_button("🔗 Vincular Carga"):
                     if materias_imparte:
-                        nombre_limpio = nombre_seleccionado.split(" - ")[1] # Extraemos solo el nombre
+                        nombre_limpio = nombre_seleccionado.split(" - ")[1] if " - " in nombre_seleccionado else nombre_seleccionado
                         datos_asignacion = {
                             "id_docente": lista_profes[nombre_seleccionado],
                             "nombre_docente": nombre_limpio,
@@ -189,19 +186,29 @@ elif opcion == "Gestión Maestros":
                     else: st.error("Seleccione materias.")
         else: st.warning("Primero registre docentes en la pestaña 1.")
 
-    # --- TAB 3: VISUALIZACIÓN ---
+    # --- TAB 3: VISUALIZACIÓN (CORREGIDA) ---
     with tab_ver:
         st.subheader("Directorio Docente")
         docs_p = db.collection("maestros_perfil").stream()
         lista_p = [d.to_dict() for d in docs_p]
+        
         if lista_p:
             df_p = pd.DataFrame(lista_p)
-            # Mostramos el código en la tabla
+            
+            # --- BLINDAJE CONTRA KEYERROR ---
+            # Si no existe la columna 'codigo' (por datos viejos), la creamos
+            if 'codigo' not in df_p.columns:
+                df_p['codigo'] = "Sin Código"
+            
+            # Rellenamos vacíos por si acaso
+            df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
+            df_p['turno_base'] = df_p.get('turno_base', 'No definido') # Uso seguro de get
+
             st.dataframe(df_p[['codigo', 'nombre', 'turno_base']], use_container_width=True)
         else: st.info("Sin registros.")
 
 # ==========================================
-# 4. CONSULTA ALUMNOS (ACTUALIZADO "MIS MAESTROS")
+# 4. CONSULTA ALUMNOS
 # ==========================================
 elif opcion == "Consulta Alumnos":
     st.title("🔎 Directorio de Estudiantes")
@@ -247,15 +254,12 @@ elif opcion == "Consulta Alumnos":
             st.write(f"**Teléfono:** {enc.get('telefono', '-')}")
             st.write(f"**Dirección:** {enc.get('direccion', '-')}")
 
-        # --- AQUI ESTA LA ACTUALIZACION CRITICA: CONECTADO CON CARGA ACADEMICA ---
         with tab_maestros:
             st.subheader(f"Carga Académica: {alumno_seleccionado.get('grado_actual')}")
             grado_alumno = alumno_seleccionado.get('grado_actual')
             if grado_alumno:
-                # Buscamos en la colección NUEVA 'carga_academica'
                 cargas = db.collection("carga_academica").where("grado", "==", grado_alumno).stream()
                 lista_cargas = [c.to_dict() for c in cargas]
-                
                 if lista_cargas:
                     for carga in lista_cargas:
                         with st.container(border=True):
@@ -266,10 +270,8 @@ elif opcion == "Consulta Alumnos":
                             with c2: 
                                 st.write("**Imparte:**")
                                 for m in carga['materias']: st.markdown(f"- {m}")
-                else:
-                    st.warning(f"No hay carga académica asignada para {grado_alumno} todavía.")
-            else:
-                st.error("El alumno no tiene grado asignado.")
+                else: st.warning(f"No hay carga académica asignada para {grado_alumno}.")
+            else: st.error("El alumno no tiene grado asignado.")
 
         with tab_fin:
             pagos = db.collection("finanzas").where("alumno_nie", "==", alumno_seleccionado['nie']).where("tipo", "==", "ingreso").stream()
@@ -293,69 +295,40 @@ elif opcion == "Consulta Alumnos":
             else: st.info("Sin notas registradas.")
 
 # ==========================================
-# 5. FINANZAS (CON PAGO DE PLANILLA VINCULADO)
+# 5. FINANZAS
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
-    
     if 'recibo_temp' not in st.session_state: st.session_state.recibo_temp = None
     if 'reporte_html' not in st.session_state: st.session_state.reporte_html = None
 
     if st.session_state.recibo_temp:
-        # ... (CÓDIGO DE IMPRESIÓN IDÉNTICO AL ANTERIOR - OCULTO PARA NO REPETIR) ...
-        # (Aquí va el mismo bloque de impresión que ya funcionaba perfecto)
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
-        color_tema = "#2e7d32" if es_ingreso else "#c62828"
-        titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
-        logo_img = get_image_base64("logo.png")
-        img_html = f'<img src="{logo_img}" style="height: 70px; object-fit: contain;">' if logo_img else ""
-        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .ticket-container { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: 'Helvetica', 'Arial', sans-serif; background-color: white; color: #000000 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }</style>""", unsafe_allow_html=True)
-        st.success("✅ Transacción registrada exitosamente.")
+        color = "#2e7d32" if es_ingreso else "#c62828"
+        titulo = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
+        img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
+        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .tc { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .tc { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: sans-serif; background: white; color: black !important; }</style>""", unsafe_allow_html=True)
         
-        # Lógica para mostrar Código de Maestro si existe
         linea_extra = ""
         if r.get('alumno_nie'):
-            linea_extra = f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Alumno:</td><td style="padding: 8px; color: #000;">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td><td style="padding: 8px; font-weight: bold; color: #000;">Grado:</td><td style="padding: 8px; color: #000;">{r.get('alumno_grado')}</td></tr>"""
+            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Alumno:</td><td style="padding:8px">{r.get('nombre_persona')}</td><td style="padding:8px;font-weight:bold">Grado:</td><td style="padding:8px">{r.get('alumno_grado')}</td></tr>"""
         elif r.get('codigo_maestro'):
-            # SI ES UN MAESTRO, MOSTRAMOS SU CÓDIGO
-            linea_extra = f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Docente:</td><td style="padding: 8px; color: #000;">{r.get('nombre_persona')}</td><td style="padding: 8px; font-weight: bold; color: #000;">Código:</td><td style="padding: 8px; color: #000;">{r.get('codigo_maestro')}</td></tr>"""
+            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Docente:</td><td style="padding:8px">{r.get('nombre_persona')}</td><td style="padding:8px;font-weight:bold">Código:</td><td style="padding:8px">{r.get('codigo_maestro')}</td></tr>"""
         else:
-            linea_extra = f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Beneficiario:</td><td style="padding: 8px; color: #000;" colspan="3">{r.get('nombre_persona', 'N/A')}</td></tr>"""
+            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Beneficiario:</td><td style="padding:8px" colspan="3">{r.get('nombre_persona')}</td></tr>"""
 
-        html_ticket = f"""
-        <div class="ticket-container">
-        <div style="background-color: {color_tema}; color: white !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 15px;"><div style="background: white; padding: 5px; border-radius: 4px;">{img_html}</div><div><h3 class="header-text" style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p class="header-text" style="margin: 0; font-size: 12px; opacity: 0.9; color: white;">San Felipe, El Salvador</p></div></div>
-        <div style="text-align: right;"><h4 class="header-text" style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4><p class="header-text" style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
-        </div>
-        <div style="padding: 20px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #000;">{linea_extra}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #000;">Fecha:</td><td style="padding: 8px; color: #000;">{r['fecha_legible']}</td><td style="padding: 8px; font-weight: bold; color: #000;">Método Pago:</td><td style="padding: 8px; color: #000;">{r.get('metodo', 'Efectivo')}</td></tr></table><br>
-        <table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px; color: #000;"><thead style="background-color: #f9f9f9;"><tr><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema}; color: #000;">Descripción / Concepto</th><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema}; color: #000;">Observaciones</th><th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema}; width: 120px; color: #000;">Monto</th></tr></thead><tbody><tr><td style="padding: 15px 10px; color: #000;">{r['descripcion']}</td><td style="padding: 15px 10px; color: #444;">{r.get('observaciones', '-')}</td><td style="padding: 15px 10px; text-align: right; font-weight: bold; font-size: 16px; color: #000;">${r['monto']:.2f}</td></tr></tbody></table>
-        <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-end;"><div style="font-size: 12px; color: #666;"><p>Recibo generado electrónicamente.<br>Conserve este documento para cualquier reclamo.</p></div><div style="text-align: right;"><p style="margin: 0; font-size: 14px; color: #444;">Total Pagado:</p><h1 style="margin: 0; color: {color_tema}; font-size: 28px;">${r['monto']:.2f}</h1></div></div><br><br>
-        <div style="display: flex; justify-content: space-between; gap: 40px; margin-top: 10px;"><div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #000;">Firma y Sello Colegio</div><div style="flex: 1; border-top: 1px solid #aaa; text-align: center; padding-top: 5px; font-size: 12px; color: #000;">Firma Conforme</div></div></div><div style="border-top: 2px dashed #ccc; margin-top: 20px; padding-top: 10px; text-align: center; color: #ccc; font-size: 10px;">✂️ -- Corte aquí -- ✂️</div></div>
-        """
-        st.markdown(html_ticket, unsafe_allow_html=True)
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            if st.button("❌ Cerrar Recibo", type="primary"):
-                st.session_state.recibo_temp = None
-                st.rerun()
-        with c2: st.info("Presiona **Ctrl + P** para imprimir.")
+        html = f"""<div class="tc"><div style="background:{color};padding:15px;color:white!important;display:flex;justify-content:space-between;"><div style="display:flex;gap:15px"><div style="background:white;padding:5px;border-radius:4px">{img_h}</div><div><h3 style="margin:0;color:white">COLEGIO PROFA. BLANCA ELENA</h3><p style="margin:0;font-size:12px;color:white">San Felipe</p></div></div><div style="text-align:right"><h4 style="margin:0;color:white">{titulo}</h4><p style="margin:0;font-size:14px;color:white">#{str(int(datetime.now().timestamp()))[-6:]}</p></div></div><div style="padding:20px"><table style="width:100%;border-collapse:collapse;font-size:14px;color:black">{linea_extra}<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Fecha:</td><td style="padding:8px">{r['fecha_legible']}</td><td style="padding:8px;font-weight:bold">Pago:</td><td style="padding:8px">{r.get('metodo')}</td></tr></table><br><table style="width:100%;border:1px solid #ddd;border-collapse:collapse;font-size:14px;color:black"><thead style="background:#f9f9f9"><tr><th style="padding:10px;border-bottom:2px solid {color}">Concepto</th><th style="padding:10px;text-align:right;border-bottom:2px solid {color}">Monto</th></tr></thead><tbody><tr><td style="padding:15px">{r['descripcion']}</td><td style="padding:15px;text-align:right;font-weight:bold;font-size:16px">${r['monto']:.2f}</td></tr></tbody></table><div style="margin-top:20px;text-align:right"><h1 style="color:{color}">${r['monto']:.2f}</h1></div><br><br><div style="display:flex;justify-content:space-between;gap:40px"><div style="flex:1;border-top:1px solid #aaa;text-align:center;font-size:12px">Firma Colegio</div><div style="flex:1;border-top:1px solid #aaa;text-align:center;font-size:12px">Firma Conforme</div></div></div><div style="border-top:2px dashed #ccc;margin-top:20px;text-align:center;color:#ccc;font-size:10px">✂️ Corte</div></div>"""
+        st.markdown(html, unsafe_allow_html=True)
+        if st.button("❌ Cerrar"): st.session_state.recibo_temp = None; st.rerun()
 
     elif st.session_state.reporte_html:
-        # (CÓDIGO REPORTE PDF IDÉNTICO AL ANTERIOR)
-        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; color: black !important; } }</style>""", unsafe_allow_html=True)
+        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .rp { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; background: white; color: black !important; } }</style>""", unsafe_allow_html=True)
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            if st.button("⬅️ Volver", type="primary"): st.session_state.reporte_html = None; st.rerun()
-        with c2: st.info("🖨️ Imprimir como PDF.")
+        if st.button("⬅️ Volver"): st.session_state.reporte_html = None; st.rerun()
 
     else:
-        tab1, tab2, tab3 = st.tabs(["💵 Ingresos", "💸 Gastos", "📊 Reporte"])
-        
-        # INGRESOS
+        tab1, tab2, tab3 = st.tabs(["Ingresos", "Gastos", "Reporte"])
         with tab1:
             col_b, col_f = st.columns([1, 2])
             with col_b:
@@ -386,67 +359,52 @@ elif opcion == "Finanzas":
                             st.session_state.recibo_temp = data
                             st.session_state.alumno_pago = None
                             st.rerun()
-
-        # GASTOS (VINCULADO CON MAESTROS)
         with tab2:
             st.subheader("Registrar Salida de Dinero")
             with st.form("f_gasto"):
                 c1, c2 = st.columns(2)
                 cat = c1.selectbox("Categoría", ["Pago de Planilla (Maestros)", "Servicios", "Mantenimiento", "Materiales", "Otros"])
                 
-                # LÓGICA DINÁMICA DE PROVEEDOR
-                maestro_seleccionado_obj = None
-                proveedor_texto = ""
-                
-                # Si es planilla, cargamos lista de maestros
+                # SELECCIÓN DINÁMICA DE MAESTRO
+                maestro_obj = None
+                prov_txt = ""
                 if cat == "Pago de Planilla (Maestros)":
                     docs_m = db.collection("maestros_perfil").stream()
-                    # Diccionario nombre -> objeto completo
-                    lista_m = {f"{d.to_dict().get('nombre')} ({d.to_dict().get('codigo')})": d.to_dict() for d in docs_m}
-                    
+                    # Safe dict creation
+                    lista_m = {f"{d.to_dict().get('nombre')} ({d.to_dict().get('codigo','S/C')})": d.to_dict() for d in docs_m}
                     if lista_m:
-                        maestro_key = c1.selectbox("Seleccione Docente a Pagar", list(lista_m.keys()))
-                        maestro_seleccionado_obj = lista_m[maestro_key] # Guardamos el objeto
-                    else:
-                        c1.warning("No hay maestros registrados.")
+                        mk = c1.selectbox("Seleccione Docente", list(lista_m.keys()))
+                        maestro_obj = lista_m[mk]
+                    else: c1.warning("Sin maestros.")
                 else:
-                    proveedor_texto = c1.text_input("Pagar a (Nombre/Empresa):")
+                    prov_txt = c1.text_input("Pagar a:")
 
                 monto = c2.number_input("Monto $", min_value=0.01)
-                obs = st.text_area("Detalle del gasto")
+                obs = st.text_area("Detalle")
                 
-                if st.form_submit_button("🔴 Registrar Gasto"):
-                    # Determinamos nombre y código según selección
-                    if cat == "Pago de Planilla (Maestros)" and maestro_seleccionado_obj:
-                        nombre_final = maestro_seleccionado_obj['nombre']
-                        codigo_final = maestro_seleccionado_obj.get('codigo', '')
+                if st.form_submit_button("🔴 Registrar"):
+                    if cat == "Pago de Planilla (Maestros)" and maestro_obj:
+                        nom = maestro_obj['nombre']
+                        cod = maestro_obj.get('codigo', '')
                     else:
-                        nombre_final = proveedor_texto
-                        codigo_final = "" # No es maestro
+                        nom = prov_txt
+                        cod = ""
 
                     data = {
-                        "tipo": "egreso", 
-                        "descripcion": cat, 
-                        "monto": monto,
-                        "nombre_persona": nombre_final,
-                        "codigo_maestro": codigo_final, # GUARDAMOS EL CÓDIGO AQUI
-                        "observaciones": obs,
-                        "fecha": firestore.SERVER_TIMESTAMP, 
-                        "fecha_dt": datetime.now(),
+                        "tipo": "egreso", "descripcion": cat, "monto": monto,
+                        "nombre_persona": nom, "codigo_maestro": cod,
+                        "observaciones": obs, "fecha": firestore.SERVER_TIMESTAMP, "fecha_dt": datetime.now(),
                         "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M")
                     }
                     db.collection("finanzas").add(data)
                     st.session_state.recibo_temp = data
                     st.rerun()
-
-        # REPORTE
         with tab3:
             st.subheader("Generación de Reportes PDF")
             col_fil1, col_fil2, col_fil3 = st.columns(3)
             fecha_ini = col_fil1.date_input("Desde", value=date(datetime.now().year, 1, 1))
             fecha_fin = col_fil2.date_input("Hasta", value=datetime.now())
             tipo_filtro = col_fil3.selectbox("Filtrar por", ["Todos los Movimientos", "Solo Ingresos", "Solo Egresos"])
-
             if st.button("📄 Generar Vista de Impresión (PDF)"):
                 docs = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).stream()
                 lista_final = []
@@ -457,25 +415,14 @@ elif opcion == "Finanzas":
                     if raw_date:
                         if hasattr(raw_date, "date"): f_obj = raw_date.date()
                         elif isinstance(raw_date, datetime): f_obj = raw_date.date()
-                    
                     if f_obj and (fecha_ini <= f_obj <= fecha_fin):
                         if tipo_filtro == "Solo Ingresos" and d.get("tipo") != "ingreso": continue
                         if tipo_filtro == "Solo Egresos" and d.get("tipo") != "egreso": continue
-                        
-                        item = {
-                            "fecha": d.get("fecha_legible", "-"),
-                            "tipo": d.get("tipo", "Desconocido"),
-                            "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A",
-                            "nie": d.get("alumno_nie", "-"),
-                            "concepto": d.get("descripcion", "-"),
-                            "monto": d.get("monto", 0.0)
-                        }
+                        item = {"fecha": d.get("fecha_legible", "-"), "tipo": d.get("tipo", "Desconocido"), "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A", "nie": d.get("alumno_nie", "-"), "concepto": d.get("descripcion", "-"), "monto": d.get("monto", 0.0)}
                         lista_final.append(item)
-                
                 if not lista_final:
                     st.warning("No hay datos para generar el reporte con esos filtros.")
                 else:
-                    # (LÓGICA DE REPORTE IGUAL A LA VERSIÓN ANTERIOR)
                     df = pd.DataFrame(lista_final)
                     t_ing = df[df['tipo']=='ingreso']['monto'].sum()
                     t_egr = df[df['tipo']=='egreso']['monto'].sum()
@@ -495,7 +442,6 @@ elif opcion == "Finanzas":
 # ==========================================
 elif opcion == "Notas":
     st.title("📊 Notas")
-    # (MÓDULO DE NOTAS DE LA VERSIÓN ANTERIOR, YA INCLUIDO)
     if st.button("📥 Descargar Plantilla Excel (CSV)"):
         df_template = pd.DataFrame(columns=["NIE", "Materia", "Periodo 1", "Periodo 2", "Periodo 3"])
         df_template.loc[0] = ["1234567", "Matemáticas", 8.5, 9.0, 0.0]

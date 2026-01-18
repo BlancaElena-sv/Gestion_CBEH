@@ -1,24 +1,3 @@
-¡Manos a la obra! Vamos a atacar el **Módulo de Notas (Calificaciones)** hoy.
-
-Siguiendo nuestra estrategia de "5 días", la forma más rápida y eficiente de manejar notas sin tener que escribir una por una en la pantalla es **mediante carga masiva (Excel/CSV)**.
-
-### 🚀 Qué incluye esta actualización:
-
-1. **Nuevo Módulo de Notas:**
-* **Descarga de Plantilla:** Un botón para que los maestros descarguen el formato correcto.
-* **Carga de Notas:** Subes el archivo con las notas y el sistema calcula automáticamente el **Promedio Final**.
-* **Guardado en Nube:** Guarda todas las calificaciones en la base de datos vinculadas al NIE del alumno.
-
-
-2. **Actualización en "Consulta Alumnos":**
-* Ahora, cuando busques a un alumno, la pestaña **"Historial Académico"** ya no dirá "En construcción". Mostrará la boleta de calificaciones en tiempo real.
-
-
-3. **Mantenimiento:** Conservé intactos los módulos de Finanzas (Recibos media carta), Maestros e Inscripción.
-
-Aquí tienes el código **COMPLETO y DEFINITIVO**. Copia y pega todo en `app.py`.
-
-```python
 import streamlit as st
 import pandas as pd
 import firebase_admin
@@ -424,5 +403,3 @@ elif opcion == "Notas":
 # ==========================================
 elif opcion == "Configuración":
     st.header("⚙️ Configuración")
-
-```

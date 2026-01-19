@@ -87,7 +87,7 @@ elif opcion == "Inscripción Alumnos":
             apellidos = st.text_input("Apellidos*")
             estado = st.selectbox("Estado Actual", ["Activo", "Inactivo", "Retirado"]) 
         with c2:
-            grados = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
+            grados = ["Kinder 4", "Kinder 5", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
             grado = st.selectbox("Grado a Matricular", grados)
             turno = st.selectbox("Turno*", ["Matutino", "Vespertino"])
             encargado = st.text_input("Nombre del Responsable")

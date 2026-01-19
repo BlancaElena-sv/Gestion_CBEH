@@ -74,7 +74,7 @@ if opcion == "Inicio":
     c3.metric("Estado", "Activo")
 
 # ==========================================
-# 2. INSCRIPCIÓN ALUMNOS
+# 2. INSCRIPCIÓN ALUMNOS (CARGA MÚLTIPLE ACTIVADA)
 # ==========================================
 elif opcion == "Inscripción Alumnos":
     st.title("📝 Nueva Inscripción")
@@ -97,8 +97,11 @@ elif opcion == "Inscripción Alumnos":
         st.markdown("---")
         st.subheader("Documentación Digital")
         col_doc1, col_doc2 = st.columns(2)
-        with col_doc1: foto = st.file_uploader("📸 Foto de Perfil (Carnet)", type=["jpg", "png", "jpeg"])
-        with col_doc2: doc_pdf = st.file_uploader("📂 Documentos (Partida/DUI) - Opcional", type=["pdf", "jpg"])
+        with col_doc1: 
+            foto = st.file_uploader("📸 Foto de Perfil (Carnet)", type=["jpg", "png", "jpeg"])
+        with col_doc2: 
+            # AQUI CAMBIAMOS A MULTIPLE FILES = TRUE
+            docs_pdf = st.file_uploader("📂 Documentos (Partida, DUI, Cartilla) - Puede seleccionar varios", type=["pdf", "jpg", "png"], accept_multiple_files=True)
         
         enviado = st.form_submit_button("💾 Guardar Inscripción", type="primary")
 
@@ -108,6 +111,14 @@ elif opcion == "Inscripción Alumnos":
             else:
                 with st.spinner("Guardando expediente..."):
                     ruta = f"expedientes/{nie}"
+                    
+                    # Lógica para subir múltiples documentos
+                    lista_urls_docs = []
+                    if docs_pdf:
+                        for archivo in docs_pdf:
+                            url = subir_archivo(archivo, ruta)
+                            if url: lista_urls_docs.append(url)
+
                     datos = {
                         "nie": nie, "nombre_completo": f"{nombres} {apellidos}", 
                         "nombres": nombres, "apellidos": apellidos,
@@ -115,12 +126,12 @@ elif opcion == "Inscripción Alumnos":
                         "encargado": {"nombre": encargado, "telefono": telefono, "direccion": direccion},
                         "documentos": {
                             "foto_url": subir_archivo(foto, ruta),
-                            "doc_url": subir_archivo(doc_pdf, ruta)
+                            "doc_urls": lista_urls_docs # Guardamos la lista de URLs
                         },
                         "fecha_registro": firestore.SERVER_TIMESTAMP
                     }
                     db.collection("alumnos").document(nie).set(datos)
-                    st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
+                    st.success(f"✅ ¡Alumno inscrito con {len(lista_urls_docs)} documentos adjuntos!")
 
 # ==========================================
 # 3. GESTIÓN DE MAESTROS
@@ -316,14 +327,14 @@ elif opcion == "Gestión Maestros":
         else: st.info("Sin registros.")
 
 # ==========================================
-# 4. CONSULTA ALUMNOS (MEJORADO: EDICIÓN Y DOCS)
+# 4. CONSULTA ALUMNOS (VISOR DE MÚLTIPLES DOCS)
 # ==========================================
 elif opcion == "Consulta Alumnos":
     st.title("🔎 Directorio de Estudiantes")
     
     tipo_busqueda = st.radio("Modo de Búsqueda:", ["Búsqueda por NIE", "Ver Listado por Grado"], horizontal=True)
     alumno_seleccionado = None
-    alumno_id = None # Guardamos el ID (que es el NIE en tu logica) para editar
+    alumno_id = None 
 
     if tipo_busqueda == "Búsqueda por NIE":
         nie_input = st.text_input("Ingrese NIE:", placeholder="Ej: 12345")
@@ -344,25 +355,21 @@ elif opcion == "Consulta Alumnos":
             seleccion = st.selectbox("Seleccione alumno:", ["Seleccionar..."] + list(opciones.keys()))
             if seleccion != "Seleccionar...": 
                 alumno_seleccionado = opciones[seleccion]
-                alumno_id = alumno_seleccionado['nie'] # El ID es el NIE
+                alumno_id = alumno_seleccionado['nie']
 
     if alumno_seleccionado:
         st.markdown("---")
-        
-        # --- MODO EDICIÓN (NUEVO) ---
         col_view, col_edit = st.columns([4, 1])
         with col_edit:
             modo_edicion = st.toggle("✏️ Habilitar Edición")
 
         if modo_edicion:
-            st.warning("⚠️ Modo Edición Activo: Modifique los datos y guarde.")
+            st.warning("⚠️ Modo Edición Activo.")
             with st.form("form_edit_alumno"):
                 c1, c2 = st.columns(2)
-                # Recuperamos datos actuales
                 new_nombres = c1.text_input("Nombres", value=alumno_seleccionado.get('nombres',''))
                 new_apellidos = c2.text_input("Apellidos", value=alumno_seleccionado.get('apellidos',''))
                 
-                # Manejo seguro de índices
                 lista_grados = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
                 curr_grado = alumno_seleccionado.get('grado_actual')
                 idx_g = lista_grados.index(curr_grado) if curr_grado in lista_grados else 0
@@ -374,46 +381,49 @@ elif opcion == "Consulta Alumnos":
                 new_turno = c2.selectbox("Turno", lista_turnos, index=idx_t)
                 
                 new_estado = c1.selectbox("Estado", ["Activo", "Inactivo", "Retirado"], index=["Activo", "Inactivo", "Retirado"].index(alumno_seleccionado.get('estado','Activo')))
-                
                 enc = alumno_seleccionado.get('encargado', {})
                 new_encargado = c2.text_input("Encargado", value=enc.get('nombre',''))
                 new_telefono = c1.text_input("Teléfono", value=enc.get('telefono',''))
                 new_direccion = st.text_area("Dirección", value=enc.get('direccion',''))
                 
-                st.markdown("##### 📂 Actualizar/Agregar Documentos")
+                st.markdown("##### 📂 Actualizar Documentos")
                 col_d1, col_d2 = st.columns(2)
                 new_foto = col_d1.file_uploader("Actualizar Foto", type=["jpg","png"])
-                new_doc = col_d2.file_uploader("Actualizar Documento (PDF/IMG)", type=["pdf","jpg","png"])
+                # Aquí se permite subir nuevos documentos adicionales
+                new_docs = col_d2.file_uploader("Agregar Documentos (Se sumarán a los existentes)", type=["pdf","jpg","png"], accept_multiple_files=True)
                 
                 if st.form_submit_button("💾 Guardar Cambios"):
                     ruta = f"expedientes/{alumno_id}"
-                    
-                    # Logica para mantener URLs viejas si no se sube nada nuevo
                     docs_actuales = alumno_seleccionado.get('documentos', {})
-                    url_foto_final = subir_archivo(new_foto, ruta) if new_foto else docs_actuales.get('foto_url')
-                    url_doc_final = subir_archivo(new_doc, ruta) if new_doc else docs_actuales.get('doc_url')
                     
-                    # Actualizar DB
+                    # Foto: Si suben nueva, reemplaza. Si no, mantiene.
+                    url_foto_final = subir_archivo(new_foto, ruta) if new_foto else docs_actuales.get('foto_url')
+                    
+                    # Documentos: Se suman a la lista existente
+                    urls_existentes = docs_actuales.get("doc_urls", [])
+                    if docs_actuales.get("doc_url"): # Migración de dato viejo
+                        urls_existentes.append(docs_actuales.get("doc_url"))
+                    
+                    if new_docs:
+                        for f in new_docs:
+                            u = subir_archivo(f, ruta)
+                            if u: urls_existentes.append(u)
+                    
                     db.collection("alumnos").document(alumno_id).update({
                         "nombres": new_nombres, "apellidos": new_apellidos,
                         "nombre_completo": f"{new_nombres} {new_apellidos}",
                         "grado_actual": new_grado, "turno": new_turno, "estado": new_estado,
                         "encargado": {"nombre": new_encargado, "telefono": new_telefono, "direccion": new_direccion},
-                        "documentos": {"foto_url": url_foto_final, "doc_url": url_doc_final}
+                        "documentos": {"foto_url": url_foto_final, "doc_urls": urls_existentes}
                     })
-                    st.success("Expediente actualizado correctamente.")
-                    time.sleep(1.5)
-                    st.rerun()
+                    st.success("Expediente actualizado."); time.sleep(1.5); st.rerun()
 
         else:
-            # --- MODO VISUALIZACIÓN (NORMAL) ---
             col_foto, col_info = st.columns([1, 4])
             docs_data = alumno_seleccionado.get("documentos", {})
-            
             with col_foto:
                 foto_url = docs_data.get("foto_url")
                 st.image(foto_url if foto_url else "https://via.placeholder.com/150?text=Sin+Foto", width=120)
-            
             with col_info:
                 st.title(alumno_seleccionado['nombre_completo'])
                 st.markdown(f"#### 🎓 {alumno_seleccionado.get('grado_actual', 'Sin Grado')} | 🕒 {alumno_seleccionado.get('turno', 'Sin Turno')}")
@@ -436,21 +446,27 @@ elif opcion == "Consulta Alumnos":
                 st.markdown("---")
                 st.subheader("📂 Documentación Adjunta")
                 
-                # --- VISOR DE DOCUMENTOS MEJORADO ---
-                doc_url = docs_data.get("doc_url")
-                if doc_url:
-                    st.success("✅ Documento de identidad/Partida cargado.")
-                    # Boton para ver
-                    st.link_button("👁️ Ver Documento (Abrir en nueva pestaña)", doc_url)
+                # --- VISUALIZADOR INTELIGENTE ---
+                # Recuperar lista nueva o archivo único viejo
+                lista_docs = docs_data.get("doc_urls", [])
+                if docs_data.get("doc_url"): lista_docs.append(docs_data.get("doc_url"))
+                
+                # Eliminar duplicados si los hubiera
+                lista_docs = list(set(lista_docs))
+                
+                if lista_docs:
+                    st.success(f"✅ Se encontraron {len(lista_docs)} documentos.")
+                    cols = st.columns(len(lista_docs)) if len(lista_docs) < 4 else st.columns(3)
                     
-                    # Intento de previsualización (iframe) para PDFs
-                    if ".pdf" in doc_url.lower():
-                        st.markdown(f'<iframe src="{doc_url}" width="100%" height="500px"></iframe>', unsafe_allow_html=True)
-                    else:
-                        # Si es imagen
-                        st.image(doc_url, width=300, caption="Vista previa documento")
+                    for i, url in enumerate(lista_docs):
+                        with st.expander(f"📄 Documento {i+1}"):
+                            st.link_button("🔗 Abrir en nueva pestaña", url)
+                            if ".pdf" in url.lower():
+                                st.markdown(f'<iframe src="{url}" width="100%" height="400"></iframe>', unsafe_allow_html=True)
+                            else:
+                                st.image(url)
                 else:
-                    st.info("⚠️ No hay documentos adjuntos. Active el 'Modo Edición' para subirlos.")
+                    st.info("⚠️ No hay documentos adjuntos.")
 
             with tab_maestros:
                 st.subheader(f"Carga Académica: {alumno_seleccionado.get('grado_actual')}")
@@ -508,7 +524,6 @@ elif opcion == "Finanzas":
         titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
         
-        # CSS NUCLEAR
         st.markdown("""
 <style>
 @media print {

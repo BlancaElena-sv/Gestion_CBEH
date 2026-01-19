@@ -123,7 +123,7 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
 
 # ==========================================
-# 3. GESTIÓN DE MAESTROS
+# 3. GESTIÓN DE MAESTROS (MATERIAS ACTUALIZADAS)
 # ==========================================
 elif opcion == "Gestión Maestros":
     st.title("👩‍🏫 Plantilla Docente")
@@ -131,7 +131,22 @@ elif opcion == "Gestión Maestros":
     tab_perfil, tab_carga, tab_admin, tab_ver = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "✏️ Administrar", "📋 Ver Planilla"])
     
     LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
-    LISTA_MATERIAS = ["Matemáticas", "Lenguaje y Literatura", "Ciencias Salud y M.A.", "Estudios Sociales", "Inglés", "Educación Artística", "Educación Física", "Moral y Cívica", "Informática", "Ortografía", "Caligrafía"]
+    
+    # --- LISTA ACTUALIZADA SEGÚN TU CUADRO + ORTOGRAFÍA Y CALIGRAFÍA ---
+    LISTA_MATERIAS = [
+        # Parvularia
+        "Lenguaje y Comunicación", "Exploración y Experimentación con el Mundo", "Desarrollo Personal y Social", "Lenguajes Artísticos",
+        # I Ciclo (1-3)
+        "Comunicación", "Números y Formas", 
+        # II Ciclo (4-6)
+        "Comunicación y Literatura", "Aritmética y Finanzas", 
+        # III Ciclo (7-9)
+        "Lenguaje y Literatura", "Matemática y Datos", "Inglés",
+        # Comunes / Transversales
+        "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal",
+        # Adicionales Solicitados
+        "Ortografía", "Caligrafía", "Informática", "Moral y Cívica"
+    ]
 
     # --- TAB 1: REGISTRO ---
     with tab_perfil:

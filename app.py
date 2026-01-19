@@ -511,3 +511,51 @@ elif opcion == "Notas":
 # ==========================================
 elif opcion == "Configuración":
     st.header("⚙️ Configuración")
+
+# ==========================================
+# 7. CONFIGURACIÓN (ZONA DE PELIGRO)
+# ==========================================
+elif opcion == "Configuración":
+    st.header("⚙️ Configuración del Sistema")
+    
+    st.info("Aquí puedes administrar parámetros generales del sistema.")
+
+    st.markdown("---")
+    st.subheader("🚨 Zona de Peligro")
+    st.warning("Las siguientes acciones son irreversibles. Úselas con precaución.")
+
+    with st.expander("🗑️ BORRAR TODA LA BASE DE DATOS (REINICIO DE FÁBRICA)"):
+        st.error("¡CUIDADO! Esto borrará permanentemente:")
+        st.markdown("""
+        - ❌ Todos los alumnos inscritos
+        - ❌ Todos los maestros y cargas académicas
+        - ❌ Todo el historial financiero (pagos y gastos)
+        - ❌ Todas las notas registradas
+        """)
+        
+        confirmacion = st.text_input("Escribe 'BORRAR TODO' para confirmar:")
+        
+        if st.button("💣 Ejecutar Borrado Completo", type="primary"):
+            if confirmacion == "BORRAR TODO":
+                progress_text = "Eliminando datos..."
+                my_bar = st.progress(0, text=progress_text)
+                
+                # Lista de colecciones a limpiar
+                colecciones = ["alumnos", "maestros", "maestros_perfil", "carga_academica", "finanzas", "notas"]
+                
+                total_cols = len(colecciones)
+                contador = 0
+                
+                for col_name in colecciones:
+                    docs = db.collection(col_name).stream()
+                    for doc in docs:
+                        doc.reference.delete()
+                    
+                    contador += 1
+                    my_bar.progress(int((contador / total_cols) * 100), text=f"Limpiando {col_name}...")
+                
+                my_bar.empty()
+                st.success("✅ El sistema ha sido formateado. La base de datos está vacía y lista para datos reales.")
+                st.balloons()
+            else:
+                st.error("Debes escribir la frase de confirmación exacta.")

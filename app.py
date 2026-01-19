@@ -369,7 +369,7 @@ elif opcion == "Finanzas":
 
         html_ticket = f"""
         <div class="ticket-container">
-        <div style="background-color: {color_tema}; color: white !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="background-color: {color_tema}; color: black !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 15px;"><div style="background: white; padding: 5px; border-radius: 4px;">{img_h}</div><div><h3 style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin: 0; font-size: 12px; color: white;">San Felipe, El Salvador</p></div></div>
         <div style="text-align: right;"><h4 style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4><p style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
         </div>

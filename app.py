@@ -128,7 +128,6 @@ elif opcion == "Inscripción Alumnos":
 elif opcion == "Gestión Maestros":
     st.title("👩‍🏫 Plantilla Docente")
     
-    # TRES PESTAÑAS: REGISTRO, CARGA Y ADMIN
     tab_perfil, tab_carga, tab_admin, tab_ver = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "✏️ Administrar", "📋 Ver Planilla"])
     
     LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
@@ -162,6 +161,7 @@ elif opcion == "Gestión Maestros":
     with tab_carga:
         st.markdown("##### Paso 2: Asignación de Materias y Grados")
         docs_m = db.collection("maestros_perfil").stream()
+        # Uso seguro de .get() para evitar KeyErrors con registros antiguos
         lista_profes = {f"{d.to_dict().get('codigo', 'S/C')} - {d.to_dict()['nombre']}": d.id for d in docs_m}
         
         if lista_profes:
@@ -218,7 +218,6 @@ elif opcion == "Gestión Maestros":
                         nuevo_tel = c_e1.text_input("Teléfono", value=contacto.get('tel', ''))
                         nuevo_email = c_e2.text_input("Email", value=contacto.get('email', ''))
                         
-                        # Manejo seguro del índice para el selectbox
                         turno_actual = maestro_edit.get('turno_base', 'Matutino')
                         opciones_turno = ["Matutino", "Vespertino", "Tiempo Completo"]
                         idx_turno = opciones_turno.index(turno_actual) if turno_actual in opciones_turno else 0
@@ -237,7 +236,7 @@ elif opcion == "Gestión Maestros":
                         db.collection("maestros_perfil").document(id_edit).delete()
                         st.success("Registro eliminado."); time.sleep(1.5); st.rerun()
 
-    # --- TAB 4: VER PLANILLA (CORREGIDA PARA EVITAR KEYERROR) ---
+    # --- TAB 4: VER PLANILLA ---
     with tab_ver:
         st.subheader("Directorio Docente")
         docs_p = db.collection("maestros_perfil").stream()
@@ -245,7 +244,7 @@ elif opcion == "Gestión Maestros":
         
         if lista_p:
             df_p = pd.DataFrame(lista_p)
-            # Aseguramos que existan las columnas para que no falle con datos viejos
+            # Relleno de seguridad para evitar errores con datos viejos
             if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
             df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
             df_p['turno_base'] = df_p.get('turno_base', 'No definido')
@@ -341,14 +340,14 @@ elif opcion == "Consulta Alumnos":
             else: st.info("Sin notas registradas.")
 
 # ==========================================
-# 5. FINANZAS
+# 5. FINANZAS (CON ARREGLO DE IMPRESIÓN BLANCA)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Finanzas del Colegio")
     if 'recibo_temp' not in st.session_state: st.session_state.recibo_temp = None
     if 'reporte_html' not in st.session_state: st.session_state.reporte_html = None
 
-    # --- MODO RECIBO ---
+    # --- MODO RECIBO (CSS REFORZADO PARA EVITAR BLANCOS) ---
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
@@ -356,29 +355,121 @@ elif opcion == "Finanzas":
         titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
         
-        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .ticket-container { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: sans-serif; background: white; color: black !important; }</style>""", unsafe_allow_html=True)
-        st.success("✅ Transacción registrada exitosamente.")
+        # CSS NUCLEAR: Forzar colores explícitos para impresión
+        st.markdown("""
+        <style>
+        @media print {
+            /* Ocultar interfaz Streamlit */
+            body * { visibility: hidden; }
+            [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
+            
+            /* Mostrar solo el ticket */
+            .ticket-container, .ticket-container * {
+                visibility: visible !important;
+            }
+            
+            .ticket-container {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                background-color: white !important; /* Fondo blanco explícito */
+                margin: 0 !important;
+                padding: 20px !important;
+            }
+            
+            /* FORZAR TEXTO NEGRO EN TODO EL TICKET */
+            .ticket-container p, .ticket-container h1, .ticket-container h2, 
+            .ticket-container h3, .ticket-container h4, .ticket-container span, 
+            .ticket-container div, .ticket-container td, .ticket-container th {
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+            }
+            
+            /* Excepción para texto blanco en encabezados de color */
+            .header-text {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+            }
+            
+            /* Forzar impresión de fondos de color */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.success("✅ Transacción registrada. Listo para imprimir.")
         
         linea_extra = ""
         if r.get('alumno_nie'):
-            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Alumno:</td><td style="padding:8px">{r.get('nombre_persona')}</td><td style="padding:8px;font-weight:bold">Grado:</td><td style="padding:8px">{r.get('alumno_grado')}</td></tr>"""
+            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold;color:black">Alumno:</td><td style="padding:8px;color:black">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td><td style="padding:8px;font-weight:bold;color:black">Grado:</td><td style="padding:8px;color:black">{r.get('alumno_grado')}</td></tr>"""
         elif r.get('codigo_maestro'):
-            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Docente:</td><td style="padding:8px">{r.get('nombre_persona')}</td><td style="padding:8px;font-weight:bold">Código:</td><td style="padding:8px">{r.get('codigo_maestro')}</td></tr>"""
+            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold;color:black">Docente:</td><td style="padding:8px;color:black">{r.get('nombre_persona')}</td><td style="padding:8px;font-weight:bold;color:black">Código:</td><td style="padding:8px;color:black">{r.get('codigo_maestro')}</td></tr>"""
         else:
-            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Beneficiario:</td><td style="padding:8px" colspan="3">{r.get('nombre_persona')}</td></tr>"""
+            linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold;color:black">Beneficiario:</td><td style="padding:8px;color:black" colspan="3">{r.get('nombre_persona')}</td></tr>"""
 
+        # HTML CON CLASES DE COLOR NEGRO EXPLICITAS
         html_ticket = f"""
-        <div class="ticket-container">
-        <div style="background-color: {color_tema}; color: black !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 15px;"><div style="background: white; padding: 5px; border-radius: 4px;">{img_h}</div><div><h3 style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin: 0; font-size: 12px; color: white;">San Felipe, El Salvador</p></div></div>
-        <div style="text-align: right;"><h4 style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4><p style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
+        <div class="ticket-container" style="font-family: Arial, sans-serif; color: black; background: white; border: 1px solid #ccc;">
+            <div style="background-color: {color_tema}; color: white !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="background: white; padding: 5px; border-radius: 4px;">{img_h}</div>
+                    <div>
+                        <h3 class="header-text" style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA</h3>
+                        <p class="header-text" style="margin: 0; font-size: 12px; opacity: 0.9; color: white;">San Felipe, El Salvador</p>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <h4 class="header-text" style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4>
+                    <p class="header-text" style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p>
+                </div>
+            </div>
+            
+            <div style="padding: 20px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: black;">
+                    {linea_extra}
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px; font-weight: bold; color: black;">Fecha:</td>
+                        <td style="padding: 8px; color: black;">{r['fecha_legible']}</td>
+                        <td style="padding: 8px; font-weight: bold; color: black;">Método Pago:</td>
+                        <td style="padding: 8px; color: black;">{r.get('metodo', 'Efectivo')}</td>
+                    </tr>
+                </table>
+                <br>
+                <table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px; color: black;">
+                    <thead style="background-color: #f9f9f9;">
+                        <tr>
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema}; color: black;">Concepto</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema}; color: black;">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 15px; color: black;">{r['descripcion']} <br> <span style="font-size:12px; color:#555;">{r.get('observaciones', '')}</span></td>
+                            <td style="padding: 15px; text-align: right; font-weight: bold; font-size: 16px; color: black;">${r['monto']:.2f}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div style="margin-top: 20px; text-align: right;">
+                    <h1 style="color: {color_tema}; margin: 0;">${r['monto']:.2f}</h1>
+                    <p style="font-size: 12px; color: black;">Total Pagado</p>
+                </div>
+                
+                <br><br>
+                <div style="display: flex; justify-content: space-between; gap: 40px; margin-top: 10px;">
+                    <div style="flex: 1; border-top: 1px solid #000; text-align: center; font-size: 12px; color: black; padding-top: 5px;">Firma y Sello Colegio</div>
+                    <div style="flex: 1; border-top: 1px solid #000; text-align: center; font-size: 12px; color: black; padding-top: 5px;">Firma Conforme</div>
+                </div>
+            </div>
+            
+            <div style="border-top: 2px dashed #ccc; margin-top: 20px; text-align: center; color: #ccc; font-size: 10px; padding: 5px;">
+                ✂️ -- Corte aquí -- ✂️
+            </div>
         </div>
-        <div style="padding: 20px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #000;">{linea_extra}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold;">Fecha:</td><td style="padding: 8px;">{r['fecha_legible']}</td><td style="padding: 8px; font-weight: bold;">Pago:</td><td style="padding: 8px;">{r.get('metodo')}</td></tr></table><br>
-        <table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px; color: #000;"><thead style="background-color: #f9f9f9;"><tr><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Concepto</th><th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema};">Monto</th></tr></thead><tbody><tr><td style="padding: 15px;">{r['descripcion']}</td><td style="padding: 15px; text-align: right; font-weight: bold; font-size: 16px;">${r['monto']:.2f}</td></tr></tbody></table>
-        <div style="margin-top: 20px; text-align: right;"><h1 style="color: {color_tema};">${r['monto']:.2f}</h1></div><br><br>
-        <div style="display: flex; justify-content: space-between; gap: 40px; margin-top: 10px;"><div style="flex: 1; border-top: 1px solid #aaa; text-align: center; font-size: 12px;">Firma Colegio</div><div style="flex: 1; border-top: 1px solid #aaa; text-align: center; font-size: 12px;">Firma Conforme</div></div>
-        </div><div style="border-top: 2px dashed #ccc; margin-top: 20px; text-align: center; color: #ccc; font-size: 10px;">✂️ -- Corte aquí -- ✂️</div></div>
         """
         st.markdown(html_ticket, unsafe_allow_html=True)
         c1, c2 = st.columns([1, 4])
@@ -388,19 +479,13 @@ elif opcion == "Finanzas":
                 st.rerun()
         with c2: st.info("Presiona **Ctrl + P** para imprimir.")
 
-    # --- MODO REPORTE ---
     elif st.session_state.reporte_html:
         st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; color: black !important; } }</style>""", unsafe_allow_html=True)
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            if st.button("⬅️ Volver", type="primary"): st.session_state.reporte_html = None; st.rerun()
-        with c2: st.info("🖨️ Presiona **Ctrl + P** y selecciona 'Guardar como PDF'.")
+        if st.button("⬅️ Volver"): st.session_state.reporte_html = None; st.rerun()
 
     else:
         tab1, tab2, tab3 = st.tabs(["Ingresos", "Gastos", "Reporte"])
-        
-        # INGRESOS
         with tab1:
             col_b, col_f = st.columns([1, 2])
             with col_b:
@@ -431,14 +516,11 @@ elif opcion == "Finanzas":
                             st.session_state.recibo_temp = data
                             st.session_state.alumno_pago = None
                             st.rerun()
-        
-        # GASTOS
         with tab2:
             st.subheader("Registrar Salida de Dinero")
             with st.form("f_gasto"):
                 c1, c2 = st.columns(2)
                 cat = c1.selectbox("Categoría", ["Pago de Planilla (Maestros)", "Servicios", "Mantenimiento", "Materiales", "Otros"])
-                
                 maestro_obj = None
                 prov_txt = ""
                 if cat == "Pago de Planilla (Maestros)":
@@ -471,8 +553,6 @@ elif opcion == "Finanzas":
                     db.collection("finanzas").add(data)
                     st.session_state.recibo_temp = data
                     st.rerun()
-        
-        # REPORTES
         with tab3:
             st.subheader("Generación de Reportes PDF")
             col_fil1, col_fil2, col_fil3 = st.columns(3)

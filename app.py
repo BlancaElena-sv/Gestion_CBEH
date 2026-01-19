@@ -4,12 +4,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime, date
 import base64
-import time # NUEVO: Para recargar la página al editar/borrar
+import time
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
 
-# --- CONEXIÓN INTELIGENTE ---
+# --- CONEXIÓN INTELIGENTE A FIREBASE ---
 @st.cache_resource
 def conectar_firebase():
     if not firebase_admin._apps:
@@ -123,13 +123,13 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
 
 # ==========================================
-# 3. GESTIÓN DE MAESTROS (CON EDICIÓN/BORRADO)
+# 3. GESTIÓN DE MAESTROS
 # ==========================================
 elif opcion == "Gestión Maestros":
     st.title("👩‍🏫 Plantilla Docente")
     
-    # NUEVA PESTAÑA: ADMIN
-    tab_perfil, tab_carga, tab_admin = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "✏️ Administrar (Editar/Borrar)"])
+    # TRES PESTAÑAS: REGISTRO, CARGA Y ADMIN
+    tab_perfil, tab_carga, tab_admin, tab_ver = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "✏️ Administrar", "📋 Ver Planilla"])
     
     LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
     LISTA_MATERIAS = ["Matemáticas", "Lenguaje y Literatura", "Ciencias Salud y M.A.", "Estudios Sociales", "Inglés", "Educación Artística", "Educación Física", "Moral y Cívica", "Informática", "Ortografía", "Caligrafía"]
@@ -190,61 +190,68 @@ elif opcion == "Gestión Maestros":
     # --- TAB 3: ADMINISTRAR (EDITAR / BORRAR) ---
     with tab_admin:
         st.subheader("🛠️ Mantenimiento de Docentes")
-        
-        # Recuperamos la lista completa con IDs para poder editar/borrar
         docs_admin = db.collection("maestros_perfil").stream()
         profes_admin = []
         for d in docs_admin:
             data = d.to_dict()
-            data['id'] = d.id # Guardamos el ID del documento
+            data['id'] = d.id 
             profes_admin.append(data)
             
         if not profes_admin:
-            st.info("No hay docentes registrados para administrar.")
+            st.info("No hay docentes registrados.")
         else:
-            # Selector para elegir a quién editar
             opciones_admin = {f"{p.get('codigo','?')} - {p['nombre']}": p for p in profes_admin}
-            seleccion_admin = st.selectbox("Seleccione Docente a modificar:", ["Seleccionar..."] + list(opciones_admin.keys()))
+            seleccion_admin = st.selectbox("Seleccione Docente:", ["Seleccionar..."] + list(opciones_admin.keys()))
             
             if seleccion_admin != "Seleccionar...":
                 maestro_edit = opciones_admin[seleccion_admin]
                 id_edit = maestro_edit['id']
-                
                 st.markdown("---")
-                st.markdown(f"### Gestionando a: **{maestro_edit['nombre']}**")
+                accion = st.radio("Acción:", ["✏️ Editar", "🗑️ Eliminar"], horizontal=True)
                 
-                accion = st.radio("¿Qué desea hacer?", ["✏️ Editar Datos", "🗑️ Eliminar Registro"], horizontal=True)
-                
-                if accion == "✏️ Editar Datos":
+                if accion == "✏️ Editar":
                     with st.form("form_edicion"):
                         c_e1, c_e2 = st.columns(2)
                         nuevo_cod = c_e1.text_input("Código", value=maestro_edit.get('codigo', ''))
                         nuevo_nom = c_e2.text_input("Nombre", value=maestro_edit.get('nombre', ''))
-                        
                         contacto = maestro_edit.get('contacto', {})
                         nuevo_tel = c_e1.text_input("Teléfono", value=contacto.get('tel', ''))
                         nuevo_email = c_e2.text_input("Email", value=contacto.get('email', ''))
                         
-                        nuevo_turno = c_e1.selectbox("Turno", ["Matutino", "Vespertino", "Tiempo Completo"], index=["Matutino", "Vespertino", "Tiempo Completo"].index(maestro_edit.get('turno_base', 'Matutino')))
+                        # Manejo seguro del índice para el selectbox
+                        turno_actual = maestro_edit.get('turno_base', 'Matutino')
+                        opciones_turno = ["Matutino", "Vespertino", "Tiempo Completo"]
+                        idx_turno = opciones_turno.index(turno_actual) if turno_actual in opciones_turno else 0
+                        nuevo_turno = c_e1.selectbox("Turno", opciones_turno, index=idx_turno)
                         
                         if st.form_submit_button("✅ Guardar Cambios"):
                             db.collection("maestros_perfil").document(id_edit).update({
-                                "codigo": nuevo_cod,
-                                "nombre": nuevo_nom,
-                                "contacto": {"tel": nuevo_tel, "email": nuevo_email},
-                                "turno_base": nuevo_turno
+                                "codigo": nuevo_cod, "nombre": nuevo_nom,
+                                "contacto": {"tel": nuevo_tel, "email": nuevo_email}, "turno_base": nuevo_turno
                             })
-                            st.success("Datos actualizados correctamente.")
-                            time.sleep(1.5)
-                            st.rerun()
+                            st.success("Datos actualizados."); time.sleep(1.5); st.rerun()
                             
-                elif accion == "🗑️ Eliminar Registro":
-                    st.warning("⚠️ ¡Cuidado! Esta acción es irreversible.")
+                elif accion == "🗑️ Eliminar":
+                    st.warning("⚠️ Acción irreversible.")
                     if st.button("🔴 Confirmar Eliminación"):
                         db.collection("maestros_perfil").document(id_edit).delete()
-                        st.success(f"El registro de {maestro_edit['nombre']} ha sido eliminado.")
-                        time.sleep(1.5)
-                        st.rerun()
+                        st.success("Registro eliminado."); time.sleep(1.5); st.rerun()
+
+    # --- TAB 4: VER PLANILLA (CORREGIDA PARA EVITAR KEYERROR) ---
+    with tab_ver:
+        st.subheader("Directorio Docente")
+        docs_p = db.collection("maestros_perfil").stream()
+        lista_p = [d.to_dict() for d in docs_p]
+        
+        if lista_p:
+            df_p = pd.DataFrame(lista_p)
+            # Aseguramos que existan las columnas para que no falle con datos viejos
+            if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
+            df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
+            df_p['turno_base'] = df_p.get('turno_base', 'No definido')
+
+            st.dataframe(df_p[['codigo', 'nombre', 'turno_base']], use_container_width=True)
+        else: st.info("Sin registros.")
 
 # ==========================================
 # 4. CONSULTA ALUMNOS
@@ -341,13 +348,16 @@ elif opcion == "Finanzas":
     if 'recibo_temp' not in st.session_state: st.session_state.recibo_temp = None
     if 'reporte_html' not in st.session_state: st.session_state.reporte_html = None
 
+    # --- MODO RECIBO ---
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
-        color = "#2e7d32" if es_ingreso else "#c62828"
-        titulo = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
+        color_tema = "#2e7d32" if es_ingreso else "#c62828"
+        titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
-        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .tc { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .tc { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: sans-serif; background: white; color: black !important; }</style>""", unsafe_allow_html=True)
+        
+        st.markdown("""<style>@media print { @page { margin: 0; size: auto; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .ticket-container { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; } } .ticket-container { width: 100%; max-width: 850px; margin: auto; border: 1px solid #ddd; font-family: sans-serif; background: white; color: black !important; }</style>""", unsafe_allow_html=True)
+        st.success("✅ Transacción registrada exitosamente.")
         
         linea_extra = ""
         if r.get('alumno_nie'):
@@ -357,17 +367,40 @@ elif opcion == "Finanzas":
         else:
             linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Beneficiario:</td><td style="padding:8px" colspan="3">{r.get('nombre_persona')}</td></tr>"""
 
-        html = f"""<div class="tc"><div style="background:{color};padding:15px;color:white!important;display:flex;justify-content:space-between;"><div style="display:flex;gap:15px"><div style="background:white;padding:5px;border-radius:4px">{img_h}</div><div><h3 style="margin:0;color:white">COLEGIO PROFA. BLANCA ELENA</h3><p style="margin:0;font-size:12px;color:white">San Felipe</p></div></div><div style="text-align:right"><h4 style="margin:0;color:white">{titulo}</h4><p style="margin:0;font-size:14px;color:white">#{str(int(datetime.now().timestamp()))[-6:]}</p></div></div><div style="padding:20px"><table style="width:100%;border-collapse:collapse;font-size:14px;color:black">{linea_extra}<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Fecha:</td><td style="padding:8px">{r['fecha_legible']}</td><td style="padding:8px;font-weight:bold">Pago:</td><td style="padding:8px">{r.get('metodo')}</td></tr></table><br><table style="width:100%;border:1px solid #ddd;border-collapse:collapse;font-size:14px;color:black"><thead style="background:#f9f9f9"><tr><th style="padding:10px;border-bottom:2px solid {color}">Concepto</th><th style="padding:10px;text-align:right;border-bottom:2px solid {color}">Monto</th></tr></thead><tbody><tr><td style="padding:15px">{r['descripcion']}</td><td style="padding:15px;text-align:right;font-weight:bold;font-size:16px">${r['monto']:.2f}</td></tr></tbody></table><div style="margin-top:20px;text-align:right"><h1 style="color:{color}">${r['monto']:.2f}</h1></div><br><br><div style="display:flex;justify-content:space-between;gap:40px"><div style="flex:1;border-top:1px solid #aaa;text-align:center;font-size:12px">Firma Colegio</div><div style="flex:1;border-top:1px solid #aaa;text-align:center;font-size:12px">Firma Conforme</div></div></div><div style="border-top:2px dashed #ccc;margin-top:20px;text-align:center;color:#ccc;font-size:10px">✂️ Corte</div></div>"""
-        st.markdown(html, unsafe_allow_html=True)
-        if st.button("❌ Cerrar"): st.session_state.recibo_temp = None; st.rerun()
+        html_ticket = f"""
+        <div class="ticket-container">
+        <div style="background-color: {color_tema}; color: white !important; padding: 15px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 15px;"><div style="background: white; padding: 5px; border-radius: 4px;">{img_h}</div><div><h3 style="margin: 0; font-size: 18px; color: white;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin: 0; font-size: 12px; color: white;">San Felipe, El Salvador</p></div></div>
+        <div style="text-align: right;"><h4 style="margin: 0; font-size: 16px; color: white;">{titulo_doc}</h4><p style="margin: 0; font-size: 14px; color: white;">Folio: #{str(int(datetime.now().timestamp()))[-6:]}</p></div>
+        </div>
+        <div style="padding: 20px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #000;">{linea_extra}<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold;">Fecha:</td><td style="padding: 8px;">{r['fecha_legible']}</td><td style="padding: 8px; font-weight: bold;">Pago:</td><td style="padding: 8px;">{r.get('metodo')}</td></tr></table><br>
+        <table style="width: 100%; border: 1px solid #ddd; border-collapse: collapse; font-size: 14px; color: #000;"><thead style="background-color: #f9f9f9;"><tr><th style="padding: 10px; text-align: left; border-bottom: 2px solid {color_tema};">Concepto</th><th style="padding: 10px; text-align: right; border-bottom: 2px solid {color_tema};">Monto</th></tr></thead><tbody><tr><td style="padding: 15px;">{r['descripcion']}</td><td style="padding: 15px; text-align: right; font-weight: bold; font-size: 16px;">${r['monto']:.2f}</td></tr></tbody></table>
+        <div style="margin-top: 20px; text-align: right;"><h1 style="color: {color_tema};">${r['monto']:.2f}</h1></div><br><br>
+        <div style="display: flex; justify-content: space-between; gap: 40px; margin-top: 10px;"><div style="flex: 1; border-top: 1px solid #aaa; text-align: center; font-size: 12px;">Firma Colegio</div><div style="flex: 1; border-top: 1px solid #aaa; text-align: center; font-size: 12px;">Firma Conforme</div></div>
+        </div><div style="border-top: 2px dashed #ccc; margin-top: 20px; text-align: center; color: #ccc; font-size: 10px;">✂️ -- Corte aquí -- ✂️</div></div>
+        """
+        st.markdown(html_ticket, unsafe_allow_html=True)
+        c1, c2 = st.columns([1, 4])
+        with c1:
+            if st.button("❌ Cerrar Recibo", type="primary"):
+                st.session_state.recibo_temp = None
+                st.rerun()
+        with c2: st.info("Presiona **Ctrl + P** para imprimir.")
 
+    # --- MODO REPORTE ---
     elif st.session_state.reporte_html:
-        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .rp { visibility: visible !important; position: absolute; left: 0; top: 0; width: 100%; background: white; color: black !important; } }</style>""", unsafe_allow_html=True)
+        st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; color: black !important; } }</style>""", unsafe_allow_html=True)
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
-        if st.button("⬅️ Volver"): st.session_state.reporte_html = None; st.rerun()
+        c1, c2 = st.columns([1, 4])
+        with c1:
+            if st.button("⬅️ Volver", type="primary"): st.session_state.reporte_html = None; st.rerun()
+        with c2: st.info("🖨️ Presiona **Ctrl + P** y selecciona 'Guardar como PDF'.")
 
     else:
         tab1, tab2, tab3 = st.tabs(["Ingresos", "Gastos", "Reporte"])
+        
+        # INGRESOS
         with tab1:
             col_b, col_f = st.columns([1, 2])
             with col_b:
@@ -398,11 +431,14 @@ elif opcion == "Finanzas":
                             st.session_state.recibo_temp = data
                             st.session_state.alumno_pago = None
                             st.rerun()
+        
+        # GASTOS
         with tab2:
             st.subheader("Registrar Salida de Dinero")
             with st.form("f_gasto"):
                 c1, c2 = st.columns(2)
                 cat = c1.selectbox("Categoría", ["Pago de Planilla (Maestros)", "Servicios", "Mantenimiento", "Materiales", "Otros"])
+                
                 maestro_obj = None
                 prov_txt = ""
                 if cat == "Pago de Planilla (Maestros)":
@@ -435,6 +471,8 @@ elif opcion == "Finanzas":
                     db.collection("finanzas").add(data)
                     st.session_state.recibo_temp = data
                     st.rerun()
+        
+        # REPORTES
         with tab3:
             st.subheader("Generación de Reportes PDF")
             col_fil1, col_fil2, col_fil3 = st.columns(3)
@@ -507,55 +545,32 @@ elif opcion == "Notas":
         except Exception as e: st.error(f"Error: {e}")
 
 # ==========================================
-# 7. CONFIGURACIÓN
-# ==========================================
-elif opcion == "Configuración":
-    st.header("⚙️ Configuración")
-
-# ==========================================
 # 7. CONFIGURACIÓN (ZONA DE PELIGRO)
 # ==========================================
 elif opcion == "Configuración":
     st.header("⚙️ Configuración del Sistema")
-    
     st.info("Aquí puedes administrar parámetros generales del sistema.")
-
     st.markdown("---")
     st.subheader("🚨 Zona de Peligro")
-    st.warning("Las siguientes acciones son irreversibles. Úselas con precaución.")
+    st.warning("Las siguientes acciones son irreversibles.")
 
     with st.expander("🗑️ BORRAR TODA LA BASE DE DATOS (REINICIO DE FÁBRICA)"):
-        st.error("¡CUIDADO! Esto borrará permanentemente:")
-        st.markdown("""
-        - ❌ Todos los alumnos inscritos
-        - ❌ Todos los maestros y cargas académicas
-        - ❌ Todo el historial financiero (pagos y gastos)
-        - ❌ Todas las notas registradas
-        """)
-        
+        st.error("¡CUIDADO! Esto borrará permanentemente alumnos, maestros, finanzas y notas.")
         confirmacion = st.text_input("Escribe 'BORRAR TODO' para confirmar:")
         
         if st.button("💣 Ejecutar Borrado Completo", type="primary"):
             if confirmacion == "BORRAR TODO":
-                progress_text = "Eliminando datos..."
-                my_bar = st.progress(0, text=progress_text)
-                
-                # Lista de colecciones a limpiar
+                prog = st.progress(0, text="Eliminando...")
                 colecciones = ["alumnos", "maestros", "maestros_perfil", "carga_academica", "finanzas", "notas"]
+                count = 0
+                for col in colecciones:
+                    docs = db.collection(col).stream()
+                    for d in docs: d.reference.delete()
+                    count += 1
+                    prog.progress(int((count / len(colecciones)) * 100))
                 
-                total_cols = len(colecciones)
-                contador = 0
-                
-                for col_name in colecciones:
-                    docs = db.collection(col_name).stream()
-                    for doc in docs:
-                        doc.reference.delete()
-                    
-                    contador += 1
-                    my_bar.progress(int((contador / total_cols) * 100), text=f"Limpiando {col_name}...")
-                
-                my_bar.empty()
-                st.success("✅ El sistema ha sido formateado. La base de datos está vacía y lista para datos reales.")
+                prog.empty()
+                st.success("✅ Sistema formateado correctamente.")
                 st.balloons()
             else:
-                st.error("Debes escribir la frase de confirmación exacta.")
+                st.error("Código de confirmación incorrecto.")

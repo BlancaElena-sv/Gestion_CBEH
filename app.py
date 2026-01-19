@@ -123,7 +123,7 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
 
 # ==========================================
-# 3. GESTIÓN DE MAESTROS (CON FILTROS AVANZADOS)
+# 3. GESTIÓN DE MAESTROS
 # ==========================================
 elif opcion == "Gestión Maestros":
     st.title("👩‍🏫 Plantilla Docente")
@@ -139,17 +139,11 @@ elif opcion == "Gestión Maestros":
     LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
     
     LISTA_MATERIAS = [
-        # Parvularia
         "Lenguaje y Comunicación", "Exploración y Experimentación con el Mundo", "Desarrollo Personal y Social", "Lenguajes Artísticos", "Pensamiento Matematico",
-        # I Ciclo (1-3)
         "Comunicación", "Números y Formas", 
-        # II Ciclo (4-6)
         "Comunicación y Literatura", "Aritmética y Finanzas", 
-        # III Ciclo (7-9)
-        "Lenguaje y Literatura", "Matemática y Datos", "Inglés", "Educación Física y Deportes",
-        # Comunes / Transversales
+        "Lenguaje y Literatura", "Matemática y Datos", "Inglés", "Educación Física",
         "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal",
-        # Adicionales Solicitados
         "Ortografía", "Caligrafía", "Informática", "Moral y Cívica"
     ]
 
@@ -206,11 +200,9 @@ elif opcion == "Gestión Maestros":
                     else: st.error("Seleccione materias.")
         else: st.warning("Primero registre docentes en la pestaña 1.")
 
-    # --- TAB 3: ADMINISTRAR CARGAS (CON FILTROS) ---
+    # --- TAB 3: ADMINISTRAR CARGAS ---
     with tab_admin_cargas:
         st.subheader("🛠️ Gestión de Cargas Académicas")
-        
-        # Obtener todas las cargas
         docs_c = db.collection("carga_academica").stream()
         cargas_list = []
         for d in docs_c:
@@ -220,82 +212,53 @@ elif opcion == "Gestión Maestros":
             
         if cargas_list:
             df_c = pd.DataFrame(cargas_list)
-            
-            # --- ZONA DE FILTROS ---
             st.markdown("Filtrar visualización:")
             col_f1, col_f2 = st.columns(2)
-            
-            # 1. Filtro por Docente
             docentes_unicos = ["Todos"] + sorted(df_c['nombre_docente'].unique().tolist())
             filtro_docente = col_f1.selectbox("Filtrar por Maestro:", docentes_unicos)
-            
-            # 2. Filtro por Grado
             grados_unicos = ["Todos"] + sorted(df_c['grado'].unique().tolist())
             filtro_grado = col_f2.selectbox("Filtrar por Grado:", grados_unicos)
             
-            # Aplicar filtros al DataFrame
             df_filtered = df_c.copy()
-            if filtro_docente != "Todos":
-                df_filtered = df_filtered[df_filtered['nombre_docente'] == filtro_docente]
-            if filtro_grado != "Todos":
-                df_filtered = df_filtered[df_filtered['grado'] == filtro_grado]
+            if filtro_docente != "Todos": df_filtered = df_filtered[df_filtered['nombre_docente'] == filtro_docente]
+            if filtro_grado != "Todos": df_filtered = df_filtered[df_filtered['grado'] == filtro_grado]
                 
-            # Mostrar tabla filtrada
             st.info(f"Mostrando {len(df_filtered)} registros.")
             st.dataframe(df_filtered[['nombre_docente', 'grado', 'materias', 'nota']], use_container_width=True)
-            
             st.markdown("---")
             st.write("#### Modificar o Eliminar una Carga")
             
-            # Selector inteligente: Solo muestra las cargas que pasaron el filtro
             if not df_filtered.empty:
                 opciones_c = {f"{row['nombre_docente']} - {row['grado']} ({len(row['materias'])} mats)": row['id'] for index, row in df_filtered.iterrows()}
                 seleccion_c_id = st.selectbox("Seleccione la carga a gestionar (de la lista filtrada):", ["Seleccionar..."] + list(opciones_c.keys()))
                 
                 if seleccion_c_id != "Seleccionar...":
                     id_carga_real = opciones_c[seleccion_c_id]
-                    # Recuperar el objeto completo original
                     carga_obj = next((item for item in cargas_list if item["id"] == id_carga_real), None)
-                    
                     if carga_obj:
                         accion_c = st.radio("Acción requerida:", ["✏️ Editar Materias/Grado", "🗑️ Eliminar Asignación"], horizontal=True)
-                        
                         if accion_c == "✏️ Editar Materias/Grado":
                             with st.form("form_edit_carga"):
                                 st.info(f"Editando carga de: **{carga_obj['nombre_docente']}**")
-                                
                                 idx_grado = LISTA_GRADOS.index(carga_obj['grado']) if carga_obj['grado'] in LISTA_GRADOS else 0
                                 nuevo_grado = st.selectbox("Grado", LISTA_GRADOS, index=idx_grado)
-                                
                                 default_mats = [m for m in carga_obj['materias'] if m in LISTA_MATERIAS]
                                 nuevas_mats = st.multiselect("Materias", LISTA_MATERIAS, default=default_mats)
-                                
                                 nueva_nota = st.text_input("Nota", value=carga_obj.get('nota', ''))
-                                
                                 if st.form_submit_button("✅ Guardar Cambios"):
                                     if nuevas_mats:
                                         db.collection("carga_academica").document(id_carga_real).update({
-                                            "grado": nuevo_grado,
-                                            "materias": nuevas_mats,
-                                            "nota": nueva_nota
+                                            "grado": nuevo_grado, "materias": nuevas_mats, "nota": nueva_nota
                                         })
-                                        st.success("Carga actualizada correctamente.")
-                                        time.sleep(1.5)
-                                        st.rerun()
-                                    else:
-                                        st.error("Debe seleccionar al menos una materia.")
-                                        
+                                        st.success("Carga actualizada."); time.sleep(1.5); st.rerun()
+                                    else: st.error("Debe seleccionar al menos una materia.")
                         elif accion_c == "🗑️ Eliminar Asignación":
                             st.warning(f"⚠️ ¿Eliminar carga de {carga_obj['nombre_docente']} en {carga_obj['grado']}?")
                             if st.button("🔴 Confirmar Eliminación"):
                                 db.collection("carga_academica").document(id_carga_real).delete()
-                                st.success("Asignación eliminada.")
-                                time.sleep(1.5)
-                                st.rerun()
-            else:
-                st.warning("No hay registros que coincidan con los filtros para editar.")
-        else:
-            st.info("No hay cargas académicas registradas.")
+                                st.success("Asignación eliminada."); time.sleep(1.5); st.rerun()
+            else: st.warning("No hay registros que coincidan con los filtros.")
+        else: st.info("No hay cargas académicas registradas.")
 
     # --- TAB 4: ADMIN DOCENTES ---
     with tab_admin_profes:
@@ -306,19 +269,15 @@ elif opcion == "Gestión Maestros":
             data = d.to_dict()
             data['id'] = d.id 
             profes_admin.append(data)
-            
-        if not profes_admin:
-            st.info("No hay docentes registrados.")
+        if not profes_admin: st.info("No hay docentes registrados.")
         else:
             opciones_admin = {f"{p.get('codigo','?')} - {p['nombre']}": p for p in profes_admin}
             seleccion_admin = st.selectbox("Seleccione Docente a editar:", ["Seleccionar..."] + list(opciones_admin.keys()))
-            
             if seleccion_admin != "Seleccionar...":
                 maestro_edit = opciones_admin[seleccion_admin]
                 id_edit = maestro_edit['id']
                 st.markdown("---")
                 accion = st.radio("Acción:", ["✏️ Editar Perfil", "🗑️ Eliminar Docente"], horizontal=True)
-                
                 if accion == "✏️ Editar Perfil":
                     with st.form("form_edicion"):
                         c_e1, c_e2 = st.columns(2)
@@ -327,19 +286,16 @@ elif opcion == "Gestión Maestros":
                         contacto = maestro_edit.get('contacto', {})
                         nuevo_tel = c_e1.text_input("Teléfono", value=contacto.get('tel', ''))
                         nuevo_email = c_e2.text_input("Email", value=contacto.get('email', ''))
-                        
                         turno_actual = maestro_edit.get('turno_base', 'Matutino')
                         opciones_turno = ["Matutino", "Vespertino", "Tiempo Completo"]
                         idx_turno = opciones_turno.index(turno_actual) if turno_actual in opciones_turno else 0
                         nuevo_turno = c_e1.selectbox("Turno", opciones_turno, index=idx_turno)
-                        
                         if st.form_submit_button("✅ Guardar Cambios"):
                             db.collection("maestros_perfil").document(id_edit).update({
                                 "codigo": nuevo_cod, "nombre": nuevo_nom,
                                 "contacto": {"tel": nuevo_tel, "email": nuevo_email}, "turno_base": nuevo_turno
                             })
                             st.success("Datos actualizados."); time.sleep(1.5); st.rerun()
-                            
                 elif accion == "🗑️ Eliminar Docente":
                     st.warning("⚠️ Acción irreversible.")
                     if st.button("🔴 Confirmar Eliminación de Docente"):
@@ -351,30 +307,31 @@ elif opcion == "Gestión Maestros":
         st.subheader("Directorio Docente")
         docs_p = db.collection("maestros_perfil").stream()
         lista_p = [d.to_dict() for d in docs_p]
-        
         if lista_p:
             df_p = pd.DataFrame(lista_p)
             if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
             df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
             df_p['turno_base'] = df_p.get('turno_base', 'No definido')
-
             st.dataframe(df_p[['codigo', 'nombre', 'turno_base']], use_container_width=True)
         else: st.info("Sin registros.")
 
 # ==========================================
-# 4. CONSULTA ALUMNOS
+# 4. CONSULTA ALUMNOS (MEJORADO: EDICIÓN Y DOCS)
 # ==========================================
 elif opcion == "Consulta Alumnos":
     st.title("🔎 Directorio de Estudiantes")
     
     tipo_busqueda = st.radio("Modo de Búsqueda:", ["Búsqueda por NIE", "Ver Listado por Grado"], horizontal=True)
     alumno_seleccionado = None
+    alumno_id = None # Guardamos el ID (que es el NIE en tu logica) para editar
 
     if tipo_busqueda == "Búsqueda por NIE":
         nie_input = st.text_input("Ingrese NIE:", placeholder="Ej: 12345")
         if st.button("Buscar Expediente") and nie_input:
             doc = db.collection("alumnos").document(nie_input).get()
-            if doc.exists: alumno_seleccionado = doc.to_dict()
+            if doc.exists: 
+                alumno_seleccionado = doc.to_dict()
+                alumno_id = nie_input
             else: st.error("❌ No encontrado.")
     else:
         grados = ["Todos", "Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
@@ -385,68 +342,155 @@ elif opcion == "Consulta Alumnos":
         if lista_alumnos:
             opciones = {f"{a['nie']} - {a['nombre_completo']}": a for a in lista_alumnos}
             seleccion = st.selectbox("Seleccione alumno:", ["Seleccionar..."] + list(opciones.keys()))
-            if seleccion != "Seleccionar...": alumno_seleccionado = opciones[seleccion]
+            if seleccion != "Seleccionar...": 
+                alumno_seleccionado = opciones[seleccion]
+                alumno_id = alumno_seleccionado['nie'] # El ID es el NIE
 
     if alumno_seleccionado:
         st.markdown("---")
-        col_foto, col_info = st.columns([1, 4])
-        with col_foto:
-            foto_url = alumno_seleccionado.get("documentos", {}).get("foto_url")
-            st.image(foto_url if foto_url else "https://via.placeholder.com/150?text=Sin+Foto", width=100)
-        with col_info:
-            st.title(alumno_seleccionado['nombre_completo'])
-            st.markdown(f"#### 🎓 {alumno_seleccionado.get('grado_actual', 'Sin Grado')} | 🕒 {alumno_seleccionado.get('turno', 'Sin Turno')}")
-            est = alumno_seleccionado.get('estado', 'Activo')
-            st.markdown(f"<span style='background-color:{'green' if est=='Activo' else 'red'}; color:white; padding:5px 10px; border-radius:5px;'>{est}</span>", unsafe_allow_html=True)
-
-        tab_gral, tab_maestros, tab_fin, tab_acad = st.tabs(["📋 General", "👨‍🏫 Mis Maestros", "💰 Finanzas", "📊 Notas"])
         
-        with tab_gral:
-            enc = alumno_seleccionado.get('encargado', {})
-            st.write(f"**NIE:** {alumno_seleccionado.get('nie')}")
-            st.write(f"**Responsable:** {enc.get('nombre', '-')}")
-            st.write(f"**Teléfono:** {enc.get('telefono', '-')}")
-            st.write(f"**Dirección:** {enc.get('direccion', '-')}")
+        # --- MODO EDICIÓN (NUEVO) ---
+        col_view, col_edit = st.columns([4, 1])
+        with col_edit:
+            modo_edicion = st.toggle("✏️ Habilitar Edición")
 
-        with tab_maestros:
-            st.subheader(f"Carga Académica: {alumno_seleccionado.get('grado_actual')}")
-            grado_alumno = alumno_seleccionado.get('grado_actual')
-            if grado_alumno:
-                cargas = db.collection("carga_academica").where("grado", "==", grado_alumno).stream()
-                lista_cargas = [c.to_dict() for c in cargas]
-                if lista_cargas:
-                    for carga in lista_cargas:
-                        with st.container(border=True):
-                            c1, c2 = st.columns([1, 3])
-                            with c1: 
-                                st.write(f"**{carga['nombre_docente']}**")
-                                if carga.get('nota'): st.caption(carga['nota'])
-                            with c2: 
-                                st.write("**Imparte:**")
-                                for m in carga['materias']: st.markdown(f"- {m}")
-                else: st.warning(f"No hay carga académica asignada para {grado_alumno}.")
-            else: st.error("El alumno no tiene grado asignado.")
+        if modo_edicion:
+            st.warning("⚠️ Modo Edición Activo: Modifique los datos y guarde.")
+            with st.form("form_edit_alumno"):
+                c1, c2 = st.columns(2)
+                # Recuperamos datos actuales
+                new_nombres = c1.text_input("Nombres", value=alumno_seleccionado.get('nombres',''))
+                new_apellidos = c2.text_input("Apellidos", value=alumno_seleccionado.get('apellidos',''))
+                
+                # Manejo seguro de índices
+                lista_grados = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
+                curr_grado = alumno_seleccionado.get('grado_actual')
+                idx_g = lista_grados.index(curr_grado) if curr_grado in lista_grados else 0
+                new_grado = c1.selectbox("Grado", lista_grados, index=idx_g)
+                
+                lista_turnos = ["Matutino", "Vespertino"]
+                curr_turno = alumno_seleccionado.get('turno', 'Matutino')
+                idx_t = lista_turnos.index(curr_turno) if curr_turno in lista_turnos else 0
+                new_turno = c2.selectbox("Turno", lista_turnos, index=idx_t)
+                
+                new_estado = c1.selectbox("Estado", ["Activo", "Inactivo", "Retirado"], index=["Activo", "Inactivo", "Retirado"].index(alumno_seleccionado.get('estado','Activo')))
+                
+                enc = alumno_seleccionado.get('encargado', {})
+                new_encargado = c2.text_input("Encargado", value=enc.get('nombre',''))
+                new_telefono = c1.text_input("Teléfono", value=enc.get('telefono',''))
+                new_direccion = st.text_area("Dirección", value=enc.get('direccion',''))
+                
+                st.markdown("##### 📂 Actualizar/Agregar Documentos")
+                col_d1, col_d2 = st.columns(2)
+                new_foto = col_d1.file_uploader("Actualizar Foto", type=["jpg","png"])
+                new_doc = col_d2.file_uploader("Actualizar Documento (PDF/IMG)", type=["pdf","jpg","png"])
+                
+                if st.form_submit_button("💾 Guardar Cambios"):
+                    ruta = f"expedientes/{alumno_id}"
+                    
+                    # Logica para mantener URLs viejas si no se sube nada nuevo
+                    docs_actuales = alumno_seleccionado.get('documentos', {})
+                    url_foto_final = subir_archivo(new_foto, ruta) if new_foto else docs_actuales.get('foto_url')
+                    url_doc_final = subir_archivo(new_doc, ruta) if new_doc else docs_actuales.get('doc_url')
+                    
+                    # Actualizar DB
+                    db.collection("alumnos").document(alumno_id).update({
+                        "nombres": new_nombres, "apellidos": new_apellidos,
+                        "nombre_completo": f"{new_nombres} {new_apellidos}",
+                        "grado_actual": new_grado, "turno": new_turno, "estado": new_estado,
+                        "encargado": {"nombre": new_encargado, "telefono": new_telefono, "direccion": new_direccion},
+                        "documentos": {"foto_url": url_foto_final, "doc_url": url_doc_final}
+                    })
+                    st.success("Expediente actualizado correctamente.")
+                    time.sleep(1.5)
+                    st.rerun()
 
-        with tab_fin:
-            pagos = db.collection("finanzas").where("alumno_nie", "==", alumno_seleccionado['nie']).where("tipo", "==", "ingreso").stream()
-            lista_p = [p.to_dict() for p in pagos]
-            if lista_p:
-                df_p = pd.DataFrame(lista_p).sort_values(by="fecha_legible", ascending=False)
-                st.dataframe(df_p[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
-            else: st.info("Sin pagos registrados.")
+        else:
+            # --- MODO VISUALIZACIÓN (NORMAL) ---
+            col_foto, col_info = st.columns([1, 4])
+            docs_data = alumno_seleccionado.get("documentos", {})
+            
+            with col_foto:
+                foto_url = docs_data.get("foto_url")
+                st.image(foto_url if foto_url else "https://via.placeholder.com/150?text=Sin+Foto", width=120)
+            
+            with col_info:
+                st.title(alumno_seleccionado['nombre_completo'])
+                st.markdown(f"#### 🎓 {alumno_seleccionado.get('grado_actual', 'Sin Grado')} | 🕒 {alumno_seleccionado.get('turno', 'Sin Turno')}")
+                est = alumno_seleccionado.get('estado', 'Activo')
+                st.markdown(f"<span style='background-color:{'green' if est=='Activo' else 'red'}; color:white; padding:5px 10px; border-radius:5px;'>{est}</span>", unsafe_allow_html=True)
 
-        with tab_acad:
-            notas_ref = db.collection("notas").where("nie", "==", alumno_seleccionado['nie']).stream()
-            lista_notas = [n.to_dict() for n in notas_ref]
-            if lista_notas:
-                df_notas = pd.DataFrame(lista_notas)
-                cols = ["materia", "p1", "p2", "p3", "promedio"]
-                for c in cols: 
-                    if c not in df_notas.columns: df_notas[c] = 0
-                st.dataframe(df_notas[cols], use_container_width=True)
-                prom = df_notas["promedio"].mean()
-                if prom > 0: st.metric("Promedio Global", f"{prom:.1f}")
-            else: st.info("Sin notas registradas.")
+            tab_gral, tab_maestros, tab_fin, tab_acad = st.tabs(["📋 General & Documentos", "👨‍🏫 Mis Maestros", "💰 Finanzas", "📊 Notas"])
+            
+            with tab_gral:
+                c1, c2 = st.columns(2)
+                enc = alumno_seleccionado.get('encargado', {})
+                with c1:
+                    st.write(f"**NIE:** {alumno_seleccionado.get('nie')}")
+                    st.write(f"**Responsable:** {enc.get('nombre', '-')}")
+                    st.write(f"**Teléfono:** {enc.get('telefono', '-')}")
+                with c2:
+                    st.write(f"**Dirección:** {enc.get('direccion', '-')}")
+                    st.write(f"**Fecha Registro:** {alumno_seleccionado.get('fecha_registro', '-')}")
+                
+                st.markdown("---")
+                st.subheader("📂 Documentación Adjunta")
+                
+                # --- VISOR DE DOCUMENTOS MEJORADO ---
+                doc_url = docs_data.get("doc_url")
+                if doc_url:
+                    st.success("✅ Documento de identidad/Partida cargado.")
+                    # Boton para ver
+                    st.link_button("👁️ Ver Documento (Abrir en nueva pestaña)", doc_url)
+                    
+                    # Intento de previsualización (iframe) para PDFs
+                    if ".pdf" in doc_url.lower():
+                        st.markdown(f'<iframe src="{doc_url}" width="100%" height="500px"></iframe>', unsafe_allow_html=True)
+                    else:
+                        # Si es imagen
+                        st.image(doc_url, width=300, caption="Vista previa documento")
+                else:
+                    st.info("⚠️ No hay documentos adjuntos. Active el 'Modo Edición' para subirlos.")
+
+            with tab_maestros:
+                st.subheader(f"Carga Académica: {alumno_seleccionado.get('grado_actual')}")
+                grado_alumno = alumno_seleccionado.get('grado_actual')
+                if grado_alumno:
+                    cargas = db.collection("carga_academica").where("grado", "==", grado_alumno).stream()
+                    lista_cargas = [c.to_dict() for c in cargas]
+                    if lista_cargas:
+                        for carga in lista_cargas:
+                            with st.container(border=True):
+                                c1, c2 = st.columns([1, 3])
+                                with c1: 
+                                    st.write(f"**{carga['nombre_docente']}**")
+                                    if carga.get('nota'): st.caption(carga['nota'])
+                                with c2: 
+                                    st.write("**Imparte:**")
+                                    for m in carga['materias']: st.markdown(f"- {m}")
+                    else: st.warning(f"No hay carga académica asignada para {grado_alumno}.")
+                else: st.error("El alumno no tiene grado asignado.")
+
+            with tab_fin:
+                pagos = db.collection("finanzas").where("alumno_nie", "==", alumno_seleccionado['nie']).where("tipo", "==", "ingreso").stream()
+                lista_p = [p.to_dict() for p in pagos]
+                if lista_p:
+                    df_p = pd.DataFrame(lista_p).sort_values(by="fecha_legible", ascending=False)
+                    st.dataframe(df_p[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
+                else: st.info("Sin pagos registrados.")
+
+            with tab_acad:
+                notas_ref = db.collection("notas").where("nie", "==", alumno_seleccionado['nie']).stream()
+                lista_notas = [n.to_dict() for n in notas_ref]
+                if lista_notas:
+                    df_notas = pd.DataFrame(lista_notas)
+                    cols = ["materia", "p1", "p2", "p3", "promedio"]
+                    for c in cols: 
+                        if c not in df_notas.columns: df_notas[c] = 0
+                    st.dataframe(df_notas[cols], use_container_width=True)
+                    prom = df_notas["promedio"].mean()
+                    if prom > 0: st.metric("Promedio Global", f"{prom:.1f}")
+                else: st.info("Sin notas registradas.")
 
 # ==========================================
 # 5. FINANZAS
@@ -456,7 +500,7 @@ elif opcion == "Finanzas":
     if 'recibo_temp' not in st.session_state: st.session_state.recibo_temp = None
     if 'reporte_html' not in st.session_state: st.session_state.reporte_html = None
 
-    # --- MODO RECIBO (SIN SANGRIA EN HTML) ---
+    # --- MODO RECIBO ---
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
         es_ingreso = r['tipo'] == 'ingreso'
@@ -464,7 +508,7 @@ elif opcion == "Finanzas":
         titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
         
-        # CSS NUCLEAR: COLORES EXPLICITOS
+        # CSS NUCLEAR
         st.markdown("""
 <style>
 @media print {
@@ -496,7 +540,6 @@ elif opcion == "Finanzas":
         else:
             linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Beneficiario:</td><td style="padding:8px" colspan="3">{r.get('nombre_persona')}</td></tr>"""
 
-        # HTML PEGADO A LA IZQUIERDA (SIN SANGRIA)
         html_ticket = f"""
 <div class="ticket-container" style="font-family:Arial,sans-serif;color:black;background:white;border:1px solid #ccc;">
 <div style="background-color:{color_tema};color:white!important;padding:15px;display:flex;align-items:center;justify-content:space-between;">
@@ -643,7 +686,6 @@ elif opcion == "Finanzas":
                         color_tipo = "green" if row['tipo'] == 'ingreso' else "red"
                         filas_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; color:#000;">{row['fecha']}</td><td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td><td style="padding: 8px; color:#000;">{row['persona']}</td><td style="padding: 8px; color:#000;">{row['concepto']}</td><td style="padding: 8px; text-align: right; color:#000;">${row['monto']:.2f}</td></tr>"""
                     
-                    # HTML SIN SANGRIA PARA EL REPORTE
                     html_reporte = f"""
 <div class="report-print" style="font-family:Arial,sans-serif;padding:20px;color:black!important;">
 <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #333;padding-bottom:10px;">

@@ -135,7 +135,7 @@ elif opcion == "Gestión Maestros":
     # --- LISTA ACTUALIZADA SEGÚN TU CUADRO + ORTOGRAFÍA Y CALIGRAFÍA ---
     LISTA_MATERIAS = [
         # Parvularia
-        "Lenguaje y Comunicación", "Exploración y Experimentación con el Mundo", "Desarrollo Personal y Social", "Lenguajes Artísticos",
+        "Lenguaje y Comunicación", "Exploración y Experimentación con el Mundo", "Desarrollo Personal y Social", "Lenguajes Artísticos","Pensamiento Matematico",
         # I Ciclo (1-3)
         "Comunicación", "Números y Formas", 
         # II Ciclo (4-6)

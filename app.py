@@ -146,7 +146,7 @@ elif opcion == "Gestión Maestros":
         # II Ciclo (4-6)
         "Comunicación y Literatura", "Aritmética y Finanzas", 
         # III Ciclo (7-9)
-        "Lenguaje y Literatura", "Matemática y Datos", "Inglés", "Educación Física",
+        "Lenguaje y Literatura", "Matemática y Datos", "Inglés", "Educación Física y Deportes",
         # Comunes / Transversales
         "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal",
         # Adicionales Solicitados

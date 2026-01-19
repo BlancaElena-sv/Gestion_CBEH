@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime, date
 import base64
+import time # NUEVO: Para recargar la página al editar/borrar
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
@@ -122,17 +123,18 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
 
 # ==========================================
-# 3. GESTIÓN DE MAESTROS (CORREGIDO ERROR KEYERROR)
+# 3. GESTIÓN DE MAESTROS (CON EDICIÓN/BORRADO)
 # ==========================================
 elif opcion == "Gestión Maestros":
     st.title("👩‍🏫 Plantilla Docente")
     
-    tab_perfil, tab_carga, tab_ver = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "📋 Ver Planilla"])
+    # NUEVA PESTAÑA: ADMIN
+    tab_perfil, tab_carga, tab_admin = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "✏️ Administrar (Editar/Borrar)"])
     
     LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
     LISTA_MATERIAS = ["Matemáticas", "Lenguaje y Literatura", "Ciencias Salud y M.A.", "Estudios Sociales", "Inglés", "Educación Artística", "Educación Física", "Moral y Cívica", "Informática", "Ortografía", "Caligrafía"]
 
-    # --- TAB 1: REGISTRO CON CÓDIGO ---
+    # --- TAB 1: REGISTRO ---
     with tab_perfil:
         st.markdown("##### Paso 1: Crear expediente del personal")
         with st.form("form_nuevo_docente"):
@@ -160,7 +162,6 @@ elif opcion == "Gestión Maestros":
     with tab_carga:
         st.markdown("##### Paso 2: Asignación de Materias y Grados")
         docs_m = db.collection("maestros_perfil").stream()
-        # Creamos diccionario seguro usando .get para evitar error si falta código
         lista_profes = {f"{d.to_dict().get('codigo', 'S/C')} - {d.to_dict()['nombre']}": d.id for d in docs_m}
         
         if lista_profes:
@@ -186,26 +187,64 @@ elif opcion == "Gestión Maestros":
                     else: st.error("Seleccione materias.")
         else: st.warning("Primero registre docentes en la pestaña 1.")
 
-    # --- TAB 3: VISUALIZACIÓN (CORREGIDA) ---
-    with tab_ver:
-        st.subheader("Directorio Docente")
-        docs_p = db.collection("maestros_perfil").stream()
-        lista_p = [d.to_dict() for d in docs_p]
+    # --- TAB 3: ADMINISTRAR (EDITAR / BORRAR) ---
+    with tab_admin:
+        st.subheader("🛠️ Mantenimiento de Docentes")
         
-        if lista_p:
-            df_p = pd.DataFrame(lista_p)
+        # Recuperamos la lista completa con IDs para poder editar/borrar
+        docs_admin = db.collection("maestros_perfil").stream()
+        profes_admin = []
+        for d in docs_admin:
+            data = d.to_dict()
+            data['id'] = d.id # Guardamos el ID del documento
+            profes_admin.append(data)
             
-            # --- BLINDAJE CONTRA KEYERROR ---
-            # Si no existe la columna 'codigo' (por datos viejos), la creamos
-            if 'codigo' not in df_p.columns:
-                df_p['codigo'] = "Sin Código"
+        if not profes_admin:
+            st.info("No hay docentes registrados para administrar.")
+        else:
+            # Selector para elegir a quién editar
+            opciones_admin = {f"{p.get('codigo','?')} - {p['nombre']}": p for p in profes_admin}
+            seleccion_admin = st.selectbox("Seleccione Docente a modificar:", ["Seleccionar..."] + list(opciones_admin.keys()))
             
-            # Rellenamos vacíos por si acaso
-            df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
-            df_p['turno_base'] = df_p.get('turno_base', 'No definido') # Uso seguro de get
-
-            st.dataframe(df_p[['codigo', 'nombre', 'turno_base']], use_container_width=True)
-        else: st.info("Sin registros.")
+            if seleccion_admin != "Seleccionar...":
+                maestro_edit = opciones_admin[seleccion_admin]
+                id_edit = maestro_edit['id']
+                
+                st.markdown("---")
+                st.markdown(f"### Gestionando a: **{maestro_edit['nombre']}**")
+                
+                accion = st.radio("¿Qué desea hacer?", ["✏️ Editar Datos", "🗑️ Eliminar Registro"], horizontal=True)
+                
+                if accion == "✏️ Editar Datos":
+                    with st.form("form_edicion"):
+                        c_e1, c_e2 = st.columns(2)
+                        nuevo_cod = c_e1.text_input("Código", value=maestro_edit.get('codigo', ''))
+                        nuevo_nom = c_e2.text_input("Nombre", value=maestro_edit.get('nombre', ''))
+                        
+                        contacto = maestro_edit.get('contacto', {})
+                        nuevo_tel = c_e1.text_input("Teléfono", value=contacto.get('tel', ''))
+                        nuevo_email = c_e2.text_input("Email", value=contacto.get('email', ''))
+                        
+                        nuevo_turno = c_e1.selectbox("Turno", ["Matutino", "Vespertino", "Tiempo Completo"], index=["Matutino", "Vespertino", "Tiempo Completo"].index(maestro_edit.get('turno_base', 'Matutino')))
+                        
+                        if st.form_submit_button("✅ Guardar Cambios"):
+                            db.collection("maestros_perfil").document(id_edit).update({
+                                "codigo": nuevo_cod,
+                                "nombre": nuevo_nom,
+                                "contacto": {"tel": nuevo_tel, "email": nuevo_email},
+                                "turno_base": nuevo_turno
+                            })
+                            st.success("Datos actualizados correctamente.")
+                            time.sleep(1.5)
+                            st.rerun()
+                            
+                elif accion == "🗑️ Eliminar Registro":
+                    st.warning("⚠️ ¡Cuidado! Esta acción es irreversible.")
+                    if st.button("🔴 Confirmar Eliminación"):
+                        db.collection("maestros_perfil").document(id_edit).delete()
+                        st.success(f"El registro de {maestro_edit['nombre']} ha sido eliminado.")
+                        time.sleep(1.5)
+                        st.rerun()
 
 # ==========================================
 # 4. CONSULTA ALUMNOS
@@ -364,13 +403,10 @@ elif opcion == "Finanzas":
             with st.form("f_gasto"):
                 c1, c2 = st.columns(2)
                 cat = c1.selectbox("Categoría", ["Pago de Planilla (Maestros)", "Servicios", "Mantenimiento", "Materiales", "Otros"])
-                
-                # SELECCIÓN DINÁMICA DE MAESTRO
                 maestro_obj = None
                 prov_txt = ""
                 if cat == "Pago de Planilla (Maestros)":
                     docs_m = db.collection("maestros_perfil").stream()
-                    # Safe dict creation
                     lista_m = {f"{d.to_dict().get('nombre')} ({d.to_dict().get('codigo','S/C')})": d.to_dict() for d in docs_m}
                     if lista_m:
                         mk = c1.selectbox("Seleccione Docente", list(lista_m.keys()))

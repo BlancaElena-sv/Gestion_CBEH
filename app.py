@@ -130,7 +130,7 @@ elif opcion == "Gestión Maestros":
     
     tab_perfil, tab_carga, tab_admin, tab_ver = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "✏️ Administrar", "📋 Ver Planilla"])
     
-    LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Kinder 6", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
+    LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
     
     # --- LISTA ACTUALIZADA SEGÚN TU CUADRO + ORTOGRAFÍA Y CALIGRAFÍA ---
     LISTA_MATERIAS = [

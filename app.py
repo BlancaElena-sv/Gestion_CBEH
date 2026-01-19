@@ -123,25 +123,31 @@ elif opcion == "Inscripción Alumnos":
                     st.success(f"✅ ¡Alumno inscrito en el turno {turno}!")
 
 # ==========================================
-# 3. GESTIÓN DE MAESTROS (MATERIAS ACTUALIZADAS)
+# 3. GESTIÓN DE MAESTROS (ACTUALIZADO: ADMIN CARGAS)
 # ==========================================
 elif opcion == "Gestión Maestros":
     st.title("👩‍🏫 Plantilla Docente")
     
-    tab_perfil, tab_carga, tab_admin, tab_ver = st.tabs(["1️⃣ Registrar Docente", "2️⃣ Asignar Carga", "✏️ Administrar", "📋 Ver Planilla"])
+    # AÑADIDA NUEVA PESTAÑA: 3️⃣ Administrar Cargas
+    tab_perfil, tab_carga, tab_admin_cargas, tab_admin_profes, tab_ver = st.tabs([
+        "1️⃣ Registrar Docente", 
+        "2️⃣ Asignar Carga", 
+        "3️⃣ Administrar Cargas", 
+        "✏️ Admin. Docentes", 
+        "📋 Ver Planilla"
+    ])
     
     LISTA_GRADOS = ["Kinder 4", "Kinder 5", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
     
-    # --- LISTA ACTUALIZADA SEGÚN TU CUADRO + ORTOGRAFÍA Y CALIGRAFÍA ---
     LISTA_MATERIAS = [
         # Parvularia
-        "Lenguaje y Comunicación", "Exploración y Experimentación con el Mundo", "Desarrollo Personal y Social", "Lenguajes Artísticos","Pensamiento Matematico",
+        "Lenguaje y Comunicación", "Exploración y Experimentación con el Mundo", "Desarrollo Personal y Social", "Lenguajes Artísticos", "Pensamiento Matematico",
         # I Ciclo (1-3)
         "Comunicación", "Números y Formas", 
         # II Ciclo (4-6)
         "Comunicación y Literatura", "Aritmética y Finanzas", 
         # III Ciclo (7-9)
-        "Lenguaje y Literatura", "Matemática y Datos", "Inglés",
+        "Lenguaje y Literatura", "Matemática y Datos", "Inglés", "Educación Física",
         # Comunes / Transversales
         "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal",
         # Adicionales Solicitados
@@ -201,9 +207,76 @@ elif opcion == "Gestión Maestros":
                     else: st.error("Seleccione materias.")
         else: st.warning("Primero registre docentes en la pestaña 1.")
 
-    # --- TAB 3: ADMINISTRAR (EDITAR / BORRAR) ---
-    with tab_admin:
-        st.subheader("🛠️ Mantenimiento de Docentes")
+    # --- TAB 3: ADMINISTRAR CARGAS (NUEVA PESTAÑA) ---
+    with tab_admin_cargas:
+        st.subheader("🛠️ Gestión de Cargas Académicas")
+        
+        # Obtener todas las cargas
+        docs_c = db.collection("carga_academica").stream()
+        cargas_list = []
+        for d in docs_c:
+            c = d.to_dict()
+            c['id'] = d.id
+            cargas_list.append(c)
+            
+        if cargas_list:
+            # Mostrar tabla resumen
+            df_c = pd.DataFrame(cargas_list)
+            st.dataframe(df_c[['nombre_docente', 'grado', 'materias', 'nota']], use_container_width=True)
+            
+            st.markdown("---")
+            st.write("#### Modificar o Eliminar una Carga")
+            
+            # Selector de carga
+            opciones_c = {f"{c['nombre_docente']} - {c['grado']} ({len(c['materias'])} materias)": c for c in cargas_list}
+            seleccion_c = st.selectbox("Seleccione la carga a gestionar:", ["Seleccionar..."] + list(opciones_c.keys()))
+            
+            if seleccion_c != "Seleccionar...":
+                carga_obj = opciones_c[seleccion_c]
+                id_carga = carga_obj['id']
+                
+                accion_c = st.radio("Acción requerida:", ["✏️ Editar Materias/Grado", "🗑️ Eliminar Asignación"], horizontal=True)
+                
+                if accion_c == "✏️ Editar Materias/Grado":
+                    with st.form("form_edit_carga"):
+                        st.info(f"Editando carga de: **{carga_obj['nombre_docente']}**")
+                        
+                        # Pre-seleccionar grado actual (validando que exista en la lista)
+                        idx_grado = LISTA_GRADOS.index(carga_obj['grado']) if carga_obj['grado'] in LISTA_GRADOS else 0
+                        nuevo_grado = st.selectbox("Grado", LISTA_GRADOS, index=idx_grado)
+                        
+                        # Pre-seleccionar materias actuales (validando que existan)
+                        default_mats = [m for m in carga_obj['materias'] if m in LISTA_MATERIAS]
+                        nuevas_mats = st.multiselect("Materias", LISTA_MATERIAS, default=default_mats)
+                        
+                        nueva_nota = st.text_input("Nota", value=carga_obj.get('nota', ''))
+                        
+                        if st.form_submit_button("✅ Guardar Cambios"):
+                            if nuevas_mats:
+                                db.collection("carga_academica").document(id_carga).update({
+                                    "grado": nuevo_grado,
+                                    "materias": nuevas_mats,
+                                    "nota": nueva_nota
+                                })
+                                st.success("Carga actualizada correctamente.")
+                                time.sleep(1.5)
+                                st.rerun()
+                            else:
+                                st.error("Debe seleccionar al menos una materia.")
+                                
+                elif accion_c == "🗑️ Eliminar Asignación":
+                    st.warning(f"⚠️ ¿Está seguro que desea eliminar la asignación de {carga_obj['nombre_docente']} en {carga_obj['grado']}?")
+                    if st.button("🔴 Confirmar Eliminación"):
+                        db.collection("carga_academica").document(id_carga).delete()
+                        st.success("Asignación eliminada.")
+                        time.sleep(1.5)
+                        st.rerun()
+        else:
+            st.info("No hay cargas académicas registradas.")
+
+    # --- TAB 4: ADMIN DOCENTES (ANTERIOR TAB 3) ---
+    with tab_admin_profes:
+        st.subheader("🛠️ Mantenimiento de Docentes (Perfiles)")
         docs_admin = db.collection("maestros_perfil").stream()
         profes_admin = []
         for d in docs_admin:
@@ -215,15 +288,15 @@ elif opcion == "Gestión Maestros":
             st.info("No hay docentes registrados.")
         else:
             opciones_admin = {f"{p.get('codigo','?')} - {p['nombre']}": p for p in profes_admin}
-            seleccion_admin = st.selectbox("Seleccione Docente:", ["Seleccionar..."] + list(opciones_admin.keys()))
+            seleccion_admin = st.selectbox("Seleccione Docente a editar:", ["Seleccionar..."] + list(opciones_admin.keys()))
             
             if seleccion_admin != "Seleccionar...":
                 maestro_edit = opciones_admin[seleccion_admin]
                 id_edit = maestro_edit['id']
                 st.markdown("---")
-                accion = st.radio("Acción:", ["✏️ Editar", "🗑️ Eliminar"], horizontal=True)
+                accion = st.radio("Acción:", ["✏️ Editar Perfil", "🗑️ Eliminar Docente"], horizontal=True)
                 
-                if accion == "✏️ Editar":
+                if accion == "✏️ Editar Perfil":
                     with st.form("form_edicion"):
                         c_e1, c_e2 = st.columns(2)
                         nuevo_cod = c_e1.text_input("Código", value=maestro_edit.get('codigo', ''))
@@ -244,13 +317,13 @@ elif opcion == "Gestión Maestros":
                             })
                             st.success("Datos actualizados."); time.sleep(1.5); st.rerun()
                             
-                elif accion == "🗑️ Eliminar":
+                elif accion == "🗑️ Eliminar Docente":
                     st.warning("⚠️ Acción irreversible.")
-                    if st.button("🔴 Confirmar Eliminación"):
+                    if st.button("🔴 Confirmar Eliminación de Docente"):
                         db.collection("maestros_perfil").document(id_edit).delete()
                         st.success("Registro eliminado."); time.sleep(1.5); st.rerun()
 
-    # --- TAB 4: VER PLANILLA ---
+    # --- TAB 5: VER PLANILLA ---
     with tab_ver:
         st.subheader("Directorio Docente")
         docs_p = db.collection("maestros_perfil").stream()
@@ -258,7 +331,6 @@ elif opcion == "Gestión Maestros":
         
         if lista_p:
             df_p = pd.DataFrame(lista_p)
-            # Relleno de seguridad
             if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
             df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
             df_p['turno_base'] = df_p.get('turno_base', 'No definido')

@@ -128,14 +128,23 @@ with st.sidebar:
     if conexion_exitosa: 
         st.success("🟢 Sistema Online")
     
-    # --- COPYRIGHT (NUEVO) ---
+    # --- PIE DE PÁGINA DE DERECHOS DE AUTOR (CORREGIDO) ---
     st.markdown("---")
     st.markdown(
         """
-        <div style='text-align: center; color: grey; font-size: 11px;'>
-            © 2026 Colegio Profa.<br>Blanca Elena de Hernández<br>
-            Todos los derechos reservados.<br>
-            v2.5 Release
+        <div style='text-align: center; color: #666; font-size: 11px;'>
+            <p style='margin-bottom: 5px;'>
+                Desarrollado y Propiedad de:<br>
+                <b style='font-size: 12px;'>[TU NOMBRE O TU EMPRESA]</b>
+            </p>
+            <p style='margin-bottom: 5px;'>
+                <i>Todos los derechos reservados © 2026</i>
+            </p>
+            <hr style='margin: 5px 0; border-color: #ddd;'>
+            <p style='color: #888;'>
+                Licencia de uso exclusivo para:<br>
+                Colegio Profa. Blanca Elena de Hernández
+            </p>
         </div>
         """, unsafe_allow_html=True
     )

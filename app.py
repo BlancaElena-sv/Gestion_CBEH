@@ -10,7 +10,12 @@ import streamlit.components.v1 as components
 import math
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
+st.set_page_config(
+    page_title="Sistema de Gestión Escolar", 
+    layout="wide", 
+    page_icon="🎓",
+    initial_sidebar_state="expanded"
+)
 
 # --- 1. CONEXIÓN Y SEGURIDAD ---
 @st.cache_resource
@@ -45,7 +50,7 @@ except Exception as e:
 # --- 2. CONFIGURACIÓN ACADÉMICA ---
 MATERIAS_ESTANDAR = [
     "Lenguaje", 
-    "Matemática", 
+    "Matemáticas", 
     "C.S y M. Ambiente", 
     "C. Sociales y Cívica", 
     "Inglés", 
@@ -101,14 +106,39 @@ def redondear_mined(valor):
     if parte_decimal >= 0.5: return float(parte_entera + 1)
     else: return float(parte_entera)
 
+# --- CSS PERSONALIZADO (Footer limpio y Copyright) ---
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            .block-container {padding-top: 1rem;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # --- MENÚ LATERAL ---
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.warning("⚠️ Falta 'logo.png'")
+    
     st.markdown("---")
     opcion = st.radio("Menú Principal:", ["Inicio", "Inscripción Alumnos", "Gestión Maestros", "Consulta Alumnos", "Finanzas", "Notas (1º-9º)", "Configuración"])
     st.markdown("---")
-    if conexion_exitosa: st.success("🟢 Sistema Conectado")
+    
+    if conexion_exitosa: 
+        st.success("🟢 Sistema Online")
+    
+    # --- COPYRIGHT (NUEVO) ---
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style='text-align: center; color: grey; font-size: 11px;'>
+            © 2026 Colegio Profa.<br>Blanca Elena de Hernández<br>
+            Todos los derechos reservados.<br>
+            v2.5 Release
+        </div>
+        """, unsafe_allow_html=True
+    )
 
 if not conexion_exitosa: st.stop() 
 
@@ -363,7 +393,7 @@ elif opcion == "Consulta Alumnos":
             else: st.info("No se encontraron registros financieros.")
 
         with t4: 
-            # --- BOLETA DE NOTAS OFICIAL (CON TRIMESTRES) ---
+            # --- BOLETA DE NOTAS OFICIAL ---
             year_actual = datetime.now().year
             st.subheader(f"Boleta de Calificaciones {year_actual}")
             
@@ -417,7 +447,7 @@ elif opcion == "Consulta Alumnos":
                 df_b = pd.DataFrame(filas)
                 st.dataframe(df_b, use_container_width=True, hide_index=True)
                 
-                # HTML Reporte con FIRMAS
+                # Generar HTML Boleta
                 html_rows = ""
                 for _, r in df_b.iterrows():
                     html_rows += f"<tr><td style='text-align:left; padding:5px;'>{r['Asignatura']}</td><td>{r['F']}</td><td>{r['M']}</td><td>{r['A']}</td><td style='background:#f0f0f0; font-weight:bold;'>{r['TI']}</td><td>{r['M.']}</td><td>{r['J']}</td><td>{r['J.']}</td><td style='background:#f0f0f0; font-weight:bold;'>{r['TII']}</td><td>{r['A.']}</td><td>{r['S']}</td><td>{r['O']}</td><td style='background:#f0f0f0; font-weight:bold;'>{r['TIII']}</td><td style='background:#333;color:white;font-weight:bold;'>{r['FINAL']}</td></tr>"
@@ -487,6 +517,7 @@ elif opcion == "Finanzas":
         titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
         
+        # CSS PARA IMPRESIÓN LIMPIA
         st.markdown("""
         <style>
         @media print {
@@ -500,6 +531,7 @@ elif opcion == "Finanzas":
         
         st.success("✅ Transacción registrada exitosamente.")
         
+        # HTML PROFESIONAL
         html_ticket = f"""
         <div class="ticket-container" style="font-family:Arial,sans-serif;color:black;background:white;border:1px solid #ccc; max-width:800px; margin:auto;">
             <div style="background-color:{color_tema};color:white !important;padding:20px;display:flex;justify-content:space-between;align-items:center;">

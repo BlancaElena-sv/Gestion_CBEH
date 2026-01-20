@@ -16,22 +16,20 @@ st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page
 def conectar_firebase():
     if not firebase_admin._apps:
         try:
-            # 1. PRIORIDAD LOCAL: Buscamos el archivo físico primero
+            # 1. PRIORIDAD LOCAL
             cred = None
             if os.path.exists("credenciales.json"):
                 cred = credentials.Certificate("credenciales.json")
             elif os.path.exists("credenciales"): 
-                # Caso especial para Windows cuando oculta la extensión
                 cred = credentials.Certificate("credenciales")
             
-            # 2. PRIORIDAD NUBE: Si no hay archivo, buscamos en Secrets
+            # 2. PRIORIDAD NUBE
             elif "firebase_key" in st.secrets:
                 key_dict = dict(st.secrets["firebase_key"])
                 cred = credentials.Certificate(key_dict)
             
             else:
                 st.error("🚨 NO SE ENCUENTRA LA LLAVE DE ACCESO.")
-                st.info("Asegúrate de que el archivo 'credenciales.json' esté en la carpeta.")
                 return None
             
             firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
@@ -634,18 +632,12 @@ elif opcion == "Finanzas":
                             st.session_state.alumno_pago = None
                             st.rerun()
         
-        # --- AQUÍ ESTÁ EL CAMBIO SOLICITADO ---
         with tab2:
             st.subheader("Registrar Salida de Dinero")
-            # 1. Selector FUERA del form
             cat = st.selectbox("Categoría", ["Pago de Planilla (Maestros)", "Servicios", "Mantenimiento", "Materiales", "Otros"])
-            
-            # 2. El resto DENTRO del form
             with st.form("f_gasto"):
                 c1, c2 = st.columns(2)
                 maestro_obj = None; prov_txt = ""
-                
-                # Lógica visual dinámica gracias a que 'cat' ya cambió
                 if cat == "Pago de Planilla (Maestros)":
                     docs_m = db.collection("maestros_perfil").stream()
                     lista_m = {f"{d.to_dict().get('nombre')} ({d.to_dict().get('codigo','S/C')})": d.to_dict() for d in docs_m}
@@ -653,11 +645,8 @@ elif opcion == "Finanzas":
                         mk = c1.selectbox("Seleccione Docente", list(lista_m.keys()))
                         maestro_obj = lista_m[mk]
                     else: c1.warning("Sin maestros.")
-                else:
-                    prov_txt = c1.text_input("Pagar a:")
-                
+                else: prov_txt = c1.text_input("Pagar a:")
                 monto = c2.number_input("Monto $", min_value=0.01); obs = st.text_area("Detalle")
-                
                 if st.form_submit_button("🔴 Registrar"):
                     if cat == "Pago de Planilla (Maestros)" and maestro_obj:
                         nom = maestro_obj['nombre']; cod = maestro_obj.get('codigo', '')
@@ -684,7 +673,8 @@ elif opcion == "Finanzas":
                     if f_obj and (fecha_ini <= f_obj <= fecha_fin):
                         if tipo_filtro == "Solo Ingresos" and d.get("tipo") != "ingreso": continue
                         if tipo_filtro == "Solo Egresos" and d.get("tipo") != "egreso": continue
-                        item = {"fecha": d.get("fecha_legible", "-"), "tipo": d.get("tipo", "Desconocido"), "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A", "nie": d.get("alumno_nie", "-"), "concepto": d.get("descripcion", "-"), "monto": d.get("monto", 0.0)}
+                        # SE AGREGÓ "observaciones" AQUÍ
+                        item = {"fecha": d.get("fecha_legible", "-"), "tipo": d.get("tipo", "Desconocido"), "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A", "nie": d.get("alumno_nie", "-"), "concepto": d.get("descripcion", "-"), "observaciones": d.get("observaciones", "-"), "monto": d.get("monto", 0.0)}
                         lista_final.append(item)
                 if not lista_final: st.warning("No hay datos para generar el reporte con esos filtros.")
                 else:
@@ -694,8 +684,10 @@ elif opcion == "Finanzas":
                     filas_html = ""
                     for index, row in df.iterrows():
                         color_tipo = "green" if row['tipo'] == 'ingreso' else "red"
-                        filas_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; color:#000;">{row['fecha']}</td><td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td><td style="padding: 8px; color:#000;">{row['persona']}</td><td style="padding: 8px; color:#000;">{row['concepto']}</td><td style="padding: 8px; text-align: right; color:#000;">${row['monto']:.2f}</td></tr>"""
-                    html_reporte = f"""<div class="report-print" style="font-family:Arial,sans-serif;padding:20px;color:black!important;"><div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #333;padding-bottom:10px;"><div style="display:flex;align-items:center;gap:15px;">{logo_html}<div><h2 style="margin:0;color:black;">COLEGIO PROFA. BLANCA ELENA</h2><p style="margin:0;color:gray;">Reporte Financiero Detallado</p></div></div><div style="text-align:right;"><p style="margin:0;color:black;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p><p style="margin:0;color:black;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p></div></div><div style="display:flex;gap:20px;margin:20px 0;"><div style="flex:1;background:#e8f5e9;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#2e7d32;">INGRESOS</h4><h2 style="margin:5px 0;color:#2e7d32;">${t_ing:,.2f}</h2></div><div style="flex:1;background:#ffebee;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#c62828;">EGRESOS</h4><h2 style="margin:5px 0;color:#c62828;">${t_egr:,.2f}</h2></div><div style="flex:1;background:#e3f2fd;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#1565c0;">BALANCE</h4><h2 style="margin:5px 0;color:#1565c0;">${balance:,.2f}</h2></div></div><table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:14px;"><thead style="background-color:#f5f5f5;"><tr><th style="padding:10px;text-align:left;color:black;">Fecha</th><th style="padding:10px;text-align:left;color:black;">Tipo</th><th style="padding:10px;text-align:left;color:black;">Responsable</th><th style="padding:10px;text-align:left;color:black;">Concepto</th><th style="padding:10px;text-align:right;color:black;">Monto</th></tr></thead><tbody>{filas_html}</tbody></table><br><p style="text-align:center;color:gray;font-size:12px;margin-top:30px;">Reporte generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}</p></div>"""
+                        # SE AGREGÓ LA COLUMNA DE OBSERVACIONES EN EL HTML
+                        filas_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; color:#000;">{row['fecha']}</td><td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td><td style="padding: 8px; color:#000;">{row['persona']}</td><td style="padding: 8px; color:#000;">{row['concepto']}</td><td style="padding: 8px; color:#000; font-style:italic;">{row['observaciones']}</td><td style="padding: 8px; text-align: right; color:#000;">${row['monto']:.2f}</td></tr>"""
+                    
+                    html_reporte = f"""<div class="report-print" style="font-family:Arial,sans-serif;padding:20px;color:black!important;"><div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #333;padding-bottom:10px;"><div style="display:flex;align-items:center;gap:15px;">{logo_html}<div><h2 style="margin:0;color:black;">COLEGIO PROFA. BLANCA ELENA</h2><p style="margin:0;color:gray;">Reporte Financiero Detallado</p></div></div><div style="text-align:right;"><p style="margin:0;color:black;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p><p style="margin:0;color:black;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p></div></div><div style="display:flex;gap:20px;margin:20px 0;"><div style="flex:1;background:#e8f5e9;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#2e7d32;">INGRESOS</h4><h2 style="margin:5px 0;color:#2e7d32;">${t_ing:,.2f}</h2></div><div style="flex:1;background:#ffebee;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#c62828;">EGRESOS</h4><h2 style="margin:5px 0;color:#c62828;">${t_egr:,.2f}</h2></div><div style="flex:1;background:#e3f2fd;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#1565c0;">BALANCE</h4><h2 style="margin:5px 0;color:#1565c0;">${balance:,.2f}</h2></div></div><table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:14px;"><thead style="background-color:#f5f5f5;"><tr><th style="padding:10px;text-align:left;color:black;">Fecha</th><th style="padding:10px;text-align:left;color:black;">Tipo</th><th style="padding:10px;text-align:left;color:black;">Responsable</th><th style="padding:10px;text-align:left;color:black;">Concepto</th><th style="padding:10px;text-align:left;color:black;">Notas/Detalle</th><th style="padding:10px;text-align:right;color:black;">Monto</th></tr></thead><tbody>{filas_html}</tbody></table><br><p style="text-align:center;color:gray;font-size:12px;margin-top:30px;">Reporte generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}</p></div>"""
                     st.session_state.reporte_html = html_reporte
                     st.rerun()
 

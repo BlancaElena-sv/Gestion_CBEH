@@ -17,20 +17,17 @@ st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page
 def conectar_firebase():
     if not firebase_admin._apps:
         try:
-            # 1. PRIORIDAD LOCAL
             cred = None
             if os.path.exists("credenciales.json"):
                 cred = credentials.Certificate("credenciales.json")
             elif os.path.exists("credenciales"): 
                 cred = credentials.Certificate("credenciales")
-            # 2. PRIORIDAD NUBE
             elif "firebase_key" in st.secrets:
                 key_dict = dict(st.secrets["firebase_key"])
                 cred = credentials.Certificate(key_dict)
             else:
                 st.error("🚨 NO SE ENCUENTRA LA LLAVE DE ACCESO.")
                 return None
-            
             firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
         except Exception as e:
             st.error(f"Error de conexión: {e}")
@@ -64,19 +61,11 @@ def get_image_base64(path):
     except: return "" 
 
 def redondear_mined(valor):
-    """
-    Regla de negocio:
-    - Si el decimal es >= 0.5, aproxima al entero superior (8.6 -> 9.0).
-    - Si el decimal es < 0.5, aproxima al entero inferior (8.4 -> 8.0).
-    """
     if valor is None: return 0.0
     parte_entera = int(valor)
     parte_decimal = valor - parte_entera
-    
-    if parte_decimal >= 0.5:
-        return float(parte_entera + 1)
-    else:
-        return float(parte_entera)
+    if parte_decimal >= 0.5: return float(parte_entera + 1)
+    else: return float(parte_entera)
 
 # --- CONSTANTES ACADÉMICAS ---
 LISTA_GRADOS_TODO = ["Kinder 4", "Kinder 5", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
@@ -193,10 +182,19 @@ elif opcion == "Gestión Maestros":
                 grado_sel = c2.selectbox("Grado", LISTA_GRADOS_TODO)
                 materias_sel = st.multiselect("Materias", LISTA_MATERIAS)
                 nota = st.text_input("Nota")
+                es_guia = st.checkbox("¿Es el Maestro Guía de este grado?") # NUEVO CAMPO
+                
                 if st.form_submit_button("🔗 Vincular Carga"):
                     if materias_sel:
                         nombre_limpio = nombre_sel.split(" - ")[1] if " - " in nombre_sel else nombre_sel
-                        db.collection("carga_academica").add({"id_docente": lista_profes[nombre_sel], "nombre_docente": nombre_limpio, "grado": grado_sel, "materias": materias_sel, "nota": nota})
+                        db.collection("carga_academica").add({
+                            "id_docente": lista_profes[nombre_sel], 
+                            "nombre_docente": nombre_limpio, 
+                            "grado": grado_sel, 
+                            "materias": materias_sel, 
+                            "nota": nota,
+                            "es_guia": es_guia # GUARDAMOS SI ES GUÍA
+                        })
                         st.success("Carga asignada.")
                     else: st.error("Seleccione materias.")
         else: st.warning("Registre docentes primero.")
@@ -206,6 +204,9 @@ elif opcion == "Gestión Maestros":
         cargas = [{"id": d.id, **d.to_dict()} for d in docs_c]
         if cargas:
             df_c = pd.DataFrame(cargas)
+            # Manejo de la columna es_guia para visualización
+            if 'es_guia' not in df_c.columns: df_c['es_guia'] = False
+            
             c1, c2 = st.columns(2)
             f_doc = c1.selectbox("Filtrar Docente:", ["Todos"] + sorted(df_c['nombre_docente'].unique().tolist()))
             f_grad = c2.selectbox("Filtrar Grado:", ["Todos"] + sorted(df_c['grado'].unique().tolist()))
@@ -213,7 +214,8 @@ elif opcion == "Gestión Maestros":
             df_show = df_c.copy()
             if f_doc != "Todos": df_show = df_show[df_show['nombre_docente'] == f_doc]
             if f_grad != "Todos": df_show = df_show[df_show['grado'] == f_grad]
-            st.dataframe(df_show[['nombre_docente', 'grado', 'materias', 'nota']], use_container_width=True)
+            
+            st.dataframe(df_show[['nombre_docente', 'grado', 'materias', 'es_guia']], use_container_width=True)
             
             if not df_show.empty:
                 opcs = {f"{r['nombre_docente']} - {r['grado']}": r['id'] for i, r in df_show.iterrows()}
@@ -228,10 +230,18 @@ elif opcion == "Gestión Maestros":
                             st.success("Eliminado"); time.sleep(1); st.rerun()
                     elif accion == "Editar":
                         with st.form("edit_carga"):
+                            st.info(f"Editando a: {c_obj['nombre_docente']}")
                             nm = st.multiselect("Materias", LISTA_MATERIAS, default=[m for m in c_obj['materias'] if m in LISTA_MATERIAS])
                             ng = st.selectbox("Grado", LISTA_GRADOS_TODO, index=LISTA_GRADOS_TODO.index(c_obj['grado']) if c_obj['grado'] in LISTA_GRADOS_TODO else 0)
+                            # Checkbox para corregir el guía
+                            es_guia_edit = st.checkbox("¿Es Maestro Guía?", value=c_obj.get('es_guia', False))
+                            
                             if st.form_submit_button("Actualizar"):
-                                db.collection("carga_academica").document(cid).update({"materias": nm, "grado": ng})
+                                db.collection("carga_academica").document(cid).update({
+                                    "materias": nm, 
+                                    "grado": ng,
+                                    "es_guia": es_guia_edit
+                                })
                                 st.success("Actualizado"); time.sleep(1); st.rerun()
 
     with t4:
@@ -311,6 +321,7 @@ elif opcion == "Consulta Alumnos":
                     with st.container(border=True):
                         c1, c2 = st.columns([2,3])
                         c1.markdown(f"<b>{c['nombre_docente']}</b>", unsafe_allow_html=True)
+                        if c.get('es_guia'): st.markdown("🌟 **Maestro Guía**")
                         c2.write(", ".join(c['materias']))
             else: st.warning("Sin carga asignada")
 
@@ -347,19 +358,24 @@ elif opcion == "Consulta Alumnos":
                         components.html(f"""<script>function p(){{window.print()}}</script><button onclick="p()" style="background:green;color:white;padding:10px;border:none;border-radius:5px;">🖨️ Imprimir</button>""", height=50)
             else: st.info("Sin pagos registrados")
 
-        with t4: # --- BOLETA DE NOTAS AUTOMÁTICA MEJORADA ---
+        with t4: 
             year_actual = datetime.now().year
             st.subheader(f"Boleta de Calificaciones {year_actual}")
             
-            # Buscar maestro guía (Intenta buscar Moral y Cívica, si no, el primero del grado)
+            # --- BUSQUEDA EXACTA DE MAESTRO GUÍA ---
             q_guia = db.collection("carga_academica").where("grado", "==", alum['grado_actual']).stream()
-            maestro_guia = "No Asignado"
-            lista_cargas_guia = [d.to_dict() for d in q_guia]
+            maestro_guia = "No asignado"
             
-            # Lógica para encontrar guía
-            cand_moral = [x['nombre_docente'] for x in lista_cargas_guia if "Moral, Urbanidad y Cívica" in x['materias']]
-            if cand_moral: maestro_guia = cand_moral[0]
-            elif lista_cargas_guia: maestro_guia = lista_cargas_guia[0]['nombre_docente']
+            # Buscar quien tiene la casilla 'es_guia' marcada
+            for d in q_guia:
+                data = d.to_dict()
+                if data.get('es_guia') is True:
+                    maestro_guia = data['nombre_docente']
+                    break
+            
+            # Si nadie la tiene marcada, avisar (fallback)
+            if maestro_guia == "No asignado":
+                st.warning("⚠️ No se ha definido un Maestro Guía para este grado. Vaya a Gestión Maestros -> Admin Cargas y marque la casilla '¿Es Maestro Guía?' al docente correspondiente.")
 
             notas_ref = db.collection("notas").where("nie", "==", alum['nie']).stream()
             notas_map = {}
@@ -376,24 +392,18 @@ elif opcion == "Consulta Alumnos":
                     if mat in notas_map:
                         n = notas_map[mat]
                         
-                        # TRIMESTRE 1 (Feb+Mar+Abr) / 3
                         f, m, a = n.get("Febrero", 0), n.get("Marzo", 0), n.get("Abril", 0)
-                        # Nota: Si falta un mes, se asume 0 para el cálculo estricto, o se promedia solo lo existente.
-                        # Según tu indicación "Feb+Mar+Abr / 3", se divide entre 3 fijo.
                         raw_t1 = (f + m + a) / 3
                         t1 = redondear_mined(raw_t1)
                         
-                        # TRIMESTRE 2 (May+Jun+Jul) / 3
                         may, jun, jul = n.get("Mayo", 0), n.get("Junio", 0), n.get("Julio", 0)
                         raw_t2 = (may + jun + jul) / 3
                         t2 = redondear_mined(raw_t2)
                         
-                        # TRIMESTRE 3 (Ago+Sep+Oct) / 3
                         ago, sep, oct_ = n.get("Agosto", 0), n.get("Septiembre", 0), n.get("Octubre", 0)
                         raw_t3 = (ago + sep + oct_) / 3
                         t3 = redondear_mined(raw_t3)
                         
-                        # FINAL (T1+T2+T3)/3 -> Usando los valores YA REDONDEADOS de los trimestres
                         raw_fin = (t1 + t2 + t3) / 3
                         fin = redondear_mined(raw_fin)
                         

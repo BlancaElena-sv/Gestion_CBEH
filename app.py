@@ -42,23 +42,13 @@ except Exception as e:
     st.error(f"⚠️ Error crítico: {e}")
     st.stop()
 
-# --- 2. MAPA CURRICULAR (CONFIGURACIÓN DE MATERIAS) ---
-# Aquí definimos exactamente qué materias lleva cada grado según tu Boleta.
-
+# --- 2. CONFIGURACIÓN ACADÉMICA (MATERIAS EXACTAS) ---
 MATERIAS_ESTANDAR = [
-    "Lenguaje", 
-    "Matemáticas", 
-    "C.S y M. Ambiente", 
-    "C. Sociales y Cívica", 
-    "Inglés", 
-    "Moral, U y C.", 
-    "Educación Física", 
-    "Educación Artística",
-    "Informática", # Agregada por ser común
-    "Conducta"
+    "Lenguaje", "Matemáticas", "C.S y M. Ambiente", "C. Sociales y Cívica", 
+    "Inglés", "Moral, U y C.", "Educación Física", "Educación Artística",
+    "Informática", "Conducta"
 ]
 
-# Diccionario Maestro: Si en el futuro 7º, 8º y 9º llevan materias distintas, se cambian aquí.
 MAPA_CURRICULAR = {
     "Kinder 4": ["Ámbitos de Desarrollo", "Conducta"],
     "Kinder 5": ["Ámbitos de Desarrollo", "Conducta"],
@@ -75,9 +65,7 @@ MAPA_CURRICULAR = {
 }
 
 LISTA_GRADOS_TODO = list(MAPA_CURRICULAR.keys())
-# Grados que llevan notas numéricas (excluyendo parvularia)
 LISTA_GRADOS_NOTAS = [g for g in LISTA_GRADOS_TODO if "Kinder" not in g and "Prepa" not in g]
-
 LISTA_MESES = ["Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre"]
 
 # --- 3. FUNCIONES AUXILIARES ---
@@ -99,7 +87,6 @@ def get_image_base64(path):
     except: return "" 
 
 def redondear_mined(valor):
-    """ Regla: >= 0.5 sube, < 0.5 baja """
     if valor is None: return 0.0
     parte_entera = int(valor)
     parte_decimal = valor - parte_entera
@@ -206,10 +193,9 @@ elif opcion == "Gestión Maestros":
             with st.form("form_carga"):
                 c1, c2 = st.columns(2)
                 nombre_sel = c1.selectbox("Docente", list(lista_profes.keys()))
-                # Al seleccionar grado, el maestro deberá elegir de la lista completa abajo (limitación visual de streamlit forms)
                 grado_sel = c2.selectbox("Grado", LISTA_GRADOS_TODO)
                 
-                # Mostramos todas las materias posibles para que elija
+                # Carga dinámica de materias (Selección manual pero guiada)
                 materias_sel = st.multiselect("Materias (Seleccione según el grado)", MATERIAS_ESTANDAR)
                 
                 nota = st.text_input("Nota / Observación")
@@ -325,50 +311,14 @@ elif opcion == "Consulta Alumnos":
             else: st.warning("Aún no se han asignado maestros a este grado.")
 
         with t3:
-            # HISTORIAL DE PAGOS
+            # HISTORIAL DE PAGOS - RECUPERANDO DISEÑO
             pagos = db.collection("finanzas").where("alumno_nie", "==", alum['nie']).where("tipo", "==", "ingreso").stream()
             lp = [{"id":p.id, **p.to_dict()} for p in pagos]
             if lp:
                 df = pd.DataFrame(lp).sort_values(by="fecha_legible", ascending=False)
                 if "observaciones" not in df: df["observaciones"] = ""
                 st.dataframe(df[['fecha_legible', 'descripcion', 'monto', 'observaciones']], use_container_width=True)
-                
-                # REIMPRESION DE RECIBO
-                st.markdown("#### 📄 Reimprimir Comprobante")
-                sel_p = st.selectbox("Seleccione transacción:", ["Seleccionar..."] + [f"{p['fecha_legible']} - ${p['monto']}" for p in lp])
-                if sel_p != "Seleccionar...":
-                    if st.button("Ver Vista Previa de Recibo"):
-                        p_obj = next(p for p in lp if f"{p['fecha_legible']} - ${p['monto']}" == sel_p)
-                        # --- INYECCION DE HTML PROFESIONAL ---
-                        color = "#2e7d32"
-                        img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
-                        html_ticket = f"""
-                        <div style="border:1px solid #ccc; padding:0; margin-top:20px; background:white; color:black; font-family:Arial, sans-serif; max-width:800px; margin-left:auto; margin-right:auto;">
-                            <div style="background-color:{color}; color:white !important; padding:20px; display:flex; justify-content:space-between; align-items:center;">
-                                <div style="display:flex; align-items:center; gap:15px;">
-                                    <div style="background:white; padding:5px; border-radius:4px;">{img_h}</div>
-                                    <div><h3 style="margin:0; color:white;">COLEGIO PROFA. BLANCA ELENA</h3><p style="margin:0; font-size:12px; opacity:0.9; color:white;">San Felipe, El Salvador</p></div>
-                                </div>
-                                <div style="text-align:right;"><h4 style="margin:0; color:white;">COPIA DE RECIBO</h4><p style="margin:0; font-size:12px; color:white;">Ref: {p_obj['id'][-6:]}</p></div>
-                            </div>
-                            <div style="padding:30px;">
-                                <table style="width:100%; border-collapse:collapse; font-size:14px; color:black;">
-                                    <tr style="border-bottom:1px solid #eee"><td style="padding:10px; font-weight:bold; width:30%;">Alumno:</td><td style="padding:10px">{p_obj.get('nombre_persona')}</td></tr>
-                                    <tr style="border-bottom:1px solid #eee"><td style="padding:10px; font-weight:bold;">Fecha de Pago:</td><td style="padding:10px">{p_obj['fecha_legible']}</td></tr>
-                                    <tr style="border-bottom:1px solid #eee"><td style="padding:10px; font-weight:bold;">Concepto:</td><td style="padding:10px">{p_obj['descripcion']}</td></tr>
-                                    <tr style="border-bottom:1px solid #eee"><td style="padding:10px; font-weight:bold;">Observaciones:</td><td style="padding:10px; font-style:italic;">{p_obj.get('observaciones','-')}</td></tr>
-                                </table>
-                                <div style="margin-top:30px; text-align:right;">
-                                    <p style="font-size:12px; color:#666;">Total Pagado</p>
-                                    <h1 style="margin:0; color:{color}; font-size:32px;">${p_obj['monto']:.2f}</h1>
-                                </div>
-                            </div>
-                            <div style="background:#f9f9f9; padding:10px; text-align:center; font-size:10px; color:#999; border-top:1px solid #eee;">Documento generado electrónicamente</div>
-                        </div>
-                        """
-                        st.markdown(html_ticket, unsafe_allow_html=True)
-                        components.html(f"""<script>function p(){{window.print()}}</script><div style="text-align:center; margin-top:20px;"><button onclick="p()" style="background:#2e7d32; color:white; padding:12px 24px; border:none; border-radius:5px; cursor:pointer; font-size:16px;">🖨️ Imprimir Copia Oficial</button></div>""", height=80)
-            else: st.info("No se encontraron registros financieros.")
+            else: st.info("Sin pagos registrados")
 
         with t4: 
             # --- BOLETA DE NOTAS OFICIAL ---
@@ -425,7 +375,7 @@ elif opcion == "Consulta Alumnos":
                 df_b = pd.DataFrame(filas)
                 st.dataframe(df_b, use_container_width=True, hide_index=True)
                 
-                # Generar HTML Boleta
+                # HTML Reporte
                 html_rows = ""
                 for _, r in df_b.iterrows():
                     html_rows += f"<tr><td style='text-align:left; padding:5px;'>{r['Asignatura']}</td><td>{r['F']}</td><td>{r['M']}</td><td>{r['A']}</td><td style='background:#f0f0f0; font-weight:bold;'>{r['TI']}</td><td>{r['M.']}</td><td>{r['J']}</td><td>{r['J.']}</td><td style='background:#f0f0f0; font-weight:bold;'>{r['TII']}</td><td>{r['A.']}</td><td>{r['S']}</td><td>{r['O']}</td><td style='background:#f0f0f0; font-weight:bold;'>{r['TIII']}</td><td style='background:#333;color:white;font-weight:bold;'>{r['FINAL']}</td></tr>"
@@ -473,7 +423,7 @@ elif opcion == "Consulta Alumnos":
                 components.html(f"""<html><body>{html_boleta}<div style="text-align:center; margin-top:20px;"><button onclick="window.print()" style="padding:10px 20px; background:black; color:white; border:none; cursor:pointer;">🖨️ IMPRIMIR BOLETA OFICIAL</button></div><style>@media print{{button{{display:none;}} body{{margin:0;}}}}</style></body></html>""", height=800, scrolling=True)
 
 # ==========================================
-# 5. FINANZAS
+# 5. FINANZAS (RECUPERADO - DISEÑO VISTOSO)
 # ==========================================
 elif opcion == "Finanzas":
     st.title("💰 Gestión Financiera")
@@ -502,7 +452,7 @@ elif opcion == "Finanzas":
         
         st.success("✅ Transacción registrada exitosamente.")
         
-        # HTML PROFESIONAL
+        # HTML PROFESIONAL (ESTILO PREMIUM)
         html_ticket = f"""
         <div class="ticket-container" style="font-family:Arial,sans-serif;color:black;background:white;border:1px solid #ccc; max-width:800px; margin:auto;">
             <div style="background-color:{color_tema};color:white !important;padding:20px;display:flex;justify-content:space-between;align-items:center;">
@@ -632,6 +582,8 @@ elif opcion == "Finanzas":
                         html_rows += f"<tr style='border-bottom:1px solid #eee;'><td>{r['fecha_legible']}</td><td style='color:{color};font-weight:bold;'>{r['tipo'].upper()}</td><td>{r.get('nombre_persona')}</td><td>{r['descripcion']}</td><td>{r.get('observaciones','-')}</td><td style='text-align:right;'>${r['monto']:.2f}</td></tr>"
                     
                     img = get_image_base64("logo.png"); h_img = f'<img src="{img}" height="60">' if img else ""
+                    
+                    # HTML DEL REPORTE (RECUPERADO - ESTILO VISTOSO)
                     html_rep = f"""
                     <div class="rep" style="font-family:Arial, sans-serif; padding:20px; color:black;">
                         <div style="display:flex; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;">
@@ -643,14 +595,25 @@ elif opcion == "Finanzas":
                         </div>
                         <p><b>Periodo:</b> {fi} al {ff}</p>
                         <div style="display:flex; gap:20px; margin:20px 0;">
-                            <div style="background:#e8f5e9; padding:10px; border-radius:5px;"><b>INGRESOS:</b> ${t_ing:.2f}</div>
-                            <div style="background:#ffebee; padding:10px; border-radius:5px;"><b>EGRESOS:</b> ${t_egr:.2f}</div>
-                            <div style="background:#e3f2fd; padding:10px; border-radius:5px;"><b>BALANCE:</b> ${bal:.2f}</div>
+                            <div style="flex:1; background:#e8f5e9; padding:15px; border-radius:5px; text-align:center; border:1px solid #c8e6c9;">
+                                <h4 style="margin:0; color:#2e7d32;">INGRESOS</h4>
+                                <h2 style="margin:5px 0;">${t_ing:,.2f}</h2>
+                            </div>
+                            <div style="flex:1; background:#ffebee; padding:15px; border-radius:5px; text-align:center; border:1px solid #ffcdd2;">
+                                <h4 style="margin:0; color:#c62828;">EGRESOS</h4>
+                                <h2 style="margin:5px 0;">${t_egr:,.2f}</h2>
+                            </div>
+                            <div style="flex:1; background:#e3f2fd; padding:15px; border-radius:5px; text-align:center; border:1px solid #bbdefb;">
+                                <h4 style="margin:0; color:#1565c0;">BALANCE</h4>
+                                <h2 style="margin:5px 0;">${bal:,.2f}</h2>
+                            </div>
                         </div>
                         <table style="width:100%; border-collapse:collapse; font-size:12px;">
                             <tr style="background:#f0f0f0; text-align:left;"><th style="padding:8px;">FECHA</th><th>TIPO</th><th>PERSONA</th><th>CONCEPTO</th><th>DETALLE</th><th style="text-align:right;">MONTO</th></tr>
                             {html_rows}
                         </table>
+                        <br>
+                        <p style="text-align:center; font-size:10px; color:#999;">Generado el {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
                     </div>
                     """
                     st.session_state.reporte_html = html_rep
@@ -669,7 +632,6 @@ elif opcion == "Notas (1º-9º)":
     grado = c1.selectbox("1. Seleccione Grado", ["Seleccionar..."] + LISTA_GRADOS_NOTAS)
     
     # LOGICA DINÁMICA DE MATERIAS
-    # Si no se selecciona grado, lista vacía. Si se selecciona, carga las específicas de ese grado.
     materias_posibles = MAPA_CURRICULAR.get(grado, []) if grado != "Seleccionar..." else []
     
     materia = c2.selectbox("2. Seleccione Materia", ["Seleccionar..."] + materias_posibles)

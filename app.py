@@ -6,17 +6,17 @@ from datetime import datetime, date
 import base64
 import time
 import os
+import streamlit.components.v1 as components
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
 
-# --- CONEXIÓN INTELIGENTE A FIREBASE (CORREGIDA PARA WINDOWS) ---
+# --- CONEXIÓN INTELIGENTE A FIREBASE ---
 @st.cache_resource
 def conectar_firebase():
     if not firebase_admin._apps:
         try:
             # 1. PRIORIDAD LOCAL: Buscamos el archivo físico primero
-            # Esto evita que Streamlit se queje de "No secrets found" en tu PC
             cred = None
             if os.path.exists("credenciales.json"):
                 cred = credentials.Certificate("credenciales.json")
@@ -29,13 +29,11 @@ def conectar_firebase():
                 key_dict = dict(st.secrets["firebase_key"])
                 cred = credentials.Certificate(key_dict)
             
-            # 3. Si no encuentra nada, error
             else:
                 st.error("🚨 NO SE ENCUENTRA LA LLAVE DE ACCESO.")
                 st.info("Asegúrate de que el archivo 'credenciales.json' esté en la carpeta.")
                 return None
             
-            # Inicializar con la credencial encontrada
             firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
         
         except Exception as e:
@@ -336,6 +334,7 @@ elif opcion == "Gestión Maestros":
         lista_p = [d.to_dict() for d in docs_p]
         if lista_p:
             df_p = pd.DataFrame(lista_p)
+            # PROTECCIÓN CONTRA KEYERROR
             if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
             df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
             df_p['turno_base'] = df_p.get('turno_base', 'No definido')
@@ -590,12 +589,17 @@ elif opcion == "Finanzas":
         c1, c2 = st.columns([1, 4])
         with c1:
             if st.button("❌ Cerrar Recibo", type="primary"): st.session_state.recibo_temp = None; st.rerun()
-        with c2: st.info("Presiona **Ctrl + P** para imprimir.")
+        with c2:
+            components.html(f"""<script>function printPage() {{ window.parent.print(); }}</script><button onclick="printPage()" style="background-color:#2e7d32;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-family:sans-serif;font-size:16px;">🖨️ Imprimir Comprobante</button>""", height=50)
 
     elif st.session_state.reporte_html:
         st.markdown("""<style>@media print { @page { margin: 10mm; size: landscape; } body * { visibility: hidden; } [data-testid="stSidebar"], header, footer { display: none !important; } .report-print, .report-print * { visibility: visible !important; } .report-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white; color: black !important; } }</style>""", unsafe_allow_html=True)
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
-        if st.button("⬅️ Volver"): st.session_state.reporte_html = None; st.rerun()
+        c1, c2 = st.columns([1,4])
+        with c1:
+            if st.button("⬅️ Volver"): st.session_state.reporte_html = None; st.rerun()
+        with c2:
+            components.html(f"""<script>function printPage() {{ window.parent.print(); }}</script><button onclick="printPage()" style="background-color:#444;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-family:sans-serif;">🖨️ Imprimir Reporte PDF</button>""", height=50)
 
     else:
         tab1, tab2, tab3 = st.tabs(["Ingresos", "Gastos", "Reporte"])

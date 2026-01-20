@@ -334,7 +334,6 @@ elif opcion == "Gestión Maestros":
         lista_p = [d.to_dict() for d in docs_p]
         if lista_p:
             df_p = pd.DataFrame(lista_p)
-            # PROTECCIÓN CONTRA KEYERROR
             if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
             df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
             df_p['turno_base'] = df_p.get('turno_base', 'No definido')
@@ -480,9 +479,10 @@ elif opcion == "Consulta Alumnos":
                     if lista_cargas:
                         for carga in lista_cargas:
                             with st.container(border=True):
-                                c1, c2 = st.columns([1, 3])
+                                # AQUI ESTÁ LA CORRECCIÓN DE LA COLUMNA ANCHA Y LA NEGRITA HTML
+                                c1, c2 = st.columns([2, 3])
                                 with c1: 
-                                    st.write(f"**{carga['nombre_docente']}**")
+                                    st.markdown(f"<b>{carga['nombre_docente']}</b>", unsafe_allow_html=True)
                                     if carga.get('nota'): st.caption(carga['nota'])
                                 with c2: 
                                     st.write("**Imparte:**")

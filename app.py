@@ -332,7 +332,6 @@ elif opcion == "Gestión Maestros":
         lista_p = [d.to_dict() for d in docs_p]
         if lista_p:
             df_p = pd.DataFrame(lista_p)
-            # PROTECCIÓN CONTRA KEYERROR
             if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
             df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
             df_p['turno_base'] = df_p.get('turno_base', 'No definido')
@@ -488,12 +487,65 @@ elif opcion == "Consulta Alumnos":
                     else: st.warning(f"No hay carga académica asignada para {grado_alumno}.")
                 else: st.error("El alumno no tiene grado asignado.")
 
+            # --- AQUI ESTA LA MAGIA DE FINANZAS EN CONSULTA ---
             with tab_fin:
+                st.subheader("Historial de Pagos y Recibos")
                 pagos = db.collection("finanzas").where("alumno_nie", "==", alumno_seleccionado['nie']).where("tipo", "==", "ingreso").stream()
-                lista_p = [p.to_dict() for p in pagos]
+                lista_p = []
+                for p in pagos:
+                    d = p.to_dict()
+                    d['id'] = p.id
+                    lista_p.append(d)
+                
                 if lista_p:
                     df_p = pd.DataFrame(lista_p).sort_values(by="fecha_legible", ascending=False)
-                    st.dataframe(df_p[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
+                    # 1. Agregamos observaciones al dataframe
+                    if "observaciones" not in df_p.columns: df_p["observaciones"] = ""
+                    st.dataframe(df_p[['fecha_legible', 'descripcion', 'monto', 'observaciones']], use_container_width=True)
+                    
+                    st.markdown("---")
+                    st.write("#### 📄 Generar Copia de Recibo")
+                    
+                    # 2. Selector de recibo para reimprimir
+                    opciones_recibo = {f"{r['fecha_legible']} - {r['descripcion']} (${r['monto']})": r for r in lista_p}
+                    seleccion_recibo = st.selectbox("Seleccione un pago para ver el recibo:", ["Seleccionar..."] + list(opciones_recibo.keys()))
+                    
+                    if seleccion_recibo != "Seleccionar...":
+                        if st.button("📄 Ver/Imprimir Recibo Seleccionado"):
+                            # Magia: Inyectamos el recibo en la sesión y recargamos
+                            st.session_state.recibo_temp = opciones_recibo[seleccion_recibo]
+                            # Forzamos ir a la pestaña de finanzas para que se active el modo impresión
+                            # (OJO: Streamlit no permite cambiar 'opcion' programáticamente fácil,
+                            # así que mostramos el recibo AQUÍ MISMO usando el mismo código HTML)
+                            
+                            r = st.session_state.recibo_temp
+                            color_tema = "#2e7d32"
+                            img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
+                            
+                            # HTML DE RECIBO (REUTILIZADO)
+                            html_ticket = f"""
+                            <div style="border:1px solid #ccc; padding:20px; margin-top:20px; background:white; color:black;">
+                                <div style="background-color:{color_tema}; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+                                    <div style="display:flex; align-items:center; gap:15px;">
+                                        <div style="background:white; padding:5px; border-radius:4px;">{img_h}</div>
+                                        <div><h3 style="margin:0; color:white;">COLEGIO PROFA. BLANCA ELENA</h3></div>
+                                    </div>
+                                    <div><h4 style="margin:0; color:white;">COPIA DE RECIBO</h4><p style="margin:0; font-size:12px; color:white;">Ref: {r['id'][-6:]}</p></div>
+                                </div>
+                                <div style="padding:20px;">
+                                    <p><strong>Alumno:</strong> {r.get('nombre_persona')}</p>
+                                    <p><strong>Fecha:</strong> {r['fecha_legible']}</p>
+                                    <p><strong>Concepto:</strong> {r['descripcion']}</p>
+                                    <p><strong>Notas:</strong> {r.get('observaciones','')}</p>
+                                    <h2 style="text-align:right; color:{color_tema};">${r['monto']:.2f}</h2>
+                                </div>
+                            </div>
+                            """
+                            st.markdown(html_ticket, unsafe_allow_html=True)
+                            
+                            # Boton de impresión JS
+                            components.html(f"""<script>function printPage() {{ window.print(); }}</script><button onclick="printPage()" style="background-color:#2e7d32;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;margin-top:10px;">🖨️ Imprimir Esta Copia</button>""", height=50)
+
                 else: st.info("Sin pagos registrados.")
 
             with tab_acad:
@@ -519,7 +571,7 @@ elif opcion == "Finanzas":
 
     if st.session_state.recibo_temp:
         r = st.session_state.recibo_temp
-        es_ingreso = r['tipo'] == 'ingreso'
+        es_ingreso = r.get('tipo') == 'ingreso' # .get() por seguridad
         color_tema = "#2e7d32" if es_ingreso else "#c62828"
         titulo_doc = "RECIBO DE INGRESO" if es_ingreso else "COMPROBANTE DE EGRESO"
         img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:70px;">' if img else ""
@@ -545,7 +597,7 @@ elif opcion == "Finanzas":
 </style>
 """, unsafe_allow_html=True)
         
-        st.success("✅ Transacción registrada.")
+        st.success("✅ Transacción registrada/visualizada.")
         linea_extra = ""
         if r.get('alumno_nie'):
             linea_extra = f"""<tr style="border-bottom:1px solid #eee"><td style="padding:8px;font-weight:bold">Alumno:</td><td style="padding:8px">{r.get('nombre_persona')} (NIE: {r.get('alumno_nie')})</td><td style="padding:8px;font-weight:bold">Grado:</td><td style="padding:8px">{r.get('alumno_grado')}</td></tr>"""
@@ -673,7 +725,6 @@ elif opcion == "Finanzas":
                     if f_obj and (fecha_ini <= f_obj <= fecha_fin):
                         if tipo_filtro == "Solo Ingresos" and d.get("tipo") != "ingreso": continue
                         if tipo_filtro == "Solo Egresos" and d.get("tipo") != "egreso": continue
-                        # SE AGREGÓ "observaciones" AQUÍ
                         item = {"fecha": d.get("fecha_legible", "-"), "tipo": d.get("tipo", "Desconocido"), "persona": d.get("nombre_persona") or d.get("alumno_nombre") or d.get("proveedor") or "N/A", "nie": d.get("alumno_nie", "-"), "concepto": d.get("descripcion", "-"), "observaciones": d.get("observaciones", "-"), "monto": d.get("monto", 0.0)}
                         lista_final.append(item)
                 if not lista_final: st.warning("No hay datos para generar el reporte con esos filtros.")
@@ -684,9 +735,7 @@ elif opcion == "Finanzas":
                     filas_html = ""
                     for index, row in df.iterrows():
                         color_tipo = "green" if row['tipo'] == 'ingreso' else "red"
-                        # SE AGREGÓ LA COLUMNA DE OBSERVACIONES EN EL HTML
                         filas_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; color:#000;">{row['fecha']}</td><td style="padding: 8px; color: {color_tipo}; font-weight: bold;">{row['tipo'].upper()}</td><td style="padding: 8px; color:#000;">{row['persona']}</td><td style="padding: 8px; color:#000;">{row['concepto']}</td><td style="padding: 8px; color:#000; font-style:italic;">{row['observaciones']}</td><td style="padding: 8px; text-align: right; color:#000;">${row['monto']:.2f}</td></tr>"""
-                    
                     html_reporte = f"""<div class="report-print" style="font-family:Arial,sans-serif;padding:20px;color:black!important;"><div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #333;padding-bottom:10px;"><div style="display:flex;align-items:center;gap:15px;">{logo_html}<div><h2 style="margin:0;color:black;">COLEGIO PROFA. BLANCA ELENA</h2><p style="margin:0;color:gray;">Reporte Financiero Detallado</p></div></div><div style="text-align:right;"><p style="margin:0;color:black;"><strong>Desde:</strong> {fecha_ini.strftime('%d/%m/%Y')}</p><p style="margin:0;color:black;"><strong>Hasta:</strong> {fecha_fin.strftime('%d/%m/%Y')}</p></div></div><div style="display:flex;gap:20px;margin:20px 0;"><div style="flex:1;background:#e8f5e9;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#2e7d32;">INGRESOS</h4><h2 style="margin:5px 0;color:#2e7d32;">${t_ing:,.2f}</h2></div><div style="flex:1;background:#ffebee;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#c62828;">EGRESOS</h4><h2 style="margin:5px 0;color:#c62828;">${t_egr:,.2f}</h2></div><div style="flex:1;background:#e3f2fd;padding:15px;border-radius:5px;text-align:center;"><h4 style="margin:0;color:#1565c0;">BALANCE</h4><h2 style="margin:5px 0;color:#1565c0;">${balance:,.2f}</h2></div></div><table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:14px;"><thead style="background-color:#f5f5f5;"><tr><th style="padding:10px;text-align:left;color:black;">Fecha</th><th style="padding:10px;text-align:left;color:black;">Tipo</th><th style="padding:10px;text-align:left;color:black;">Responsable</th><th style="padding:10px;text-align:left;color:black;">Concepto</th><th style="padding:10px;text-align:left;color:black;">Notas/Detalle</th><th style="padding:10px;text-align:right;color:black;">Monto</th></tr></thead><tbody>{filas_html}</tbody></table><br><p style="text-align:center;color:gray;font-size:12px;margin-top:30px;">Reporte generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}</p></div>"""
                     st.session_state.reporte_html = html_reporte
                     st.rerun()

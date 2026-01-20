@@ -334,6 +334,7 @@ elif opcion == "Gestión Maestros":
         lista_p = [d.to_dict() for d in docs_p]
         if lista_p:
             df_p = pd.DataFrame(lista_p)
+            # PROTECCIÓN CONTRA KEYERROR
             if 'codigo' not in df_p.columns: df_p['codigo'] = "Sin Código"
             df_p['codigo'] = df_p['codigo'].fillna("Sin Código")
             df_p['turno_base'] = df_p.get('turno_base', 'No definido')
@@ -479,7 +480,6 @@ elif opcion == "Consulta Alumnos":
                     if lista_cargas:
                         for carga in lista_cargas:
                             with st.container(border=True):
-                                # AQUI ESTÁ LA CORRECCIÓN DE LA COLUMNA ANCHA Y LA NEGRITA HTML
                                 c1, c2 = st.columns([2, 3])
                                 with c1: 
                                     st.markdown(f"<b>{carga['nombre_docente']}</b>", unsafe_allow_html=True)
@@ -633,12 +633,19 @@ elif opcion == "Finanzas":
                             st.session_state.recibo_temp = data
                             st.session_state.alumno_pago = None
                             st.rerun()
+        
+        # --- AQUÍ ESTÁ EL CAMBIO SOLICITADO ---
         with tab2:
             st.subheader("Registrar Salida de Dinero")
+            # 1. Selector FUERA del form
+            cat = st.selectbox("Categoría", ["Pago de Planilla (Maestros)", "Servicios", "Mantenimiento", "Materiales", "Otros"])
+            
+            # 2. El resto DENTRO del form
             with st.form("f_gasto"):
                 c1, c2 = st.columns(2)
-                cat = c1.selectbox("Categoría", ["Pago de Planilla (Maestros)", "Servicios", "Mantenimiento", "Materiales", "Otros"])
                 maestro_obj = None; prov_txt = ""
+                
+                # Lógica visual dinámica gracias a que 'cat' ya cambió
                 if cat == "Pago de Planilla (Maestros)":
                     docs_m = db.collection("maestros_perfil").stream()
                     lista_m = {f"{d.to_dict().get('nombre')} ({d.to_dict().get('codigo','S/C')})": d.to_dict() for d in docs_m}
@@ -646,8 +653,11 @@ elif opcion == "Finanzas":
                         mk = c1.selectbox("Seleccione Docente", list(lista_m.keys()))
                         maestro_obj = lista_m[mk]
                     else: c1.warning("Sin maestros.")
-                else: prov_txt = c1.text_input("Pagar a:")
+                else:
+                    prov_txt = c1.text_input("Pagar a:")
+                
                 monto = c2.number_input("Monto $", min_value=0.01); obs = st.text_area("Detalle")
+                
                 if st.form_submit_button("🔴 Registrar"):
                     if cat == "Pago de Planilla (Maestros)" and maestro_obj:
                         nom = maestro_obj['nombre']; cod = maestro_obj.get('codigo', '')
@@ -656,6 +666,7 @@ elif opcion == "Finanzas":
                     db.collection("finanzas").add(data)
                     st.session_state.recibo_temp = data
                     st.rerun()
+
         with tab3:
             st.subheader("Generación de Reportes PDF")
             col_fil1, col_fil2, col_fil3 = st.columns(3)

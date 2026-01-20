@@ -42,38 +42,45 @@ except Exception as e:
     st.error(f"⚠️ Error crítico: {e}")
     st.stop()
 
-# --- 2. CONFIGURACIÓN ACADÉMICA (ESTRUCTURA DE MATERIAS) ---
-# Aquí definimos qué materias ve cada ciclo. Cuando tengas la lista final, solo editamos esto.
+# --- 2. MAPA CURRICULAR (CONFIGURACIÓN DE MATERIAS) ---
+# Aquí definimos exactamente qué materias lleva cada grado según tu Boleta.
 
-LISTA_GRADOS = [
-    "Kinder 4", "Kinder 5", "Preparatoria", 
-    "Primer Grado", "Segundo Grado", "Tercer Grado", 
-    "Cuarto Grado", "Quinto Grado", "Sexto Grado", 
-    "Séptimo Grado", "Octavo Grado", "Noveno Grado"
+MATERIAS_ESTANDAR = [
+    "Lenguaje", 
+    "Matemáticas", 
+    "C.S y M. Ambiente", 
+    "C. Sociales y Cívica", 
+    "Inglés", 
+    "Moral, U y C.", 
+    "Educación Física", 
+    "Educación Artística",
+    "Informática", # Agregada por ser común
+    "Conducta"
 ]
 
-# Definimos las materias por defecto (Base Común)
-MATERIAS_BASICAS = [
-    "Lenguaje", "Matemática", "Ciencia y Tecnología", "Estudios Sociales", 
-    "Inglés", "Moral, Urbanidad y Cívica", "Educación Física", "Educación Artística"
-]
+# Diccionario Maestro: Si en el futuro 7º, 8º y 9º llevan materias distintas, se cambian aquí.
+MAPA_CURRICULAR = {
+    "Kinder 4": ["Ámbitos de Desarrollo", "Conducta"],
+    "Kinder 5": ["Ámbitos de Desarrollo", "Conducta"],
+    "Preparatoria": ["Ámbitos de Desarrollo", "Conducta"],
+    "Primer Grado": MATERIAS_ESTANDAR,
+    "Segundo Grado": MATERIAS_ESTANDAR,
+    "Tercer Grado": MATERIAS_ESTANDAR,
+    "Cuarto Grado": MATERIAS_ESTANDAR,
+    "Quinto Grado": MATERIAS_ESTANDAR,
+    "Sexto Grado": MATERIAS_ESTANDAR,
+    "Séptimo Grado": MATERIAS_ESTANDAR,
+    "Octavo Grado": MATERIAS_ESTANDAR,
+    "Noveno Grado": MATERIAS_ESTANDAR
+}
 
-# Definimos materias extra o específicas
-MATERIAS_COMPLEMENTARIAS = ["Informática", "Ortografía", "Caligrafía", "Conducta"]
-
-# Función inteligente para devolver materias según el grado
-def obtener_materias_por_grado(grado):
-    # Aquí puedes personalizar si Kinder ve materias distintas a Noveno, etc.
-    # Por ahora, unificamos I, II y III ciclo con la estructura estándar + complementarias
-    if grado in ["Kinder 4", "Kinder 5", "Preparatoria"]:
-        return ["Ámbitos de Desarrollo", "Conducta"] # Ejemplo para parvularia (aunque no se evalue igual)
-    
-    # Para 1º a 9º Grado (La lista completa que tenías)
-    return MATERIAS_BASICAS + MATERIAS_COMPLEMENTARIAS
+LISTA_GRADOS_TODO = list(MAPA_CURRICULAR.keys())
+# Grados que llevan notas numéricas (excluyendo parvularia)
+LISTA_GRADOS_NOTAS = [g for g in LISTA_GRADOS_TODO if "Kinder" not in g and "Prepa" not in g]
 
 LISTA_MESES = ["Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre"]
 
-# --- 3. FUNCIONES AUXILIARES (REDONDEO Y ARCHIVOS) ---
+# --- 3. FUNCIONES AUXILIARES ---
 def subir_archivo(archivo, ruta_carpeta):
     if archivo is None: return None
     try:
@@ -92,9 +99,7 @@ def get_image_base64(path):
     except: return "" 
 
 def redondear_mined(valor):
-    """
-    Regla MINED: >= 0.5 sube, < 0.5 baja.
-    """
+    """ Regla: >= 0.5 sube, < 0.5 baja """
     if valor is None: return 0.0
     parte_entera = int(valor)
     parte_decimal = valor - parte_entera
@@ -137,7 +142,7 @@ elif opcion == "Inscripción Alumnos":
             apellidos = st.text_input("Apellidos*")
             estado = st.selectbox("Estado", ["Activo", "Inactivo"]) 
         with c2:
-            grado = st.selectbox("Grado a Matricular", LISTA_GRADOS)
+            grado = st.selectbox("Grado a Matricular", LISTA_GRADOS_TODO)
             turno = st.selectbox("Turno*", ["Matutino", "Vespertino"])
             encargado = st.text_input("Nombre del Responsable")
             telefono = st.text_input("Teléfono")
@@ -201,11 +206,11 @@ elif opcion == "Gestión Maestros":
             with st.form("form_carga"):
                 c1, c2 = st.columns(2)
                 nombre_sel = c1.selectbox("Docente", list(lista_profes.keys()))
-                grado_sel = c2.selectbox("Grado", LISTA_GRADOS)
+                # Al seleccionar grado, el maestro deberá elegir de la lista completa abajo (limitación visual de streamlit forms)
+                grado_sel = c2.selectbox("Grado", LISTA_GRADOS_TODO)
                 
-                # Carga dinámica de materias según el grado seleccionado (aunque en el form es estático, usamos la lista completa para elegir)
-                # Nota: Streamlit forms no son dinámicos al cambiar el selectbox dentro del form. Usamos la lista completa para selección.
-                materias_sel = st.multiselect("Materias", obtener_materias_por_grado("Noveno Grado")) # Carga todas las posibles
+                # Mostramos todas las materias posibles para que elija
+                materias_sel = st.multiselect("Materias (Seleccione según el grado)", MATERIAS_ESTANDAR)
                 
                 nota = st.text_input("Nota / Observación")
                 es_guia = st.checkbox("¿Es el Maestro Guía de este grado?")
@@ -226,7 +231,6 @@ elif opcion == "Gestión Maestros":
         else: st.warning("No hay docentes registrados.")
 
     with t3: 
-        # Admin Cargas (Manteniendo funcionalidad)
         docs_c = db.collection("carga_academica").stream()
         cargas = [{"id": d.id, **d.to_dict()} for d in docs_c]
         if cargas:
@@ -249,9 +253,8 @@ elif opcion == "Gestión Maestros":
                     c_obj = next((x for x in cargas if x['id'] == cid), None)
                     with st.form("edit_carga_real"):
                         st.info(f"Editando: {c_obj['nombre_docente']} - {c_obj['grado']}")
-                        # Aquí permitimos editar si es guía
                         es_guia_edit = st.checkbox("¿Es Maestro Guía?", value=c_obj.get('es_guia', False))
-                        materias_edit = st.multiselect("Materias", obtener_materias_por_grado("Noveno Grado"), default=c_obj['materias'])
+                        materias_edit = st.multiselect("Materias", MATERIAS_ESTANDAR, default=[m for m in c_obj['materias'] if m in MATERIAS_ESTANDAR])
                         
                         c_a, c_b = st.columns(2)
                         if c_a.form_submit_button("💾 Actualizar"):
@@ -261,7 +264,6 @@ elif opcion == "Gestión Maestros":
                             db.collection("carga_academica").document(cid).delete()
                             st.success("Eliminado"); time.sleep(1); st.rerun()
 
-    # (Pestañas 4 y 5 simplificadas visualmente pero funcionales en el backend si se requiere expandir)
     with t5:
         docs_p = db.collection("maestros_perfil").stream()
         lista_p = [d.to_dict() for d in docs_p]
@@ -282,7 +284,7 @@ elif opcion == "Consulta Alumnos":
             if d.exists: alum = d.to_dict()
             else: st.error("Alumno no encontrado.")
     else:
-        g = st.selectbox("Seleccione Grado", ["Todos"] + LISTA_GRADOS)
+        g = st.selectbox("Seleccione Grado", ["Todos"] + LISTA_GRADOS_TODO)
         q = db.collection("alumnos")
         if g != "Todos": q = q.where("grado_actual", "==", g)
         l = [d.to_dict() for d in q.stream()]
@@ -394,14 +396,13 @@ elif opcion == "Consulta Alumnos":
                 st.warning("⚠️ No hay calificaciones registradas para este alumno.")
             else:
                 filas = []
-                # Usamos la función obtener_materias para asegurar el orden correcto
-                materias_del_grado = obtener_materias_por_grado(alum['grado_actual'])
+                # CARGAR MATERIAS EXACTAS DEL GRADO
+                materias_del_grado = MAPA_CURRICULAR.get(alum['grado_actual'], MATERIAS_ESTANDAR)
                 
                 for mat in materias_del_grado:
                     if mat in notas_map:
                         n = notas_map[mat]
                         
-                        # Cálculo Trimestral (Regla: Promedio de los 3 meses -> Redondeo MINED)
                         f, m, a = n.get("Febrero", 0), n.get("Marzo", 0), n.get("Abril", 0)
                         t1 = redondear_mined((f + m + a) / 3)
                         
@@ -665,13 +666,13 @@ elif opcion == "Notas (1º-9º)":
     
     # 1. Selectores
     c1, c2, c3 = st.columns(3)
-    grado = c1.selectbox("1. Seleccione Grado", ["Seleccionar..."] + list(obtener_materias_por_grado("Noveno Grado") and LISTA_GRADOS)) # Truco para cargar grados
+    grado = c1.selectbox("1. Seleccione Grado", ["Seleccionar..."] + LISTA_GRADOS_NOTAS)
     
-    # Aquí cargamos las materias dinámicamente según el grado, pero como Streamlit reinicia, 
-    # usamos la función obtener_materias_por_grado si ya hay grado seleccionado
-    materias_posibles = obtener_materias_por_grado(grado) if grado != "Seleccionar..." else []
+    # LOGICA DINÁMICA DE MATERIAS
+    # Si no se selecciona grado, lista vacía. Si se selecciona, carga las específicas de ese grado.
+    materias_posibles = MAPA_CURRICULAR.get(grado, []) if grado != "Seleccionar..." else []
+    
     materia = c2.selectbox("2. Seleccione Materia", ["Seleccionar..."] + materias_posibles)
-    
     mes = c3.selectbox("3. Mes a Calificar", LISTA_MESES)
 
     if grado != "Seleccionar..." and materia != "Seleccionar...":

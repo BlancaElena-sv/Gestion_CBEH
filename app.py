@@ -7,6 +7,7 @@ import base64
 import time
 import os
 import streamlit.components.v1 as components
+import math
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Sistema de Gestión Escolar", layout="wide", page_icon="🎓")
@@ -62,9 +63,23 @@ def get_image_base64(path):
             return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
     except: return "" 
 
+def redondear_mined(valor):
+    """
+    Regla de negocio:
+    - Si el decimal es >= 0.5, aproxima al entero superior (8.6 -> 9.0).
+    - Si el decimal es < 0.5, aproxima al entero inferior (8.4 -> 8.0).
+    """
+    if valor is None: return 0.0
+    parte_entera = int(valor)
+    parte_decimal = valor - parte_entera
+    
+    if parte_decimal >= 0.5:
+        return float(parte_entera + 1)
+    else:
+        return float(parte_entera)
+
 # --- CONSTANTES ACADÉMICAS ---
 LISTA_GRADOS_TODO = ["Kinder 4", "Kinder 5", "Preparatoria", "Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
-# Solo grados que llevan notas numéricas
 LISTA_GRADOS_NOTAS = ["Primer Grado", "Segundo Grado", "Tercer Grado", "Cuarto Grado", "Quinto Grado", "Sexto Grado", "Séptimo Grado", "Octavo Grado", "Noveno Grado"]
 
 LISTA_MATERIAS = [
@@ -93,7 +108,7 @@ if opcion == "Inicio":
     st.title("🍎 Panel de Control")
     st.markdown(f"**Fecha:** {datetime.now().strftime('%d/%m/%Y')}")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Ciclo", "2026")
+    c1.metric("Ciclo", str(datetime.now().year))
     c2.metric("Modalidad", "Presencial")
     c3.metric("Estado", "Activo")
 
@@ -118,7 +133,6 @@ elif opcion == "Inscripción Alumnos":
             direccion = st.text_area("Dirección de Residencia", height=100)
         
         st.markdown("---")
-        st.subheader("Documentación Digital")
         col_doc1, col_doc2 = st.columns(2)
         with col_doc1: 
             foto = st.file_uploader("📸 Foto de Perfil (Carnet)", type=["jpg", "png", "jpeg"])
@@ -268,7 +282,6 @@ elif opcion == "Consulta Alumnos":
 
     if alum:
         st.markdown("---")
-        # --- DISEÑO LIMPIO Y FIJO ---
         c1, c2 = st.columns([1, 4])
         with c1: st.image(alum.get('documentos',{}).get('foto_url', "https://via.placeholder.com/150"), width=120)
         with c2: 
@@ -290,6 +303,7 @@ elif opcion == "Consulta Alumnos":
             else: st.info("Sin documentos")
 
         with t2:
+            st.subheader(f"Carga: {alum.get('grado_actual')}")
             cargas = db.collection("carga_academica").where("grado", "==", alum['grado_actual']).stream()
             lc = [c.to_dict() for c in cargas]
             if lc:
@@ -307,12 +321,46 @@ elif opcion == "Consulta Alumnos":
                 df = pd.DataFrame(lp).sort_values(by="fecha_legible", ascending=False)
                 if "observaciones" not in df: df["observaciones"] = ""
                 st.dataframe(df[['fecha_legible', 'descripcion', 'monto', 'observaciones']], use_container_width=True)
-                # (Aquí iría la lógica de reimpresión si se desea, por simplicidad solo muestro la tabla)
+                
+                sel_p = st.selectbox("Reimprimir Recibo:", ["Seleccionar..."] + [f"{p['fecha_legible']} - ${p['monto']}" for p in lp])
+                if sel_p != "Seleccionar...":
+                    if st.button("📄 Generar Vista Previa"):
+                        p_obj = next(p for p in lp if f"{p['fecha_legible']} - ${p['monto']}" == sel_p)
+                        color = "#2e7d32"
+                        img = get_image_base64("logo.png"); img_h = f'<img src="{img}" style="height:60px;">' if img else ""
+                        html = f"""
+                        <div style="border:1px solid #ccc; padding:20px; background:white; color:black;">
+                            <div style="background:{color}; color:white; padding:15px; display:flex; justify-content:space-between;">
+                                <div style="display:flex; gap:15px;"><div>{img_h}</div><div><h3>COLEGIO PROFA. BLANCA ELENA</h3><p>COPIA DE RECIBO</p></div></div>
+                                <div><h4>Ref: {p_obj['id'][-6:]}</h4></div>
+                            </div>
+                            <div style="padding:20px;">
+                                <p><b>Fecha:</b> {p_obj['fecha_legible']}</p>
+                                <p><b>Alumno:</b> {p_obj.get('nombre_persona')}</p>
+                                <p><b>Concepto:</b> {p_obj['descripcion']}</p>
+                                <p><b>Nota:</b> {p_obj.get('observaciones','')}</p>
+                                <h2 style="text-align:right; color:{color};">${p_obj['monto']:.2f}</h2>
+                            </div>
+                        </div>
+                        """
+                        st.markdown(html, unsafe_allow_html=True)
+                        components.html(f"""<script>function p(){{window.print()}}</script><button onclick="p()" style="background:green;color:white;padding:10px;border:none;border-radius:5px;">🖨️ Imprimir</button>""", height=50)
             else: st.info("Sin pagos registrados")
 
-        with t4: # --- BOLETA DE NOTAS AUTOMÁTICA ---
-            st.subheader(f"Boleta de Calificaciones {datetime.now().year}")
+        with t4: # --- BOLETA DE NOTAS AUTOMÁTICA MEJORADA ---
+            year_actual = datetime.now().year
+            st.subheader(f"Boleta de Calificaciones {year_actual}")
             
+            # Buscar maestro guía (Intenta buscar Moral y Cívica, si no, el primero del grado)
+            q_guia = db.collection("carga_academica").where("grado", "==", alum['grado_actual']).stream()
+            maestro_guia = "No Asignado"
+            lista_cargas_guia = [d.to_dict() for d in q_guia]
+            
+            # Lógica para encontrar guía
+            cand_moral = [x['nombre_docente'] for x in lista_cargas_guia if "Moral, Urbanidad y Cívica" in x['materias']]
+            if cand_moral: maestro_guia = cand_moral[0]
+            elif lista_cargas_guia: maestro_guia = lista_cargas_guia[0]['nombre_docente']
+
             notas_ref = db.collection("notas").where("nie", "==", alum['nie']).stream()
             notas_map = {}
             for doc in notas_ref:
@@ -327,28 +375,34 @@ elif opcion == "Consulta Alumnos":
                 for mat in LISTA_MATERIAS:
                     if mat in notas_map:
                         n = notas_map[mat]
-                        # Cálculo Trimestral Simplificado (Promedio de lo existente)
-                        t1_meses = [n.get("Febrero"), n.get("Marzo"), n.get("Abril")]
-                        t1_vals = [x for x in t1_meses if x is not None]
-                        t1 = sum(t1_vals)/len(t1_vals) if t1_vals else 0
                         
-                        t2_meses = [n.get("Mayo"), n.get("Junio"), n.get("Julio")]
-                        t2_vals = [x for x in t2_meses if x is not None]
-                        t2 = sum(t2_vals)/len(t2_vals) if t2_vals else 0
+                        # TRIMESTRE 1 (Feb+Mar+Abr) / 3
+                        f, m, a = n.get("Febrero", 0), n.get("Marzo", 0), n.get("Abril", 0)
+                        # Nota: Si falta un mes, se asume 0 para el cálculo estricto, o se promedia solo lo existente.
+                        # Según tu indicación "Feb+Mar+Abr / 3", se divide entre 3 fijo.
+                        raw_t1 = (f + m + a) / 3
+                        t1 = redondear_mined(raw_t1)
                         
-                        t3_meses = [n.get("Agosto"), n.get("Septiembre"), n.get("Octubre")]
-                        t3_vals = [x for x in t3_meses if x is not None]
-                        t3 = sum(t3_vals)/len(t3_vals) if t3_vals else 0
+                        # TRIMESTRE 2 (May+Jun+Jul) / 3
+                        may, jun, jul = n.get("Mayo", 0), n.get("Junio", 0), n.get("Julio", 0)
+                        raw_t2 = (may + jun + jul) / 3
+                        t2 = redondear_mined(raw_t2)
                         
-                        fin_vals = [x for x in [t1, t2, t3] if x > 0]
-                        fin = sum(fin_vals)/len(fin_vals) if fin_vals else 0
+                        # TRIMESTRE 3 (Ago+Sep+Oct) / 3
+                        ago, sep, oct_ = n.get("Agosto", 0), n.get("Septiembre", 0), n.get("Octubre", 0)
+                        raw_t3 = (ago + sep + oct_) / 3
+                        t3 = redondear_mined(raw_t3)
+                        
+                        # FINAL (T1+T2+T3)/3 -> Usando los valores YA REDONDEADOS de los trimestres
+                        raw_fin = (t1 + t2 + t3) / 3
+                        fin = redondear_mined(raw_fin)
                         
                         filas.append({
                             "Asignatura": mat,
-                            "F": n.get("Febrero", "-"), "M": n.get("Marzo", "-"), "A": n.get("Abril", "-"), "TI": round(t1,1) if t1 else "-",
-                            "M.": n.get("Mayo", "-"), "J": n.get("Junio", "-"), "J.": n.get("Julio", "-"), "TII": round(t2,1) if t2 else "-",
-                            "A.": n.get("Agosto", "-"), "S": n.get("Septiembre", "-"), "O": n.get("Octubre", "-"), "TIII": round(t3,1) if t3 else "-",
-                            "FINAL": round(fin,1) if fin else "-"
+                            "F": n.get("Febrero", "-"), "M": n.get("Marzo", "-"), "A": n.get("Abril", "-"), "TI": t1,
+                            "M.": n.get("Mayo", "-"), "J": n.get("Junio", "-"), "J.": n.get("Julio", "-"), "TII": t2,
+                            "A.": n.get("Agosto", "-"), "S": n.get("Septiembre", "-"), "O": n.get("Octubre", "-"), "TIII": t3,
+                            "FINAL": fin
                         })
                 
                 df_b = pd.DataFrame(filas)
@@ -357,18 +411,21 @@ elif opcion == "Consulta Alumnos":
                 # HTML Reporte
                 html_rows = ""
                 for _, r in df_b.iterrows():
-                    html_rows += f"<tr><td style='text-align:left'>{r['Asignatura']}</td><td>{r['F']}</td><td>{r['M']}</td><td>{r['A']}</td><td style='background:#eee'><b>{r['TI']}</b></td><td>{r['M.']}</td><td>{r['J']}</td><td>{r['J.']}</td><td style='background:#eee'><b>{r['TII']}</b></td><td>{r['A.']}</td><td>{r['S']}</td><td>{r['O']}</td><td style='background:#eee'><b>{r['TIII']}</b></td><td style='background:#333;color:white'><b>{r['FINAL']}</b></td></tr>"
+                    html_rows += f"<tr><td style='text-align:left; padding:4px;'>{r['Asignatura']}</td><td>{r['F']}</td><td>{r['M']}</td><td>{r['A']}</td><td style='background:#eee; font-weight:bold;'>{r['TI']}</td><td>{r['M.']}</td><td>{r['J']}</td><td>{r['J.']}</td><td style='background:#eee; font-weight:bold;'>{r['TII']}</td><td>{r['A.']}</td><td>{r['S']}</td><td>{r['O']}</td><td style='background:#eee; font-weight:bold;'>{r['TIII']}</td><td style='background:#333;color:white;font-weight:bold;'>{r['FINAL']}</td></tr>"
                 
                 logo = get_image_base64("logo.png"); h_img = f'<img src="{logo}" height="60">' if logo else ""
                 html = f"""
                 <div style="font-family:Arial; font-size:12px;">
-                    <div style="display:flex; align-items:center;">{h_img}<div style="margin-left:15px"><h3>COLEGIO PROFA. BLANCA ELENA</h3><p>BOLETA DE CALIFICACIONES</p></div></div>
-                    <div style="border:1px solid #000; padding:5px; margin:10px 0;"><b>Alumno:</b> {alum['nombre_completo']} | <b>Grado:</b> {alum['grado_actual']}</div>
+                    <div style="display:flex; align-items:center;">{h_img}<div style="margin-left:15px"><h3>COLEGIO PROFA. BLANCA ELENA</h3><p>BOLETA DE CALIFICACIONES - AÑO {year_actual}</p></div></div>
+                    <div style="border:1px solid #000; padding:5px; margin:10px 0;">
+                        <b>Alumno:</b> {alum['nombre_completo']} <br>
+                        <b>Grado:</b> {alum['grado_actual']} &nbsp; | &nbsp; <b>Maestro Guía:</b> {maestro_guia}
+                    </div>
                     <table border="1" style="width:100%; border-collapse:collapse; text-align:center;">
                         <tr style="background:#ddd;"><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>
                         {html_rows}
                     </table>
-                    <br><br><div style="display:flex; justify-content:space-between; text-align:center;"><div style="border-top:1px solid #000; width:30%">Orientador</div><div style="border-top:1px solid #000; width:30%">Dirección</div></div>
+                    <br><br><div style="display:flex; justify-content:space-between; text-align:center; font-size:11px;"><div style="border-top:1px solid #000; width:30%">Orientador</div><div style="border-top:1px solid #000; width:30%">Dirección</div></div>
                 </div>
                 """
                 components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
@@ -413,7 +470,9 @@ elif opcion == "Finanzas":
     elif st.session_state.reporte_html:
         st.markdown("""<style>@media print { body * { visibility: hidden; } .rep, .rep * { visibility: visible; } .rep { position: absolute; left: 0; top: 0; width: 100%; background: white; color: black !important; } }</style>""", unsafe_allow_html=True)
         st.markdown(st.session_state.reporte_html, unsafe_allow_html=True)
-        if st.button("⬅️ Volver"): st.session_state.reporte_html = None; st.rerun()
+        c1, c2 = st.columns([1,4])
+        if c1.button("⬅️ Volver"): st.session_state.reporte_html = None; st.rerun()
+        with c2: components.html(f"""<script>function p(){{window.parent.print()}}</script><button onclick="p()" style="background:green;color:white;padding:10px;border:none;">🖨️ IMPRIMIR</button>""", height=50)
 
     else:
         t1, t2, t3 = st.tabs(["Ingresos", "Gastos", "Reportes"])
@@ -432,7 +491,7 @@ elif opcion == "Finanzas":
                     mes = st.selectbox("Mes", LISTA_MESES)
                     mon = st.number_input("Monto", min_value=0.01)
                     obs = st.text_area("Detalle")
-                    if st.form_submit_button("✅ Cobrar"):
+                    if st.form_submit_button("Cobrar"):
                         data = {"tipo": "ingreso", "descripcion": f"{con} - {mes}", "monto": mon, "nombre_persona": a['nombre_completo'], "alumno_nie": a['nie'], "observaciones": obs, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")}
                         db.collection("finanzas").add(data)
                         st.session_state.recibo_temp = data; st.session_state.pago_alum = None; st.rerun()

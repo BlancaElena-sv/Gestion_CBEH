@@ -135,7 +135,7 @@ with st.sidebar:
         <div style='text-align: center; color: #666; font-size: 11px;'>
             <p style='margin-bottom: 5px;'>
                 Desarrollado y Propiedad de:<br>
-                <b style='font-size: 12px;'>[TU NOMBRE O TU EMPRESA]</b>
+                <b style='font-size: 12px;'>Jose David Fuentes Mejia</b>
             </p>
             <p style='margin-bottom: 5px;'>
                 <i>Todos los derechos reservados © 2026</i>

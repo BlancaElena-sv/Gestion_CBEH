@@ -57,16 +57,24 @@ if "user_name" not in st.session_state: st.session_state["user_name"] = None
 if "user_id" not in st.session_state: st.session_state["user_id"] = None
 
 def login():
-    col_izq, col_centro, col_der = st.columns([1, 2, 1])
-    with col_centro:
-        try: 
-            st.image("logo.png", width=180) 
-        except: 
+    # --- PANTALLA DE LOGIN CENTRADA ---
+    # Usamos columnas vacias a los lados para centrar el contenido
+    c1, c2, c3 = st.columns([1, 2, 1])
+    
+    with c2:
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        try:
+            # Centrar imagen usando columnas anidadas dentro de la central
+            ic1, ic2, ic3 = st.columns([1,1,1])
+            with ic2:
+                st.image("logo.png", use_container_width=True)
+        except:
             st.warning("⚠️")
-            
-        st.markdown("<h1 style='text-align: left; color: #1E3A8A;'>EduManager</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: left; color: #555;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
+        
+        st.markdown("<h1 style='text-align: center; color: #1E3A8A; margin-bottom: 0;'>EduManager</h1>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center; color: #555; margin-top: 0;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
         st.write("") 
+        st.markdown("</div>", unsafe_allow_html=True)
 
         with st.form("login_form"):
             user = st.text_input("Usuario")
@@ -97,7 +105,13 @@ def login():
                 else: st.error("⚠️ Sin conexión.")
 
         st.info("¿Olvidó su credencial? Solicite restablecimiento con la Administración.")
-        st.markdown("<div style='text-align: center; color: grey; font-size: 11px; margin-top: 40px;'><p>© 2026 David Fuentes Development | Todos los derechos reservados.</p></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style='text-align: center; color: grey; font-size: 11px; margin-top: 40px;'>
+                <p>© 2026 David Fuentes Development | Todos los derechos reservados.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
 
 def logout():
     for key in list(st.session_state.keys()): del st.session_state[key]
@@ -164,29 +178,23 @@ def borrar_coleccion(coll_name, batch_size=10):
         deleted += 1
     if deleted >= batch_size: return borrar_coleccion(coll_name, batch_size)
 
-# --- VERIFICACIÓN DE DUPLICADOS ROBUSTA (SIN FILTRO DE FECHA EN QUERY) ---
+# --- VERIFICACIÓN DE DUPLICADOS ROBUSTA ---
 def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
-    # 1. Filtramos SOLO por docente y tipo (esto no da error)
     docs = db.collection("finanzas").where("docente_id", "==", docente_id).where("tipo", "==", "egreso").stream()
-    
     hoy = date.today()
-    
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
-        
-        # 2. Filtramos la fecha AQUÍ en Python (memoria)
         if fecha_db:
             if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
             
-            # Si la fecha es HOY y la descripción contiene "Salario", es duplicado
             if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
                 return True
     return False
 
-def existe_duplicado_alumno(id_alumno, descripcion):
-    docs = db.collection("finanzas").where("alumno_nie", "==", id_alumno).where("descripcion", "==", descripcion).stream()
+def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
+    docs = db.collection(coleccion).where(campo_id, "==", id_valor).where("descripcion", "==", descripcion).stream()
     hoy = date.today()
     for d in docs:
         data = d.to_dict()
@@ -405,7 +413,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     dd = doc.to_dict()
                     if dd['materia'] not in nm: nm[dd['materia']] = {}
                     nm[dd['materia']][dd['mes']] = dd['promedio_final']
-                
                 filas = []
                 malla = MAPA_CURRICULAR.get(a['grado_actual'], [])
                 for mat in malla:
@@ -553,7 +560,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         else: st.info("Sin historial.")
                 except Exception as e: st.error(f"Error cargando docente: {e}")
 
-    # --- 5. ASISTENCIA GLOBAL (CON RANGO FECHAS) ---
+    # --- 5. ASISTENCIA GLOBAL ---
     elif opcion_seleccionada == "Asistencia Global":
         st.title("📅 Reporte de Asistencia Global")
         c1, c2, c3 = st.columns(3)
@@ -583,13 +590,13 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 if f_ini <= f_obj <= f_fin:
                     total_dias += 1
                     regs = data_doc.get('registros', {})
-                    obs = data_doc.get('observaciones', {})
+                    obs_regs = data_doc.get('observaciones', {})
                     for nie, est in regs.items():
                         if nie in stats: 
                             if est == "Presente": stats[nie]["P"] += 1
                             elif est == "Ausente": 
                                 stats[nie]["A"] += 1
-                                if obs.get(nie): stats[nie]["Obs"].append(f"{f_obj.strftime('%d/%m')}: {obs[nie]}")
+                                if obs_regs.get(nie): stats[nie]["Obs"].append(f"{f_obj.strftime('%d/%m')}: {obs_regs[nie]}")
             
             if total_dias > 0:
                 data = [{"Alumno": v["Nombre"], "Asistencias": v["P"], "Faltas": v["A"], "% Asist": f"{(v['P']/total_dias)*100:.0f}%", "Observaciones": ", ".join(v["Obs"])} for v in stats.values()]
@@ -719,7 +726,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     obs = st.text_input("Observaciones")
                     if st.form_submit_button("✅ Registrar Ingreso"):
                         desc_full = f"{tipo_c} - {det_c}"
-                        if existe_duplicado_alumno(n, desc_full):
+                        if existe_duplicado("finanzas", "alumno_nie", n, desc_full):
                             st.error("⛔ Transacción duplicada (Mismo alumno, mismo concepto hoy).")
                         else:
                             recibo_data = {"tipo": "ingreso", "descripcion": desc_full, "monto": monto, "alumno_nie": n, "nombre_persona": pa['nombre_completo'], "observaciones": obs, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"), "id_short": str(int(time.time()))[-6:]}
@@ -755,6 +762,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 
                 if st.form_submit_button("Registrar"):
                     desc_full = f"{tp} - {det_g}"
+                    # CHECK ANTI DUPLICADOS GASTO
                     duplicado = False
                     if tp == "Salario" and maestro_seleccionado:
                         if verificar_pago_duplicado_hoy(maestro_seleccionado, "Salario"): duplicado = True
@@ -777,46 +785,105 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
         with t4:
-            c1, c2, c3 = st.columns(3)
-            txt = c1.text_input("Buscar")
-            fi = c2.date_input("Desde", date.today().replace(day=1))
-            ff = c3.date_input("Hasta", date.today())
+            c_f1, c_f2, c_f3, c_f4 = st.columns(4)
+            # 1. Filtro Rango Rápido
+            filtro_rango = c_f1.selectbox("Rango de Tiempo", ["Este Mes", "Mes Pasado", "Últimos 3 Meses", "Últimos 6 Meses", "Este Año", "Personalizado"])
+            
+            # Lógica de fechas automática
+            hoy = date.today()
+            if filtro_rango == "Este Mes":
+                f_inicio = hoy.replace(day=1)
+                f_fin = hoy
+            elif filtro_rango == "Mes Pasado":
+                mes_anterior = hoy.replace(day=1) - timedelta(days=1)
+                f_inicio = mes_anterior.replace(day=1)
+                f_fin = mes_anterior
+            elif filtro_rango == "Últimos 3 Meses":
+                f_inicio = hoy - timedelta(days=90)
+                f_fin = hoy
+            elif filtro_rango == "Últimos 6 Meses":
+                f_inicio = hoy - timedelta(days=180)
+                f_fin = hoy
+            elif filtro_rango == "Este Año":
+                f_inicio = hoy.replace(month=1, day=1)
+                f_fin = hoy
+            else: # Personalizado
+                f_inicio = c_f2.date_input("Desde", hoy.replace(day=1))
+                f_fin = c_f3.date_input("Hasta", hoy)
+
+            f_tipo = c_f4.multiselect("Tipo:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
+            
+            # Filtro fecha en Python
+            dt_ini = datetime.combine(f_inicio, datetime.min.time())
+            dt_fin = datetime.combine(f_fin, datetime.max.time())
             
             docs_hist = db.collection("finanzas").stream() 
             data_raw = []
-            dt_ini = datetime.combine(fi, datetime.min.time())
-            dt_fin = datetime.combine(ff, datetime.max.time())
+            
+            tot_ing = 0.0
+            tot_egr = 0.0
             
             for doc in docs_hist:
                 d = doc.to_dict()
                 d_date = d.get("fecha")
                 if not d_date: continue
+                # Manejar tipos de fecha
                 if isinstance(d_date, datetime): actual = d_date.replace(tzinfo=None)
                 else: actual = datetime.fromtimestamp(d_date.timestamp())
                 
                 if dt_ini <= actual <= dt_fin:
-                    if txt.lower() in d.get('descripcion','').lower() or txt.lower() in d.get('nombre_persona','').lower():
+                    c_typ = d['tipo'] in f_tipo
+                    if c_typ:
                         data_raw.append(d)
+                        if d['tipo'] == 'ingreso': tot_ing += d['monto']
+                        elif d['tipo'] == 'egreso': tot_egr += d['monto']
             
+            # Tarjetas Resumen
+            st.divider()
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Total Ingresos", f"${tot_ing:.2f}", border=True)
+            k2.metric("Total Egresos", f"${tot_egr:.2f}", delta_color="inverse", border=True)
+            k3.metric("Balance Periodo", f"${tot_ing - tot_egr:.2f}", border=True)
+            st.divider()
+
             data_raw.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
             if data_raw:
-                st.dataframe(pd.DataFrame(data_raw)[['fecha_legible','tipo','descripcion','monto']], use_container_width=True)
+                df_rep = pd.DataFrame(data_raw)
+                st.dataframe(df_rep[['fecha_legible','tipo','nombre_persona','descripcion','monto']], use_container_width=True)
                 
-                # Reimpresión
-                st.markdown("#### 🔄 Reimpresión")
-                options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_raw}
-                selection = st.selectbox("Seleccione transacción:", ["Seleccionar..."] + list(options.keys()))
-                if selection != "Seleccionar...":
-                    r = options[selection]
-                    if st.button("Ver Original"):
-                        logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                        color_b = "#333" if r['tipo'] == 'ingreso' else "#d32f2f"
-                        titulo = "COMPROBANTE DE INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE DE EGRESO"
-                        etiqueta1 = "RECIBIMOS DE:" if r['tipo'] == 'ingreso' else "PAGADO A:"
-                        etiqueta2 = "Entregado Por" if r['tipo'] == 'ingreso' else "Autorizado Por"
-                        etiqueta3 = "Recibido (Caja)" if r['tipo'] == 'ingreso' else "Recibido Conforme"
-                        html_reimp = f"""<div style="border: 2px solid {color_b}; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: {color_b};">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>{etiqueta1}</b> {r.get('nombre_persona','-')}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p><p><b>OBSERVACIONES:</b> {r.get('observaciones','')}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta2}</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta3}</td></tr></table></div>"""
-                        components.html(f"""<html><body>{html_reimp}<br><center><button onclick="window.print()">🖨️ REIMPRIMIR</button></center></body></html>""", height=500)
+                # REPORTE IMPRESO CON FILTROS
+                if st.button("🖨️ Imprimir Reporte Generado"):
+                    logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
+                    rows_html = ""
+                    for item in data_raw:
+                        color_row = "#e8f5e9" if item['tipo'] == 'ingreso' else "#ffebee"
+                        rows_html += f"<tr style='background:{color_row};'><td>{item['fecha_legible']}</td><td>{item.get('id_short','-')}</td><td>{item['nombre_persona']}</td><td>{item['descripcion']}</td><td align='right'>${item['monto']:.2f}</td></tr>"
+                    
+                    html_reporte = f"""
+                    <div style="font-family:Arial; padding:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:15px;">
+                                {hi}
+                                <div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">REPORTE FINANCIERO ({filtro_rango})</p></div>
+                            </div>
+                            <div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')}<br><b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div>
+                        </div>
+                        <br>
+                        <div style="display:flex; gap:20px; margin-bottom:20px;">
+                            <div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div>
+                            <div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div>
+                            <div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd">
+                            <tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Ref</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>
+                            {rows_html}
+                        </table>
+                        <br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div>
+                    </div>
+                    """
+                    components.html(f"""<html><body>{html_reporte}<br><center><button onclick="window.print()" style="background:#333; color:white; padding:10px 20px; cursor:pointer;">🖨️ IMPRIMIR REPORTE PDF</button></center></body></html>""", height=600, scrolling=True)
+
+            else: st.info("No hay registros en este rango.")
 
     # --- 8. CONFIGURACIÓN (USUARIOS) (NUEVO MODULO) ---
     elif opcion_seleccionada == "Configuración (Usuarios)":

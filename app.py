@@ -68,7 +68,7 @@ def login():
         st.info("Use credenciales maestras: admin / master2026")
     
     c1, c2, c3 = st.columns([1,1,1])
-    with col2:
+    with c2: # CORREGIDO: Antes decía 'with col2', ahora es 'with c2'
         with st.form("login_form"):
             user = st.text_input("Usuario")
             password = st.text_input("Contraseña", type="password")
@@ -401,7 +401,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         db.collection("alumnos").document(a['nie']).update(update_data)
                         st.success("Actualizado"); time.sleep(1); st.rerun()
 
-    # --- 4. MAESTROS (RESTAURADO) ---
+    # --- 4. MAESTROS ---
     elif opcion_seleccionada == "Maestros":
         st.title("👩‍🏫 Gestión Docente Pro")
         docs_m = db.collection("maestros_perfil").stream()
@@ -510,7 +510,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         else: st.info("Sin historial.")
                 except Exception as e: st.error(f"Error cargando docente: {e}")
 
-    # --- 5. ASISTENCIA GLOBAL (REPARADO) ---
+    # --- 5. ASISTENCIA GLOBAL ---
     elif opcion_seleccionada == "Asistencia Global":
         st.title("📅 Reporte de Asistencia")
         c1, c2 = st.columns(2)
@@ -518,8 +518,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         m = c2.date_input("Mes", date.today())
         
         if st.button("Generar Reporte"):
-            # Lógica de reporte simplificada para evitar errores de fecha
-            # Filtramos solo por grado y luego filtramos fecha en Python
+            # Lógica simplificada de filtrado
             docs = db.collection("asistencia").where("grado", "==", g).stream()
             
             stats = {}
@@ -531,16 +530,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             
             for d in docs:
                 data_doc = d.to_dict()
-                # Parsear fecha string o timestamp
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                
-                # Convertir a datetime si es Timestamp
-                if hasattr(fecha_doc, 'month'): 
-                    f_mes = fecha_doc.month
-                else: 
-                    # Fallback si fuera string (no debería pasar con este código)
-                    continue
+                # Manejo de Timestamp o datetime
+                f_mes = fecha_doc.month if hasattr(fecha_doc, 'month') else datetime.fromtimestamp(fecha_doc.timestamp()).month
 
                 if f_mes == target_month:
                     total_dias += 1

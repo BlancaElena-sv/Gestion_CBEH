@@ -57,17 +57,25 @@ if "user_name" not in st.session_state: st.session_state["user_name"] = None
 if "user_id" not in st.session_state: st.session_state["user_id"] = None
 
 def login():
-    col_izq, col_centro, col_der = st.columns([1, 2, 1])
-    with col_centro:
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        try: 
-            st.image("logo.png", width=180) 
-        except: 
-            st.warning("⚠️")
-            
-        st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>EduManager</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center; color: #555;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+    # 1. Columnas principales para centrar el formulario en la pantalla
+    c1, c2, c3 = st.columns([1, 2, 1])
+    
+    with c2:
+        # --- INICIO BLOQUE CENTRADO DE IMAGEN ---
+        # Creamos 3 sub-columnas invisibles DENTRO de la columna central
+        # La del medio (sc2) tendrá la imagen, logrando el centrado perfecto.
+        sc1, sc2, sc3 = st.columns([1, 1, 1])
+        
+        with sc2:
+            try:
+                # use_container_width=True hace que se ajuste al ancho de esta sub-columna central
+                st.image("logo.png", use_container_width=True) 
+            except:
+                st.warning("⚠️")
+        # --- FIN BLOQUE CENTRADO DE IMAGEN ---
+        
+        st.markdown("<h1 style='text-align: center; color: #1E3A8A; margin-bottom: 0;'>EduManager</h1>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center; color: #555; margin-top: 0;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
         st.write("") 
 
         with st.form("login_form"):
@@ -76,6 +84,7 @@ def login():
             submitted = st.form_submit_button("INICIAR SESIÓN", type="primary", use_container_width=True)
             
             if submitted:
+                # ... (resto de tu lógica de validación igual que antes) ...
                 if user == "admin" and password == "master2026":
                     st.session_state["logged_in"] = True
                     st.session_state["user_role"] = "admin"
@@ -99,7 +108,13 @@ def login():
                 else: st.error("⚠️ Sin conexión.")
 
         st.info("¿Olvidó su credencial? Solicite restablecimiento con la Administración.")
-        st.markdown("<div style='text-align: center; color: grey; font-size: 11px; margin-top: 40px;'><p>© 2026 David Fuentes Development | Todos los derechos reservados.</p></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style='text-align: center; color: grey; font-size: 11px; margin-top: 40px;'>
+                <p>© 2026 David Fuentes Development | Todos los derechos reservados.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
 
 def logout():
     for key in list(st.session_state.keys()): del st.session_state[key]
@@ -906,7 +921,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     if u_user == "david" and st.session_state["user_id"] != "david":
                         st.error("No tienes permiso para modificar al Super Admin.")
                     else:
-                        db.collection("usuarios").document(u_user).set({"usuario": u_user, "pass": u_pass, "rol": u_rol, "nombre": u_name})
+                        db.collection("usuarios").documenft(u_user).set({"usuario": u_user, "pass": u_pass, "rol": u_rol, "nombre": u_name})
                         st.success("Usuario creado/actualizado"); time.sleep(1); st.rerun()
 
         with t_db:

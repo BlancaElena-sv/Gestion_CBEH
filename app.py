@@ -63,7 +63,6 @@ def login():
                 else: st.error("Acceso Denegado")
 
 def logout():
-    # Limpiar toda la sesión al salir
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.session_state["logged_in"] = False
@@ -121,7 +120,7 @@ def redondear_mined(valor):
     else: return float(parte_entera)
 
 # ==========================================
-# 4. BARRA LATERAL & NAVEGACIÓN INTELIGENTE
+# 4. BARRA LATERAL
 # ==========================================
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
@@ -129,25 +128,20 @@ with st.sidebar:
     
     st.info(f"👤 **{st.session_state['user_name']}**")
     
-    # SELECCIÓN DE MENÚ SEGÚN ROL
     if st.session_state["user_role"] == "admin":
         opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Notas", "Finanzas", "Configuración"])
     else:
         opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Cargar Notas", "Ver Mis Cargas"])
     
-    # --- LÓGICA DE LIMPIEZA DE SESIÓN (SOLUCIÓN "NO PEGARSE") ---
-    # Si la opción cambia con respecto a la anterior, borramos las variables de búsqueda
+    # Limpieza de variables al cambiar de módulo
     if "last_page" not in st.session_state:
         st.session_state.last_page = opcion_seleccionada
-    
     if st.session_state.last_page != opcion_seleccionada:
-        # Lista de variables a limpiar al cambiar de módulo
         keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum"]
         for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
+            if key in st.session_state: del st.session_state[key]
         st.session_state.last_page = opcion_seleccionada
-        st.rerun() # Recargar para aplicar limpieza inmediatamente
+        st.rerun()
 
     st.markdown("---")
     if st.button("Cerrar Sesión"): logout()
@@ -219,9 +213,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     })
                     st.success("Guardado")
 
-    # --- CONSULTA ALUMNOS (ROBUSTA) ---
+    # --- CONSULTA ALUMNOS (DEFINITIVO V5) ---
     elif opcion_seleccionada == "Consulta Alumnos":
-        st.title("🔎 Expediente Electrónico del Alumno")
+        st.title("🔎 Expediente Electrónico")
         
         col_search, col_res = st.columns([1, 3])
         with col_search:
@@ -245,6 +239,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
         if "alum_view" in st.session_state:
             a = st.session_state.alum_view
+            
+            # --- BUSCAR MAESTRO GUÍA ---
+            q_guia = db.collection("carga_academica").where("grado", "==", a['grado_actual']).where("es_guia", "==", True).stream()
+            maestro_guia = "No Asignado"
+            for d in q_guia: maestro_guia = d.to_dict()['nombre_docente']
+
             st.markdown("---")
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 3, 2])
@@ -252,13 +252,15 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 with c2:
                     st.title(a['nombre_completo'])
                     st.markdown(f"#### **NIE:** {a['nie']}")
+                    # MAESTRO GUÍA AQUÍ
                     st.markdown(f"**Grado:** {a['grado_actual']} | **Turno:** {a.get('turno')}")
+                    st.info(f"👨‍🏫 **Maestro Guía:** {maestro_guia}")
                 with c3:
                     est = a.get('estado', 'Activo')
                     color = "green" if est == "Activo" else "red"
                     st.markdown(f"<h3 style='color:{color};text-align:center;border:2px solid {color};padding:5px;border-radius:10px;'>{est.upper()}</h3>", unsafe_allow_html=True)
 
-            tabs = st.tabs(["📋 Datos", "💰 Financiero & Solvencia", "📊 Boleta", "⚙️ Edición"])
+            tabs = st.tabs(["📋 Datos", "💰 Solvencia (Taco)", "📊 Boleta", "⚙️ Edición"])
 
             with tabs[0]:
                 col_d1, col_d2 = st.columns(2)
@@ -271,75 +273,69 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     st.subheader("📂 Documentos")
                     docs = a.get('documentos',{}).get('doc_urls', [])
                     if a.get('documentos',{}).get('doc_url'): docs.append(a.get('documentos',{}).get('doc_url'))
+                    # REGRESO A BOTONES (OPCIONAL)
                     if docs:
                         for i, url in enumerate(list(set(docs))):
-                            if ".pdf" in url.lower() or "token" in url:
-                                with st.expander(f"📄 Documento {i+1}"):
-                                    st.markdown(f'<iframe src="{url}" width="100%" height="500px"></iframe>', unsafe_allow_html=True)
-                            else: st.image(url, caption=f"Doc {i+1}")
+                            st.link_button(f"📄 Ver Documento {i+1}", url)
                     else: st.info("Sin documentos.")
 
             with tabs[1]:
-                # --- SOLVENCIA TIPO TICKET ---
-                st.subheader("Estado de Cuenta y Solvencia")
-                col_fin1, col_fin2 = st.columns([2,1])
+                # --- SOLVENCIA TIPO TACO (COMPACTA) ---
+                st.subheader("Emisión de Solvencia")
                 
-                with col_fin1:
-                    pagos = db.collection("finanzas").where("alumno_nie", "==", a['nie']).where("tipo", "==", "ingreso").stream()
-                    lista_pagos = [{"Fecha": p.to_dict()['fecha_legible'], "Concepto": p.to_dict()['descripcion'], "Monto": p.to_dict()['monto']} for p in pagos]
-                    if lista_pagos:
-                        df_pagos = pd.DataFrame(lista_pagos)
-                        st.dataframe(df_pagos, use_container_width=True)
-                        st.metric("Total Abonado", f"${df_pagos['Monto'].sum():.2f}")
-                    else: st.warning("Sin pagos registrados.")
+                # VERIFICACIÓN FINANCIERA PREVIA
+                pagos = db.collection("finanzas").where("alumno_nie", "==", a['nie']).where("tipo", "==", "ingreso").stream()
+                tiene_pagos = False
+                total_pagado = 0.0
+                for p in pagos:
+                    tiene_pagos = True
+                    total_pagado += p.to_dict().get('monto', 0)
+                
+                st.metric("Total Abonado a la Fecha", f"${total_pagado:.2f}")
 
-                with col_fin2:
-                    st.markdown("### 🎫 Pase de Examen")
-                    periodo_solvencia = st.selectbox("Seleccione Periodo:", ["I Trimestre", "II Trimestre", "III Trimestre", "Final"])
-                    if st.button("Generar 'Taco' de Solvencia"):
-                        fecha_hoy = datetime.now().strftime("%d/%m/%Y")
-                        logo = get_base64("logo.png"); h_img = f'<img src="{logo}" height="50">' if logo else ""
-                        
-                        # DISEÑO TIPO TICKET (TACO)
-                        html_taco = f"""
-                        <div style="font-family:Arial; width:350px; border:2px dashed black; padding:15px; margin:auto; text-align:center;">
-                            <div style="display:flex; align-items:center; justify-content:center; margin-bottom:10px;">
-                                {h_img}
-                                <div style="font-weight:bold; font-size:12px; margin-left:10px;">COLEGIO PROFA. BLANCA ELENA</div>
-                            </div>
-                            <h3 style="margin:5px 0; background-color:black; color:white;">SOLVENCIA DE EXAMEN</h3>
-                            <p style="font-size:14px; font-weight:bold; margin:5px;">{periodo_solvencia} - 2026</p>
-                            <br>
-                            <div style="text-align:left; font-size:12px;">
-                                <b>Alumno:</b> {a['nombre_completo']}<br>
-                                <b>Grado:</b> {a['grado_actual']}<br>
-                                <b>NIE:</b> {a['nie']}<br>
-                                <b>Fecha:</b> {fecha_hoy}
-                            </div>
-                            <br>
-                            <div style="border:1px solid black; padding:5px;">
-                                <p style="font-weight:bold; margin:0;">CONTROL DE ASISTENCIA A EXÁMENES</p>
-                                <table style="width:100%; font-size:10px; margin-top:5px; border-collapse:collapse;" border="1">
+                col_taco1, col_taco2 = st.columns(2)
+                with col_taco1:
+                    periodo_solvencia = st.selectbox("Periodo a Evaluar:", ["I Trimestre", "II Trimestre", "III Trimestre", "Final"])
+                
+                with col_taco2:
+                    st.write("") # Espacio
+                    if not tiene_pagos:
+                        st.error("⛔ ALUMNO INSOLVENTE: No se registran pagos. No se puede emitir el comprobante.")
+                    else:
+                        if st.button("🎫 Generar Taco de Solvencia"):
+                            fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+                            
+                            # DISEÑO TACO (SIN RECUADROS GRANDES, SOLO LO ESENCIAL)
+                            html_taco = f"""
+                            <div style="font-family: monospace; width: 300px; margin: auto; padding: 10px; border: 1px dashed #ccc; text-align: center;">
+                                <h4 style="margin: 0;">COLEGIO BLANCA ELENA</h4>
+                                <p style="margin: 0; font-size: 10px;">SOLVENCIA DE EXAMEN</p>
+                                <br>
+                                <div style="text-align: left; font-size: 11px;">
+                                    <b>ALUMNO:</b> {a['nombre_completo']}<br>
+                                    <b>NIE:</b> {a['nie']}<br>
+                                    <b>GRADO:</b> {a['grado_actual']}<br>
+                                    <b>PERIODO:</b> {periodo_solvencia}<br>
+                                    <b>ESTADO:</b> SOLVENTE ✅
+                                </div>
+                                <br>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 10px; text-align: center;" border="1">
                                     <tr>
-                                        <td height="30">LUNES</td><td height="30">MARTES</td><td height="30">MIÉRC.</td><td height="30">JUEVES</td><td height="30">VIERNES</td>
+                                        <td width="20%">LUN</td><td width="20%">MAR</td><td width="20%">MIE</td><td width="20%">JUE</td><td width="20%">VIE</td>
                                     </tr>
                                     <tr>
-                                        <td height="40"></td><td height="40"></td><td height="40"></td><td height="40"></td><td height="40"></td>
+                                        <td height="30"></td><td></td><td></td><td></td><td></td>
                                     </tr>
                                 </table>
+                                <br>
+                                <p style="font-size: 9px;">Válido: {fecha_hoy}</p>
                             </div>
-                            <br>
-                            <p style="font-size:10px;">________________________<br>Sello Dirección / Admin</p>
-                        </div>
-                        """
-                        components.html(f"""<html><body>{html_taco}<br><center><button onclick="window.print()">🖨️ IMPRIMIR TACO</button></center><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=500, scrolling=True)
+                            """
+                            components.html(f"""<html><body>{html_taco}<br><center><button onclick="window.print()" style="font-size:10px;">🖨️ IMPRIMIR</button></center><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=350, scrolling=False)
 
             with tabs[2]:
                 # BOLETA (Lógica anterior)
                 st.subheader("Boleta Oficial")
-                cg = db.collection("carga_academica").where("grado", "==", a['grado_actual']).where("es_guia", "==", True).stream()
-                guia = "No asignado"
-                for d in cg: guia = d.to_dict()['nombre_docente']
                 notas = db.collection("notas").where("nie", "==", a['nie']).stream()
                 nm = {}
                 for doc in notas:
@@ -347,7 +343,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     if dd['materia'] not in nm: nm[dd['materia']] = {}
                     nm[dd['materia']][dd['mes']] = dd['promedio_final']
                 
-                if not nm: st.warning("Sin notas")
+                if not nm: st.warning("Sin notas registradas.")
                 else:
                     filas = []
                     malla = MAPA_CURRICULAR.get(a['grado_actual'], [])
@@ -360,8 +356,8 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                             fin = redondear_mined((t1+t2+t3)/3)
                             filas.append(f"<tr><td style='text-align:left'>{mat}</td><td>{n.get('Febrero','-')}</td><td>{n.get('Marzo','-')}</td><td>{n.get('Abril','-')}</td><td style='background:#eee'><b>{t1}</b></td><td>{n.get('Mayo','-')}</td><td>{n.get('Junio','-')}</td><td>{n.get('Julio','-')}</td><td style='background:#eee'><b>{t2}</b></td><td>{n.get('Agosto','-')}</td><td>{n.get('Septiembre','-')}</td><td>{n.get('Octubre','-')}</td><td style='background:#eee'><b>{t3}</b></td><td style='background:#333;color:white'><b>{fin}</b></td></tr>")
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                    html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><div style='display:flex;justify-content:space-between;text-align:center;padding:0 50px;'><div style='border-top:1px solid black;width:30%'>Orientador</div><div style='border-top:1px solid black;width:30%'>Dirección</div></div></div>"""
-                    components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+                    html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><div style='display:flex;justify-content:space-between;text-align:center;padding:0 50px;'><div style='border-top:1px solid black;width:30%'>Orientador</div><div style='border-top:1px solid black;width:30%'>Dirección</div></div></div>"""
+                    components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
             with tabs[3]:
                 # EDICIÓN
@@ -433,6 +429,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
                 else:
                     for c in cols: df[c] = 0.0
+                
                 df["Promedio"] = 0.0
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0, max_value=10, step=0.1)

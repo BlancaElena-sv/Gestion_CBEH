@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 import base64
 import time
 import os
@@ -298,10 +298,19 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         if sel_recibo != "Seleccionar...":
                             p_obj = opciones_recibo[sel_recibo]
                             if st.button("Visualizar Recibo"):
-                                col = "#2e7d32"
                                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                                html_recibo = f"""<div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:700px;margin:auto;"><div style="background:{col};color:white;padding:15px;display:flex;justify-content:space-between;"><div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3><p style="margin:0;font-size:12px;">COPIA DE RECIBO</p></div></div><h4>RECIBO DE INGRESO</h4></div><div style="padding:20px;"><p><b>Fecha:</b> {p_obj['fecha_legible']}</p><p><b>Alumno:</b> {p_obj.get('nombre_persona')}</p><p><b>Concepto:</b> {p_obj['descripcion']}</p><p><b>Detalle:</b> {p_obj.get('observaciones','-')}</p><h1 style="text-align:right;color:{col};">${p_obj['monto']:.2f}</h1></div></div>"""
-                                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()" style="background:green;color:white;padding:10px;">🖨️ IMPRIMIR COPIA</button></center></body></html>""", height=400, scrolling=True)
+                                html_recibo = f"""
+                                <div style="border:2px solid black;padding:20px;font-family:Arial;max-width:700px;margin:auto;">
+                                    <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:0;font-size:12px;">San Felipe, Ilopango</p><p><b>COMPROBANTE DE INGRESO (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0;color:red;">NO VALIDO</h4><p>{p_obj['fecha_legible']}</p></td></tr></table>
+                                    <hr>
+                                    <p><b>RECIBIMOS DE:</b> {p_obj.get('nombre_persona')}</p>
+                                    <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px;">${p_obj['monto']:.2f}</span></p>
+                                    <p><b>POR CONCEPTO DE:</b> {p_obj['descripcion']}</p>
+                                    <br><br>
+                                    <table width="100%"><tr><td align="center" style="border-top:1px solid black;">Entregado Por</td><td width="10%"></td><td align="center" style="border-top:1px solid black;">Recibido Caja</td></tr></table>
+                                </div>
+                                """
+                                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR</button></center></body></html>""", height=450, scrolling=True)
                     else: st.info("Sin pagos registrados.")
                 with col_fin2:
                     st.markdown("### 🎫 Solvencia")
@@ -387,7 +396,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         db.collection("alumnos").document(a['nie']).update(update_data)
                         st.success("Expediente actualizado."); time.sleep(1); st.rerun()
 
-    # --- 4. MAESTROS ---
+    # --- 4. MAESTROS (ROBUSTO) ---
     elif opcion_seleccionada == "Maestros":
         st.title("👩‍🏫 Gestión Docente Pro")
         docs_m = db.collection("maestros_perfil").stream()
@@ -589,16 +598,14 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
         
-        # PESTAÑAS: Dashboard, Cobros, Gastos, Reportes
+        # PESTAÑAS
         t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Historial & Reportes"])
 
-        # 1. DASHBOARD / CORTE DE CAJA
+        # 1. DASHBOARD
         with t_dash:
             c_date, _ = st.columns([1, 2])
             fecha_corte = c_date.date_input("Fecha de Corte", date.today())
             fecha_str = fecha_corte.strftime("%d/%m/%Y")
-            
-            # Traer todo para calcular (MVP: Filtro en Python)
             all_fin = db.collection("finanzas").stream()
             data_hoy = []
             ingreso_dia = 0.0
@@ -623,28 +630,11 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             if data_hoy:
                 df_hoy = pd.DataFrame(data_hoy)
                 st.dataframe(df_hoy[['descripcion', 'tipo', 'monto', 'nombre_persona']], use_container_width=True)
-                
-                # Ticket de Corte
                 if st.button("🖨️ Imprimir Corte del Día"):
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="40">' if logo else ""
-                    html_corte = f"""
-                    <div style="font-family:monospace;width:300px;margin:auto;border:1px solid black;padding:10px;">
-                        <div style="text-align:center;">{hi}<br><b>COLEGIO BLANCA ELENA</b><br>CORTE DE CAJA</div>
-                        <br>
-                        <b>FECHA:</b> {fecha_str}<br>
-                        <hr>
-                        <table width="100%">
-                            <tr><td>(+) INGRESOS:</td><td align="right">${ingreso_dia:.2f}</td></tr>
-                            <tr><td>(-) GASTOS:</td><td align="right">${egreso_dia:.2f}</td></tr>
-                            <tr><td><b>(=) SALDO:</b></td><td align="right"><b>${saldo_dia:.2f}</b></td></tr>
-                        </table>
-                        <br>
-                        <div style="text-align:center;margin-top:20px;">___________________<br>Firma Responsable</div>
-                    </div>
-                    """
+                    html_corte = f"""<div style="font-family:monospace;width:300px;margin:auto;border:1px solid black;padding:10px;"><div style="text-align:center;">{hi}<br><b>COLEGIO BLANCA ELENA</b><br>CORTE DE CAJA</div><br><b>FECHA:</b> {fecha_str}<br><hr><table width="100%"><tr><td>(+) INGRESOS:</td><td align="right">${ingreso_dia:.2f}</td></tr><tr><td>(-) GASTOS:</td><td align="right">${egreso_dia:.2f}</td></tr><tr><td><b>(=) SALDO:</b></td><td align="right"><b>${saldo_dia:.2f}</b></td></tr></table><br><div style="text-align:center;margin-top:20px;">___________________<br>Firma Responsable</div></div>"""
                     components.html(f"""<html><body>{html_corte}<br><center><button onclick="window.print()">IMPRIMIR</button></center></body></html>""", height=400)
-            else:
-                st.info("No hay movimientos registrados hoy.")
+            else: st.info("No hay movimientos registrados hoy.")
 
         # 2. COBROS (ALUMNOS)
         with t_ingreso:
@@ -658,73 +648,109 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 pa = st.session_state.pago_alum
                 st.info(f"Cobrando a: **{pa['nombre_completo']}**")
                 with st.form("form_cobro"):
-                    concepto = st.text_input("Concepto (Ej: Mensualidad Febrero)")
+                    tipo_c = st.selectbox("Tipo de Cobro", ["Colegiatura", "Matrícula", "Uniformes", "Otros"])
+                    det_c = st.text_input("Detalle (Ej: Mes de Marzo)")
                     monto = st.number_input("Monto ($)", min_value=0.01)
-                    notas_pago = st.text_input("Observaciones (Opcional)")
+                    obs = st.text_input("Observaciones Adicionales")
                     if st.form_submit_button("✅ Registrar Ingreso"):
+                        concepto_full = f"{tipo_c} - {det_c}" if det_c else tipo_c
                         recibo_data = {
-                            "tipo": "ingreso", "descripcion": concepto, "monto": monto,
+                            "tipo": "ingreso", "descripcion": concepto_full, "monto": monto,
                             "alumno_nie": pa['nie'], "nombre_persona": pa['nombre_completo'],
-                            "observaciones": notas_pago,
+                            "observaciones": obs,
                             "fecha": firestore.SERVER_TIMESTAMP,
-                            "fecha_legible": datetime.now().strftime("%d/%m/%Y")
+                            "fecha_legible": datetime.now().strftime("%d/%m/%Y"),
+                            "id_short": str(int(time.time()))[-6:]
                         }
                         db.collection("finanzas").add(recibo_data)
-                        st.session_state.recibo_temp = recibo_data # Para imprimir
-                        st.success("Cobro registrado exitosamente")
-                        del st.session_state.pago_alum # Limpiar
+                        st.session_state.recibo_temp = recibo_data
+                        st.success("Cobro registrado")
+                        del st.session_state.pago_alum
                         st.rerun()
             
-            # Mostrar recibo recién generado
+            # IMPRESION FORMAL INGRESO
             if "recibo_temp" in st.session_state:
                 r = st.session_state.recibo_temp
-                st.success("¡Pago Registrado! Imprima el recibo a continuación:")
+                st.success("¡Pago Registrado! Imprima el comprobante:")
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                html_recibo = f"""<div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:400px;margin:auto;"><div style="text-align:center;">{hi}<h3>RECIBO DE INGRESO</h3></div><p><b>Fecha:</b> {r['fecha_legible']}</p><p><b>Alumno:</b> {r['nombre_persona']}</p><p><b>Concepto:</b> {r['descripcion']}</p><h2 style="text-align:center;">${r['monto']:.2f}</h2></div>"""
-                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR RECIBO</button></center></body></html>""", height=400)
-                if st.button("Cerrar Recibo"):
+                html_recibo = f"""
+                <div style="border: 2px solid #333; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;">
+                    <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE INGRESO</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
+                    <hr>
+                    <div style="padding: 10px;">
+                        <p><b>RECIBIMOS DE:</b> {r['nombre_persona']}</p>
+                        <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p>
+                        <p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p>
+                        <p><b>OBSERVACIONES:</b> {r['observaciones']}</p>
+                    </div>
+                    <br><br>
+                    <table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Entregado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido (Caja)</td></tr></table>
+                </div>
+                """
+                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
+                if st.button("Cerrar Comprobante"):
                     del st.session_state.recibo_temp
                     st.rerun()
 
-        # 3. GASTOS (OPERATIVOS)
+        # 3. GASTOS (FORMALES)
         with t_egreso:
             st.subheader("Registro de Gastos Operativos")
             with st.form("form_gasto"):
                 c1, c2 = st.columns(2)
-                desc_gasto = c1.text_input("Descripción del Gasto (Ej: Pago Luz del Sur)")
-                monto_gasto = c2.number_input("Monto ($)", min_value=0.01)
-                categoria = c1.selectbox("Categoría", ["Servicios Básicos", "Mantenimiento", "Papelería/Insumos", "Planilla Admin", "Otros"])
-                beneficiario = c2.text_input("Beneficiario / Proveedor")
+                tipo_g = c1.selectbox("Tipo de Gasto", ["Salario", "Servicios", "Mantenimiento", "Otros"])
+                det_g = c2.text_input("Detalle (Ej: Recibo Luz del Sur)")
+                monto_g = c1.number_input("Monto ($)", min_value=0.01)
+                beneficiario = c2.text_input("Pagado a (Nombre/Empresa)")
                 
-                if st.form_submit_button("🔴 Registrar Salida de Dinero"):
-                    db.collection("finanzas").add({
-                        "tipo": "egreso", "descripcion": f"{categoria} - {desc_gasto}", 
-                        "monto": monto_gasto, "nombre_persona": beneficiario,
+                if st.form_submit_button("🔴 Registrar Salida"):
+                    concepto_full = f"{tipo_g} - {det_g}" if det_g else tipo_g
+                    gasto_data = {
+                        "tipo": "egreso", "descripcion": concepto_full, 
+                        "monto": monto_g, "nombre_persona": beneficiario,
                         "fecha": firestore.SERVER_TIMESTAMP,
-                        "fecha_legible": datetime.now().strftime("%d/%m/%Y")
-                    })
+                        "fecha_legible": datetime.now().strftime("%d/%m/%Y"),
+                        "id_short": str(int(time.time()))[-6:]
+                    }
+                    db.collection("finanzas").add(gasto_data)
+                    st.session_state.gasto_temp = gasto_data
                     st.success("Gasto registrado correctamente.")
-                    time.sleep(1); st.rerun()
+                    st.rerun()
+
+            # IMPRESION FORMAL GASTO
+            if "gasto_temp" in st.session_state:
+                r = st.session_state.gasto_temp
+                st.warning("Gasto registrado. Imprima el comprobante:")
+                logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                html_gasto = f"""
+                <div style="border: 2px solid #d32f2f; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;">
+                    <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE EGRESO (GASTO)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
+                    <hr>
+                    <div style="padding: 10px;">
+                        <p><b>PAGADO A:</b> {r['nombre_persona']}</p>
+                        <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p>
+                        <p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p>
+                    </div>
+                    <br><br>
+                    <table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Autorizado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido Conforme</td></tr></table>
+                </div>
+                """
+                components.html(f"""<html><body>{html_gasto}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
+                if st.button("Cerrar Comprobante Gasto"):
+                    del st.session_state.gasto_temp
+                    st.rerun()
 
         # 4. HISTORIAL
         with t_rep:
-            st.subheader("Historial Completo de Transacciones")
-            # Filtros
+            st.subheader("Historial Completo")
             cf1, cf2 = st.columns(2)
             f_tipo = cf1.multiselect("Filtrar por Tipo:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
-            
-            # Cargar datos (Optimización: limitar a últimos 100 si crece mucho)
             docs_hist = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).limit(50).stream()
             data_hist = [{"Fecha": d.to_dict().get('fecha_legible'), "Tipo": d.to_dict().get('tipo'), "Descripción": d.to_dict().get('descripcion'), "Monto": d.to_dict().get('monto'), "Responsable": d.to_dict().get('nombre_persona')} for d in docs_hist]
-            
             if data_hist:
                 df_hist = pd.DataFrame(data_hist)
-                # Aplicar filtro visual
-                if f_tipo:
-                    df_hist = df_hist[df_hist['Tipo'].isin(f_tipo)]
+                if f_tipo: df_hist = df_hist[df_hist['Tipo'].isin(f_tipo)]
                 st.dataframe(df_hist, use_container_width=True)
-            else:
-                st.info("Sin registros recientes.")
+            else: st.info("Sin registros recientes.")
 
     # --- 7. CONFIGURACIÓN ---
     elif opcion_seleccionada == "Configuración":
@@ -806,7 +832,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     batch.commit()
                     st.success("Guardado")
                 
-                # Visualización acumulada para docente también
                 st.divider()
                 st.subheader(f"📋 Registro Acumulado Detallado - {m}")
                 rows_acumulados = []

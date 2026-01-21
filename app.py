@@ -77,33 +77,10 @@ if not st.session_state["logged_in"]:
 # 2. CONFIGURACIÓN ACADÉMICA (MALLA 2026)
 # ==========================================
 
-# Parvularia
-MAT_KINDER = [
-    "Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", 
-    "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", 
-    "Cuerpo, Movimiento y Bienestar", "Conducta"
-]
-
-# I Ciclo (1, 2, 3)
-MAT_I_CICLO = [
-    "Comunicación", "Números y Formas", "Ciencia y Tecnología", 
-    "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", 
-    "Ortografía", "Caligrafía", "Lectura", "Conducta"
-]
-
-# II Ciclo (4, 5, 6)
-MAT_II_CICLO = [
-    "Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", 
-    "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", 
-    "Ortografía", "Caligrafía", "Lectura", "Conducta"
-]
-
-# III Ciclo (7, 8, 9)
-MAT_III_CICLO = [
-    "Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", 
-    "Ciudadanía y Valores", "Inglés", "Educación Física y Deportes", 
-    "Ortografía", "Caligrafía", "Lectura", "Conducta"
-]
+MAT_KINDER = ["Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", "Cuerpo, Movimiento y Bienestar", "Conducta"]
+MAT_I_CICLO = ["Comunicación", "Números y Formas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
+MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
+MAT_III_CICLO = ["Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", "Ciudadanía y Valores", "Inglés", "Educación Física y Deportes", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
 
 MAPA_CURRICULAR = {
     "Kinder 4": MAT_KINDER, "Kinder 5": MAT_KINDER, "Preparatoria": MAT_KINDER,
@@ -142,7 +119,7 @@ def redondear_mined(valor):
     else: return float(parte_entera)
 
 # ==========================================
-# 4. BARRA LATERAL (REORGANIZADA)
+# 4. BARRA LATERAL
 # ==========================================
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
@@ -151,58 +128,29 @@ with st.sidebar:
     st.info(f"👤 **{st.session_state['user_name']}**")
     
     if st.session_state["user_role"] == "admin":
-        # NUEVO ORDEN SOLICITADO
-        opcion = st.radio("Menú Admin:", [
-            "Inicio", 
-            "Inscripción", 
-            "Consulta Alumnos", 
-            "Maestros", 
-            "Notas", 
-            "Finanzas", 
-            "Configuración"
-        ])
+        opcion = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Notas", "Finanzas", "Configuración"])
     else:
-        # Menú Docente (se mantiene igual)
         opcion = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Cargar Notas", "Ver Mis Cargas"])
         
     st.markdown("---")
     if st.button("Cerrar Sesión"): logout()
     
     st.markdown("---")
-    st.markdown(
-        """
-        <div style='text-align: center; color: #666; font-size: 11px;'>
-            <p style='margin-bottom: 5px;'>
-                Desarrollado y Propiedad de:<br>
-                <b style='font-size: 12px;'>David Fuentes</b>
-            </p>
-            <p style='margin-bottom: 5px;'>
-                <i>Todos los derechos reservados © 2026</i>
-            </p>
-            <hr style='margin: 5px 0; border-color: #ddd;'>
-            <p style='color: #888;'>
-                Licencia de uso exclusivo para:<br>
-                Colegio Profa. Blanca Elena de Hernández
-            </p>
-        </div>
-        """, unsafe_allow_html=True
-    )
+    st.markdown("<div style='text-align:center;color:#666;font-size:11px;'><p>Desarrollado y Propiedad de:<br><b>David Fuentes</b></p><p><i>Todos los derechos reservados © 2026</i></p><hr><p>Licencia de uso exclusivo para:<br>Colegio Profa. Blanca Elena de Hernández</p></div>", unsafe_allow_html=True)
 
 # ==========================================
 # 5. CONTENIDO PRINCIPAL
 # ==========================================
 
-# --- INICIO (DASHBOARD) ---
+# --- INICIO ---
 if opcion == "Inicio":
     st.title("🍎 Tablero Institucional 2026")
     c1, c2, c3 = st.columns(3)
     c1.metric("Ciclo Lectivo", "2026")
     c2.metric("Usuario Activo", st.session_state['user_name'])
     c3.metric("Rol", st.session_state['user_role'].upper())
-    
     st.markdown("---")
     st.subheader("📅 Agenda de Actividades")
-    
     col_izq, col_der = st.columns(2)
     with col_izq:
         st.info("**ESTADO: PERIODO DE INSCRIPCIÓN**")
@@ -225,7 +173,7 @@ if opcion == "Inicio":
 # ==========================================
 if st.session_state["user_role"] == "admin" and opcion != "Inicio":
 
-    # --- 2. INSCRIPCIÓN ---
+    # --- INSCRIPCIÓN (DEFINITIVO) ---
     if opcion == "Inscripción":
         st.title("📝 Inscripción 2026")
         with st.form("fi"):
@@ -254,44 +202,145 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
                     })
                     st.success("Guardado")
 
-    # --- 3. CONSULTA ALUMNOS ---
+    # --- CONSULTA ALUMNOS (ROBUSTA) ---
     elif opcion == "Consulta Alumnos":
-        st.title("🔎 Consulta General")
-        col_bus, _ = st.columns([1,2])
-        n = col_bus.text_input("Buscar por NIE:")
+        st.title("🔎 Expediente Electrónico del Alumno")
         
-        if col_bus.button("Buscar") and n:
-            d = db.collection("alumnos").document(n).get()
-            if d.exists: st.session_state.alum_view = d.to_dict()
-            else: st.error("No encontrado")
-        
+        # BÚSQUEDA
+        col_search, col_res = st.columns([1, 3])
+        with col_search:
+            st.markdown("### 🔍 Búsqueda")
+            metodo = st.radio("Criterio:", ["NIE", "Grado"])
+            if metodo == "NIE":
+                val = st.text_input("Ingrese NIE:")
+                if st.button("Buscar Expediente") and val:
+                    d = db.collection("alumnos").document(val).get()
+                    if d.exists: st.session_state.alum_view = d.to_dict()
+                    else: st.error("No existe")
+            else:
+                g = st.selectbox("Filtrar Grado", ["Todos"] + LISTA_GRADOS_TODO)
+                q = db.collection("alumnos")
+                if g != "Todos": q = q.where("grado_actual", "==", g)
+                res = [d.to_dict() for d in q.stream()]
+                sel = st.selectbox("Seleccionar Alumno", ["Seleccionar..."] + [f"{r['nie']} - {r['nombre_completo']}" for r in res])
+                if sel != "Seleccionar...":
+                    nie_sel = sel.split(" - ")[0]
+                    st.session_state.alum_view = db.collection("alumnos").document(nie_sel).get().to_dict()
+
+        # VISTA DETALLADA
         if "alum_view" in st.session_state:
             a = st.session_state.alum_view
             st.markdown("---")
-            c1, c2 = st.columns([1,4])
-            with c1: st.image(a.get('documentos',{}).get('foto_url', "https://via.placeholder.com/150"), width=120)
-            with c2: 
-                st.title(a['nombre_completo'])
-                st.write(f"NIE: {a['nie']} | Grado: {a['grado_actual']}")
             
-            t1, t2 = st.tabs(["Info General / Historial", "🖨️ Boleta de Notas"])
-            
-            with t1:
-                st.info("Expediente digital, documentos y pagos.")
-                # Aquí podrías poner botones para ver documentos si lo deseas
-                docs = a.get('documentos',{}).get('doc_urls', [])
-                if docs:
-                    st.write("**Documentos Adjuntos:**")
-                    for u in docs: st.markdown(f"- [Ver Documento]({u})")
+            # ENCABEZADO ROBUSTO
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([1, 3, 2])
+                with c1:
+                    st.image(a.get('documentos',{}).get('foto_url', "https://via.placeholder.com/150"), width=130)
+                with c2:
+                    st.title(a['nombre_completo'])
+                    st.markdown(f"#### **NIE:** {a['nie']}")
+                    st.markdown(f"**Grado:** {a['grado_actual']} | **Turno:** {a.get('turno')}")
+                with c3:
+                    estado = a.get('estado', 'Activo')
+                    color_est = "green" if estado == "Activo" else "red"
+                    st.markdown(f"<h3 style='color:{color_est}; text-align:center; border: 2px solid {color_est}; padding: 5px; border-radius: 10px;'>{estado.upper()}</h3>", unsafe_allow_html=True)
+                    st.caption("Estado Académico Administrativo")
 
-            with t2:
-                # BOLETA
-                st.subheader(f"Boleta {datetime.now().year}")
-                # Buscar Guía
+            # PESTAÑAS DE INFORMACIÓN
+            tabs = st.tabs(["📋 Datos y Documentos", "💰 Estado Financiero y Solvencia", "📊 Historial Académico (Boleta)", "⚙️ Edición y Estado"])
+
+            # 1. DATOS GENERALES Y DOCUMENTOS (VISUALIZACIÓN)
+            with tabs[0]:
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    st.subheader("Datos Personales")
+                    st.write(f"**Responsable:** {a.get('encargado',{}).get('nombre')}")
+                    st.write(f"**Teléfono:** {a.get('encargado',{}).get('telefono')}")
+                    st.write(f"**Dirección:** {a.get('encargado',{}).get('direccion')}")
+                    st.write(f"**Fecha Registro:** {a.get('fecha_registro', 'N/A')}")
+                
+                with col_d2:
+                    st.subheader("📂 Documentos Digitales")
+                    docs = a.get('documentos',{}).get('doc_urls', [])
+                    if a.get('documentos',{}).get('doc_url'): docs.append(a.get('documentos',{}).get('doc_url'))
+                    docs = list(set(docs))
+                    
+                    if docs:
+                        for i, url in enumerate(docs):
+                            with st.expander(f"📄 Visualizar Documento {i+1}"):
+                                # Lógica de visualización embebida (Preview)
+                                if ".pdf" in url.lower() or "token" in url: # Asumimos PDF o imagen url con token
+                                    # Opción 1: Iframe (Mejor intento de visualización)
+                                    st.markdown(f'<iframe src="{url}" width="100%" height="500px"></iframe>', unsafe_allow_html=True)
+                                    # Opción 2: Enlace de respaldo por si el navegador bloquea iframe
+                                    st.link_button("↗️ Abrir en Pestaña Externa (Si no carga)", url)
+                                else:
+                                    st.image(url, use_column_width=True)
+                    else:
+                        st.info("No hay documentos escaneados en el expediente.")
+
+            # 2. ESTADO FINANCIERO Y SOLVENCIA
+            with tabs[1]:
+                st.subheader("Estado de Cuenta")
+                
+                # Obtener pagos
+                pagos = db.collection("finanzas").where("alumno_nie", "==", a['nie']).where("tipo", "==", "ingreso").stream()
+                lista_pagos = [{"Fecha": p.to_dict()['fecha_legible'], "Concepto": p.to_dict()['descripcion'], "Monto": p.to_dict()['monto']} for p in pagos]
+                
+                col_fin1, col_fin2 = st.columns([2,1])
+                
+                with col_fin1:
+                    if lista_pagos:
+                        df_pagos = pd.DataFrame(lista_pagos)
+                        st.dataframe(df_pagos, use_container_width=True)
+                        total_pagado = df_pagos["Monto"].sum()
+                        st.metric("Total Abonado a la Fecha", f"${total_pagado:.2f}")
+                    else:
+                        st.warning("No se registran pagos en este ciclo.")
+                        total_pagado = 0.0
+
+                with col_fin2:
+                    st.markdown("### 📄 Emisión de Solvencia")
+                    st.write("Generar documento para derecho a examen.")
+                    if st.button("Generar Constancia de Solvencia"):
+                        # HTML DE SOLVENCIA
+                        fecha_hoy = datetime.now().strftime("%d de %B de %Y")
+                        logo = get_base64("logo.png"); h_img = f'<img src="{logo}" height="80">' if logo else ""
+                        
+                        html_solvencia = f"""
+                        <div style="font-family:Arial; padding:40px; line-height:1.6; color:black;">
+                            <div style="text-align:center; margin-bottom:30px;">
+                                {h_img}
+                                <h2>COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
+                                <p style="font-size:14px;">San Felipe, San Bartolo, Ilopango</p>
+                                <h3>CONSTANCIA DE SOLVENCIA</h3>
+                            </div>
+                            <p style="text-align:right;">{fecha_hoy}</p>
+                            <br>
+                            <p>A quien interese:</p>
+                            <p>Por medio de la presente se hace constar que el alumno(a):</p>
+                            <h3 style="text-align:center; text-transform:uppercase;">{a['nombre_completo']}</h3>
+                            <p style="text-align:center;">Del grado: <b>{a['grado_actual']}</b> con NIE: <b>{a['nie']}</b></p>
+                            <br>
+                            <p>Se encuentra <b>SOLVENTE</b> con las cuotas de escolaridad y obligaciones financieras con la institución hasta la fecha.</p>
+                            <p>Se extiende la presente para que el estudiante pueda realizar sus evaluaciones correspondientes.</p>
+                            <br><br><br><br>
+                            <div style="text-align:center;">
+                                <p>______________________________________</p>
+                                <p>Administración / Dirección</p>
+                            </div>
+                        </div>
+                        """
+                        components.html(f"""<html><body>{html_solvencia}<br><center><button onclick="window.print()" style="padding:10px 20px; background:#000; color:#fff; border:none; cursor:pointer;">🖨️ IMPRIMIR SOLVENCIA</button></center></body></html>""", height=600, scrolling=True)
+
+            # 3. ACADÉMICO (BOLETA) - Se mantiene la lógica robusta anterior
+            with tabs[2]:
+                st.subheader("Boleta de Calificaciones Oficial")
+                # (Lógica de boleta idéntica a la versión anterior aprobada)
                 cg = db.collection("carga_academica").where("grado", "==", a['grado_actual']).where("es_guia", "==", True).stream()
                 guia = "No asignado"
                 for d in cg: guia = d.to_dict()['nombre_docente']
-                
                 notas = db.collection("notas").where("nie", "==", a['nie']).stream()
                 nm = {}
                 for doc in notas:
@@ -314,7 +363,34 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
                     
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
                     html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><div style='display:flex;justify-content:space-between;text-align:center;padding:0 50px;'><div style='border-top:1px solid black;width:30%'>Orientador</div><div style='border-top:1px solid black;width:30%'>Dirección</div></div></div>"""
-                    components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+                    components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+
+            # 4. EDICIÓN Y ESTADO (ACTIVO/INACTIVO)
+            with tabs[3]:
+                st.subheader("Gestión del Expediente")
+                with st.form("edit_status"):
+                    col_e1, col_e2 = st.columns(2)
+                    new_estado = col_e1.selectbox("Estado del Alumno", ["Activo", "Inactivo", "Retirado"], index=["Activo", "Inactivo", "Retirado"].index(a.get('estado', 'Activo')))
+                    new_grado = col_e2.selectbox("Grado Actual", LISTA_GRADOS_TODO, index=LISTA_GRADOS_TODO.index(a['grado_actual']) if a['grado_actual'] in LISTA_GRADOS_TODO else 0)
+                    
+                    st.write("---")
+                    st.write("**Actualizar Datos Personales:**")
+                    nn = st.text_input("Nombres", a['nombres'])
+                    na = st.text_input("Apellidos", a['apellidos'])
+                    ntel = st.text_input("Teléfono", a.get('encargado',{}).get('telefono',''))
+                    
+                    if st.form_submit_button("💾 Guardar Cambios"):
+                        db.collection("alumnos").document(a['nie']).update({
+                            "estado": new_estado,
+                            "grado_actual": new_grado,
+                            "nombres": nn,
+                            "apellidos": na,
+                            "nombre_completo": f"{nn} {na}",
+                            "encargado.telefono": ntel
+                        })
+                        st.success("Expediente actualizado correctamente.")
+                        time.sleep(1)
+                        st.rerun()
 
     # --- 4. MAESTROS ---
     elif opcion == "Maestros":
@@ -335,11 +411,8 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
             with st.form("asig"):
                 p = st.selectbox("Docente", list(profs.keys()) if profs else [])
                 g = st.selectbox("Grado", LISTA_GRADOS_TODO)
-                
-                # Carga dinámica
                 materias_grado = MAPA_CURRICULAR.get(g, [])
                 m = st.multiselect("Materias (Malla 2026)", materias_grado)
-                
                 guia = st.checkbox("¿Es Maestro Guía?")
                 if st.form_submit_button("Asignar"):
                     db.collection("carga_academica").add({"id_docente": profs[p], "nombre_docente": p, "grado": g, "materias": m, "es_guia": guia})
@@ -371,9 +444,7 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
             else:
                 df = pd.DataFrame(lista).sort_values("Nombre")
                 id_doc = f"{g}_{m}_{mes}".replace(" ","_")
-                
                 cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
-                
                 doc_ref = db.collection("notas_mensuales").document(id_doc).get()
                 if doc_ref.exists:
                     dd = doc_ref.to_dict().get('detalles', {})
@@ -382,7 +453,6 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
                     for c in cols: df[c] = 0.0
                 
                 df["Promedio"] = 0.0
-                
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0, max_value=10, step=0.1)
                 
@@ -394,12 +464,10 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
                     for _, r in ed.iterrows():
                         if m == "Conducta": prom = r[cols[0]]
                         else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
-                        
                         detalles[r["NIE"]] = {c: r[c] for c in cols}
                         detalles[r["NIE"]]["Promedio"] = round(prom, 1)
                         ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
                         batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": round(prom, 1)})
-                    
                     db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
                     st.success("Guardado por Admin")
@@ -408,13 +476,11 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
     elif opcion == "Finanzas":
         st.title("💰 Finanzas")
         if 'recibo' not in st.session_state: st.session_state.recibo = None
-        
         if st.session_state.recibo:
             r = st.session_state.recibo
             col = "#2e7d32" if r['tipo'] == 'ingreso' else "#c62828"
             tit = "RECIBO INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE EGRESO"
             img = get_base64("logo.png"); hi = f'<img src="{img}" height="60">' if img else ""
-            
             st.markdown("""<style>@media print { body * { visibility: hidden; } .ticket, .ticket * { visibility: visible; } .ticket { position: absolute; left: 0; top: 0; width: 100%; } }</style>""", unsafe_allow_html=True)
             html = f"""<div class="ticket" style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;"><div style="background:{col};color:white;padding:15px;display:flex;justify-content:space-between;"><div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3></div></div><h4>{tit}</h4></div><div style="padding:20px;"><p><b>Fecha:</b> {r['fecha']}</p><p><b>Persona:</b> {r['persona']}</p><p><b>Concepto:</b> {r['desc']}</p><h1 style="text-align:right;color:{col};">${r['monto']:.2f}</h1></div></div>"""
             st.markdown(html, unsafe_allow_html=True)
@@ -456,7 +522,7 @@ elif st.session_state["user_role"] == "docente" and opcion != "Inicio":
             lista = sorted([d.to_dict()['nombre_completo'] for d in docs])
             if not lista: st.warning("Sin alumnos")
             else:
-                rows = "".join([f"<tr><td>{i+1}</td><td style='text-align:left'>{n}</td><td></td><td></td><td></td><td></td></tr>" for i, n in enumerate(lista)])
+                rows = "".join([f"<tr><td>{i+1}</td><td style='text-align:left'>{n}</td><td></td><td></td><td></td><td></td><td></td></tr>" for i, n in enumerate(lista)])
                 img = get_base64("logo.png"); hi = f'<img src="{img}" height="50">' if img else ""
                 html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>COLEGIO PROFA. BLANCA ELENA</h3><h4>LISTADO DE ASISTENCIA - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='40%'>NOMBRE</td><td width='10%'></td><td width='10%'></td><td width='10%'></td><td width='10%'></td><td width='10%'></td></tr>{rows}</table></div>"""
                 components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
@@ -464,7 +530,6 @@ elif st.session_state["user_role"] == "docente" and opcion != "Inicio":
     elif opcion == "Cargar Notas":
         st.title("📝 Registro de Notas")
         g = st.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
-        
         mat_pos = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
         m = st.selectbox("Materia", ["Select..."] + mat_pos)
         mes = st.selectbox("Mes", LISTA_MESES)
@@ -472,14 +537,11 @@ elif st.session_state["user_role"] == "docente" and opcion != "Inicio":
         if g != "Select..." and m != "Select...":
             docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
             lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
-            
             if not lista: st.warning("Sin alumnos")
             else:
                 df = pd.DataFrame(lista).sort_values("Nombre")
                 id_doc = f"{g}_{m}_{mes}".replace(" ","_")
-                
                 cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
-                
                 doc_ref = db.collection("notas_mensuales").document(id_doc).get()
                 if doc_ref.exists:
                     dd = doc_ref.to_dict().get('detalles', {})
@@ -488,25 +550,20 @@ elif st.session_state["user_role"] == "docente" and opcion != "Inicio":
                     for c in cols: df[c] = 0.0
                 
                 df["Promedio"] = 0.0
-                
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0, max_value=10, step=0.1)
                 
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
-                
                 if st.button("Guardar"):
                     batch = db.batch()
                     detalles = {}
                     for _, r in ed.iterrows():
                         if m == "Conducta": prom = r[cols[0]]
                         else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
-                        
                         detalles[r["NIE"]] = {c: r[c] for c in cols}
                         detalles[r["NIE"]]["Promedio"] = round(prom, 1)
-                        
                         ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
                         batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": round(prom, 1)})
-                    
                     db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
                     st.success("Guardado")

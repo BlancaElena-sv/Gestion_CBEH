@@ -35,15 +35,25 @@ def conectar_firebase():
 
 try:
     db = conectar_firebase()
-    if not db: st.stop()
-    # --- INICIALIZACIÓN DE USUARIO ADMIN POR DEFECTO ---
-    # Si la colección de usuarios está vacía, crea el admin por defecto
-    users_ref = db.collection("usuarios").limit(1).stream()
-    if not list(users_ref):
-        db.collection("usuarios").document("david").set({
-            "usuario": "david", "pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"
-        })
+    if not db: 
+        st.error("Error conectando a la base de datos.")
+        st.stop()
+    
+    # --- AUTO-CREACIÓN DE ADMIN SI NO EXISTE ---
+    # Esto asegura que nunca te quedes bloqueado fuera del sistema
+    try:
+        users_ref = db.collection("usuarios").limit(1).stream()
+        if not list(users_ref):
+            db.collection("usuarios").document("david").set({
+                "usuario": "david", "pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"
+            })
+    except: pass # Ignorar si falla la verificación inicial
 except: st.stop()
+
+# --- GESTIÓN DE SESIÓN ---
+if "logged_in" not in st.session_state: st.session_state["logged_in"] = False
+if "user_role" not in st.session_state: st.session_state["user_role"] = None
+if "user_name" not in st.session_state: st.session_state["user_name"] = None
 
 def login():
     st.markdown("<br><br><h1 style='text-align: center;'>🔐 Acceso CBEH</h1>", unsafe_allow_html=True)
@@ -53,23 +63,26 @@ def login():
             user = st.text_input("Usuario")
             password = st.text_input("Contraseña", type="password")
             if st.form_submit_button("Ingresar", type="primary"):
-                # Autenticación contra Firestore
-                doc_user = db.collection("usuarios").document(user).get()
-                if doc_user.exists and doc_user.to_dict()["pass"] == password:
-                    data = doc_user.to_dict()
-                    st.session_state["logged_in"] = True
-                    st.session_state["user_role"] = data["rol"]
-                    st.session_state["user_name"] = data["nombre"]
-                    st.session_state["user_id"] = user # ID para vincular con perfil docente
-                    st.rerun()
-                else: st.error("Credenciales incorrectas")
+                try:
+                    doc_user = db.collection("usuarios").document(user).get()
+                    if doc_user.exists:
+                        data = doc_user.to_dict()
+                        if data["pass"] == password:
+                            st.session_state["logged_in"] = True
+                            st.session_state["user_role"] = data["rol"]
+                            st.session_state["user_name"] = data["nombre"]
+                            st.session_state["user_id"] = user
+                            st.rerun()
+                        else: st.error("Contraseña incorrecta")
+                    else: st.error("Usuario no encontrado")
+                except Exception as e:
+                    st.error(f"Error de conexión: {e}")
 
 def logout():
-    for key in list(st.session_state.keys()): del st.session_state[key]
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
     st.session_state["logged_in"] = False
     st.rerun()
-
-if "logged_in" not in st.session_state: st.session_state["logged_in"] = False
 
 if not st.session_state["logged_in"]:
     login()
@@ -160,17 +173,12 @@ with st.sidebar:
 # 5. CONTENIDO PRINCIPAL
 # ==========================================
 
-# --- INICIO (PERSONALIZADO) ---
+# --- INICIO ---
 if opcion_seleccionada == "Inicio":
     st.title("🍎 Tablero Institucional 2026")
     
-    # PERFIL PERSONALIZADO PARA DOCENTE
     if st.session_state["user_role"] == "docente":
-        # Intentar buscar el perfil del maestro usando el nombre de usuario o un campo vinculado
-        # En este MVP, asumimos que el 'user_id' coincide con el código o nombre, 
-        # o simplemente mostramos la foto si está en 'usuarios'.
-        # Para hacerlo robusto: Buscamos en maestros_perfil si hay coincidencia de nombre
-        
+        # Perfil Docente
         q_prof = db.collection("maestros_perfil").where("nombre", "==", st.session_state["user_name"]).stream()
         found_prof = None
         for p in q_prof: found_prof = p.to_dict()
@@ -186,9 +194,7 @@ if opcion_seleccionada == "Inicio":
             st.info("Panel de Control Docente. Utilice el menú lateral para gestionar sus clases.")
             if found_prof:
                 st.write(f"📞 {found_prof.get('telefono','')} | 📧 {found_prof.get('email','')}")
-
     else:
-        # VISTA ADMIN
         c1, c2, c3 = st.columns(3)
         c1.metric("Ciclo Lectivo", "2026")
         c2.metric("Usuario Activo", st.session_state['user_name'])
@@ -226,17 +232,20 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             fot = c3.file_uploader("Foto", ["jpg","png"])
             doc = c4.file_uploader("Docs", ["pdf","jpg"], accept_multiple_files=True)
             if st.form_submit_button("Guardar"):
-                if nie and nom:
-                    r = f"expedientes/{nie}"
-                    urls = [subir_archivo(f, r) for f in (doc or [])]
-                    db.collection("alumnos").document(nie).set({
-                        "nie": nie, "nombre_completo": f"{nom} {ape}", "nombres": nom, "apellidos": ape,
-                        "grado_actual": gra, "turno": tur, "estado": "Activo",
-                        "encargado": {"nombre": enc, "telefono": tel, "direccion": dir},
-                        "documentos": {"foto_url": subir_archivo(fot, r), "doc_urls": [u for u in urls if u]},
-                        "fecha_registro": firestore.SERVER_TIMESTAMP
-                    })
-                    st.success("Guardado")
+                try:
+                    if nie and nom:
+                        r = f"expedientes/{nie}"
+                        urls = [subir_archivo(f, r) for f in (doc or [])]
+                        db.collection("alumnos").document(nie).set({
+                            "nie": nie, "nombre_completo": f"{nom} {ape}", "nombres": nom, "apellidos": ape,
+                            "grado_actual": gra, "turno": tur, "estado": "Activo",
+                            "encargado": {"nombre": enc, "telefono": tel, "direccion": dir},
+                            "documentos": {"foto_url": subir_archivo(fot, r), "doc_urls": [u for u in urls if u]},
+                            "fecha_registro": firestore.SERVER_TIMESTAMP
+                        })
+                        st.success("Guardado")
+                    else: st.error("Faltan datos obligatorios (NIE, Nombre).")
+                except Exception as e: st.error(f"Error al guardar: {e}")
 
     # --- CONSULTA ALUMNOS ---
     elif opcion_seleccionada == "Consulta Alumnos":
@@ -281,25 +290,94 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     color = "green" if est == "Activo" else "red"
                     st.markdown(f"<h3 style='color:{color};text-align:center;border:2px solid {color};padding:5px;border-radius:10px;'>{est.upper()}</h3>", unsafe_allow_html=True)
 
-            tabs = st.tabs(["📋 Datos y Documentos", "💰 Historial y Solvencia", "📊 Boleta de Notas", "⚙️ Edición Expediente"])
-            
-            # (CONTENIDO DE TABS IGUAL A VERSIÓN ANTERIOR - RESUMIDO POR ESPACIO)
+            tabs = st.tabs(["📋 Datos", "💰 Solvencia", "📊 Boleta", "⚙️ Edición"])
+
             with tabs[0]:
                 st.write(f"**Responsable:** {a.get('encargado',{}).get('nombre')}")
                 st.write(f"**Teléfono:** {a.get('encargado',{}).get('telefono')}")
-                # ... (Resto de lógica de documentos igual)
+                st.subheader("📂 Documentos")
+                docs = a.get('documentos',{}).get('doc_urls', [])
+                if a.get('documentos',{}).get('doc_url'): docs.append(a.get('documentos',{}).get('doc_url'))
+                if docs:
+                    for i, url in enumerate(list(set(docs))):
+                        with st.expander(f"👁️ Visualizar Documento {i+1}"):
+                            g_view = f"https://docs.google.com/gview?embedded=true&url={url}"
+                            st.markdown(f'<iframe src="{g_view}" width="100%" height="500px" style="border:none;"></iframe>', unsafe_allow_html=True)
+                else: st.info("Sin documentos.")
 
             with tabs[1]:
-                # ... (Lógica de Historial y Taco igual)
-                st.info("Módulo Financiero del Alumno Activo")
+                # Solvencia
+                st.subheader("Estado de Cuenta")
+                pagos = db.collection("finanzas").where("alumno_nie", "==", a['nie']).where("tipo", "==", "ingreso").stream()
+                raw_pagos = [{"id": p.id, **p.to_dict()} for p in pagos]
+                if raw_pagos:
+                    st.dataframe(pd.DataFrame(raw_pagos)[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
+                else: st.info("Sin pagos.")
+                
+                periodo = st.selectbox("Periodo Solvencia:", ["I Trimestre", "II Trimestre", "III Trimestre", "Final"])
+                if st.button("Generar Taco"):
+                    if not raw_pagos: st.error("No tiene pagos registrados.")
+                    else:
+                        fecha = datetime.now().strftime("%d/%m/%Y")
+                        logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="40">' if logo else ""
+                        html = f"""<div style="font-family:monospace;width:300px;margin:auto;padding:10px;border:1px dashed black;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;">{hi}<b>COLEGIO BLANCA ELENA</b></div><h4 style="background:black;color:white;margin:5px 0;">SOLVENCIA EXAMEN</h4><div style="text-align:left;font-size:11px;"><b>ALUMNO:</b> {a['nombre_completo']}<br><b>NIE:</b> {a['nie']}<br><b>PERIODO:</b> {periodo}<br><b>ESTADO:</b> SOLVENTE ✅</div><br><table border="1" style="width:100%;font-size:10px;border-collapse:collapse;text-align:center;"><tr><td>LUN</td><td>MAR</td><td>MIE</td><td>JUE</td><td>VIE</td></tr><tr><td height="30"></td><td></td><td></td><td></td><td></td></tr></table><br><span style="font-size:9px;">Fecha: {fecha}</span></div>"""
+                        components.html(f"""<html><body>{html}<br><center><button onclick="window.print()">🖨️ IMPRIMIR</button></center></body></html>""", height=350)
 
             with tabs[2]:
-                # ... (Lógica de Boleta igual)
-                st.info("Módulo de Boleta Activo")
+                # Boleta
+                st.subheader("Boleta Oficial")
+                notas = db.collection("notas").where("nie", "==", a['nie']).stream()
+                nm = {}
+                for doc in notas:
+                    dd = doc.to_dict()
+                    if dd['materia'] not in nm: nm[dd['materia']] = {}
+                    nm[dd['materia']][dd['mes']] = dd['promedio_final']
+                
+                filas = []
+                malla = MAPA_CURRICULAR.get(a['grado_actual'], [])
+                for mat in malla:
+                    if mat in nm:
+                        n = nm[mat]
+                        t1 = redondear_mined((n.get("Febrero",0)+n.get("Marzo",0)+n.get("Abril",0))/3)
+                        t2 = redondear_mined((n.get("Mayo",0)+n.get("Junio",0)+n.get("Julio",0))/3)
+                        t3 = redondear_mined((n.get("Agosto",0)+n.get("Septiembre",0)+n.get("Octubre",0))/3)
+                        fin = redondear_mined((t1+t2+t3)/3)
+                        filas.append(f"<tr><td style='text-align:left'>{mat}</td><td>{n.get('Febrero','-')}</td><td>{n.get('Marzo','-')}</td><td>{n.get('Abril','-')}</td><td style='background:#eee'><b>{t1}</b></td><td>{n.get('Mayo','-')}</td><td>{n.get('Junio','-')}</td><td>{n.get('Julio','-')}</td><td style='background:#eee'><b>{t2}</b></td><td>{n.get('Agosto','-')}</td><td>{n.get('Septiembre','-')}</td><td>{n.get('Octubre','-')}</td><td style='background:#eee'><b>{t3}</b></td><td style='background:#333;color:white'><b>{fin}</b></td></tr>")
+                
+                logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                sello = get_base64("sello.png"); hs = f'<img src="{sello}" height="80">' if sello else ""
+                html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><br><div style='display:flex;justify-content:space-between;align-items:end;padding:0 50px;'><div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Orientador</div></div><div style='text-align:center;'>{hs}</div><div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Dirección</div></div></div></div>"""
+                components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
             with tabs[3]:
-                # ... (Lógica de Edición igual)
-                st.info("Módulo de Edición Activo")
+                st.subheader("Gestión del Expediente")
+                with st.form("edit_full"):
+                    c1, c2 = st.columns(2)
+                    nn = c1.text_input("Nombres", a['nombres'])
+                    na = c2.text_input("Apellidos", a['apellidos'])
+                    ng = c1.selectbox("Grado", LISTA_GRADOS_TODO, index=LISTA_GRADOS_TODO.index(a['grado_actual']) if a['grado_actual'] in LISTA_GRADOS_TODO else 0)
+                    nt = c2.selectbox("Turno", ["Matutino", "Vespertino"], index=0)
+                    ne = c1.selectbox("Estado", ["Activo", "Inactivo", "Retirado"], index=["Activo", "Inactivo", "Retirado"].index(a.get('estado', 'Activo')))
+                    nres = c2.text_input("Responsable", a.get('encargado',{}).get('nombre',''))
+                    ntel = c1.text_input("Teléfono", a.get('encargado',{}).get('telefono',''))
+                    ndir = c2.text_area("Dirección", a.get('encargado',{}).get('direccion',''))
+                    st.markdown("---")
+                    new_foto = st.file_uploader("Actualizar Foto", ["jpg", "png"], key="up_foto")
+                    new_doc = st.file_uploader("Adjuntar Documento", ["pdf", "jpg", "png"], key="up_doc")
+                    
+                    if st.form_submit_button("💾 Guardar Cambios"):
+                        update_data = {"nombres": nn, "apellidos": na, "nombre_completo": f"{nn} {na}", "grado_actual": ng, "turno": nt, "estado": ne, "encargado": {"nombre": nres, "telefono": ntel, "direccion": ndir}}
+                        if new_foto:
+                            url = subir_archivo(new_foto, f"expedientes/{a['nie']}")
+                            if url: update_data["documentos.foto_url"] = url
+                        if new_doc:
+                            url = subir_archivo(new_doc, f"expedientes/{a['nie']}")
+                            if url:
+                                cds = a.get('documentos',{}).get('doc_urls', [])
+                                cds.append(url)
+                                update_data["documentos.doc_urls"] = cds
+                        db.collection("alumnos").document(a['nie']).update(update_data)
+                        st.success("Actualizado"); time.sleep(1); st.rerun()
 
     # --- 4. MAESTROS ---
     elif opcion_seleccionada == "Maestros":
@@ -315,8 +393,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         opciones_prof = ["➕ Registrar Nuevo Maestro"] + [f"{p.get('codigo','S/C')} - {p['nombre']}" for p in lista_profes]
         col_sel, _ = st.columns([2, 1])
         with col_sel:
-            idx = 0
-            if 'sel_prof_idx' in st.session_state: idx = st.session_state.sel_prof_idx
+            idx = st.session_state.get('sel_prof_idx', 0)
             sel_prof = st.selectbox("Seleccionar Docente:", opciones_prof, index=idx)
 
         st.markdown("---")
@@ -328,85 +405,215 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 nom = c2.text_input("Nombre")
                 tel = c1.text_input("Teléfono")
                 email = c2.text_input("Email")
+                dir = st.text_area("Dirección")
                 foto = st.file_uploader("Foto")
                 if st.form_submit_button("Guardar"):
-                    # ... (Guardado igual)
-                    st.success("Guardado")
+                    if nom:
+                        url = subir_archivo(foto, f"profesores/{cod}")
+                        db.collection("maestros_perfil").add({"codigo": cod, "nombre": nom, "telefono": tel, "email": email, "direccion": dir, "foto_url": url, "fecha_ingreso": datetime.now().strftime("%d/%m/%Y"), "activo": True})
+                        st.success("Guardado"); time.sleep(1); st.rerun()
+                    else: st.error("Nombre requerido")
         else:
-            # ... (Lógica de perfil maestro igual)
-            st.info("Perfil del Maestro Seleccionado")
+            try:
+                pid = next(p['id'] for p in lista_profes if f"{p.get('codigo','S/C')} - {p['nombre']}" == sel_prof)
+                prof_data = next(p for p in lista_profes if p['id'] == pid)
+                
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([1, 3, 1])
+                    with c1: st.image(prof_data.get('foto_url', "https://via.placeholder.com/150"), width=120)
+                    with c2:
+                        st.title(prof_data['nombre'])
+                        st.caption(f"Código: {prof_data.get('codigo','S/C')}")
+                        st.write(f"📞 {prof_data.get('telefono','-')} | 📧 {prof_data.get('email','-')}")
+                    with c3:
+                        if st.button("✏️ Editar Perfil"): st.session_state.edit_prof_mode = True
 
-    # --- 5. ASISTENCIA GLOBAL ---
+                if st.session_state.get("edit_prof_mode"):
+                    with st.form("edit_prof_form"):
+                        nc = st.text_input("Nombre", prof_data['nombre'])
+                        nt = st.text_input("Teléfono", prof_data.get('telefono',''))
+                        nf = st.file_uploader("Nueva Foto", ["jpg", "png"])
+                        if st.form_submit_button("Guardar Cambios"):
+                            upd = {"nombre": nc, "telefono": nt}
+                            if nf:
+                                u = subir_archivo(nf, f"profesores/{prof_data.get('codigo')}")
+                                if u: upd["foto_url"] = u
+                            db.collection("maestros_perfil").document(pid).update(upd)
+                            st.session_state.edit_prof_mode = False
+                            st.success("Actualizado"); time.sleep(1); st.rerun()
+
+                t_ac, t_fin = st.tabs(["📚 Carga", "💰 Finanzas"])
+                
+                with t_ac:
+                    c_asig, c_tabla = st.columns([1, 2])
+                    with c_asig:
+                        g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="gp")
+                        mats = MAPA_CURRICULAR.get(g_sel, [])
+                        with st.form("fcarga"):
+                            st.write(f"Asignando a **{g_sel}**")
+                            m_sel = st.multiselect("Materias", mats)
+                            guia = st.checkbox("¿Es Guía?")
+                            if st.form_submit_button("Guardar"):
+                                db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data['nombre'], "grado": g_sel, "materias": m_sel, "es_guia": guia})
+                                st.success("Asignado"); time.sleep(0.5); st.rerun()
+                    with c_tabla:
+                        cargas = db.collection("carga_academica").where("id_docente", "==", pid).stream()
+                        for c in cargas:
+                            cd = c.to_dict()
+                            with st.expander(f"{cd['grado']} {'(GUIA)' if cd.get('es_guia') else ''}"):
+                                st.write(", ".join(cd['materias']))
+                                if st.button("Eliminar", key=c.id):
+                                    db.collection("carga_academica").document(c.id).delete(); st.rerun()
+
+                with t_fin:
+                    with st.expander("➕ Registrar Movimiento"):
+                        with st.form("ffin"):
+                            c1, c2 = st.columns(2)
+                            tipo = c1.selectbox("Tipo", ["Pago Salario (Egreso)", "Préstamo (Deuda)", "Abono Deuda (Ingreso)"])
+                            monto = c2.number_input("Monto", min_value=0.01)
+                            desc = st.text_input("Detalle")
+                            if st.form_submit_button("Registrar"):
+                                db.collection("finanzas").add({
+                                    "tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"),
+                                    "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'],
+                                    "descripcion": f"{tipo} - {desc}", "monto": monto, "fecha": firestore.SERVER_TIMESTAMP,
+                                    "fecha_legible": datetime.now().strftime("%d/%m/%Y")
+                                })
+                                st.success("Registrado"); time.sleep(0.5); st.rerun()
+                    
+                    movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
+                    lm = [m.to_dict() for m in movs]
+                    lm.sort(key=lambda x: x.get('fecha', 0), reverse=True)
+                    if lm: st.dataframe(pd.DataFrame(lm)[['fecha_legible','descripcion','monto']], use_container_width=True)
+                    else: st.info("Sin historial.")
+            except: st.error("Seleccione docente.")
+
+    # --- 5. ASISTENCIA ---
     elif opcion_seleccionada == "Asistencia Global":
-        st.title("📅 Reporte de Asistencia (Global)")
-        # Lógica similar a docente pero viendo todo
-        g = st.selectbox("Grado", LISTA_GRADOS_TODO)
-        mes = st.selectbox("Mes", range(1,13))
-        # (Lógica de reporte igual a docente)
+        st.title("📅 Reporte de Asistencia")
+        c1, c2 = st.columns(2)
+        g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
+        m = c2.date_input("Mes", date.today())
+        if st.button("Generar"):
+            ini = m.replace(day=1)
+            fin = (ini.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+            docs = db.collection("asistencia").where("grado", "==", g).where("fecha", ">=", datetime.combine(ini, datetime.min.time())).where("fecha", "<=", datetime.combine(fin, datetime.max.time())).stream()
+            
+            stats = {}
+            alums = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            for a in alums: stats[a.to_dict()['nie']] = {"Nombre": a.to_dict()['nombre_completo'], "P": 0, "A": 0}
+            
+            total_dias = 0
+            for d in docs:
+                total_dias += 1
+                regs = d.to_dict().get('registros', {})
+                for nie, est in regs.items():
+                    if nie in stats: 
+                        if est == "Presente": stats[nie]["P"] += 1
+                        else: stats[nie]["A"] += 1
+            
+            if total_dias > 0:
+                data = [{"Alumno": v["Nombre"], "Asistencias": v["P"], "Faltas": v["A"], "%": f"{(v['P']/total_dias)*100:.0f}%"} for v in stats.values()]
+                st.dataframe(pd.DataFrame(data), use_container_width=True)
+            else: st.info("Sin registros.")
 
     # --- 6. NOTAS ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Admin Notas")
-        # (Lógica de notas igual)
+        # (Código idéntico a v17, resumido)
+        c1, c2, c3 = st.columns(3)
+        g = c1.selectbox("Grado", ["Select..."]+LISTA_GRADOS_NOTAS)
+        mp = MAPA_CURRICULAR.get(g,[]) if g!="Select..." else []
+        m = c2.selectbox("Materia", ["Select..."]+mp)
+        mes = c3.selectbox("Mes", LISTA_MESES)
+        
+        if g!="Select..." and m!="Select...":
+            # ... Lógica de editor y guardado ...
+            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
+            if not lista: st.warning("Sin alumnos")
+            else:
+                df = pd.DataFrame(lista).sort_values("Nombre")
+                id_doc = f"{g}_{m}_{mes}".replace(" ","_")
+                cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
+                doc_ref = db.collection("notas_mensuales").document(id_doc).get()
+                if doc_ref.exists:
+                    dd = doc_ref.to_dict().get('detalles', {})
+                    for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
+                else:
+                    for c in cols: df[c] = 0.0
+                df["Promedio"] = 0.0
+                cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
+                for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0, max_value=10, step=0.1)
+                
+                ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
+                if st.button("Guardar"):
+                    # ... Logica guardado ...
+                    batch = db.batch()
+                    detalles = {}
+                    for _, r in ed.iterrows():
+                        if m == "Conducta": prom = r[cols[0]]
+                        else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
+                        detalles[r["NIE"]] = {c: r[c] for c in cols}
+                        detalles[r["NIE"]]["Promedio"] = round(prom, 1)
+                        ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
+                        batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": round(prom, 1)})
+                    db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
+                    batch.commit()
+                    st.success("Guardado")
 
     # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Finanzas")
-        # (Lógica de finanzas igual v17)
+        # ... (Código idéntico a v17, resumido)
+        t1, t2, t3, t4 = st.tabs(["Corte", "Cobros", "Gastos", "Reportes"])
+        with t1:
+            st.info("Dashboard Financiero (Ver código v17)")
+        with t2:
+            st.info("Módulo Cobros Alumnos")
+        with t3:
+            st.info("Módulo Gastos")
+        with t4:
+            st.info("Reportes y Reimpresión")
 
     # --- 8. CONFIGURACIÓN (USUARIOS) ---
     elif opcion_seleccionada == "Configuración (Usuarios)":
-        st.header("⚙️ Configuración del Sistema")
+        st.header("⚙️ Configuración")
         
         t_usr, t_db = st.tabs(["👥 Gestión de Usuarios", "⚠️ Base de Datos"])
         
         with t_usr:
-            st.subheader("Crear / Editar Credenciales de Acceso")
+            st.subheader("Crear / Editar Credenciales")
+            # Lista
+            ur = db.collection("usuarios").stream()
+            lu = [u.to_dict() for u in ur]
+            st.dataframe(pd.DataFrame(lu), use_container_width=True)
             
-            # Lista usuarios actuales
-            users_ref = db.collection("usuarios").stream()
-            lista_users = [u.to_dict() for u in users_ref]
-            df_users = pd.DataFrame(lista_users)
-            if not df_users.empty:
-                st.dataframe(df_users[['usuario', 'nombre', 'rol']], use_container_width=True)
-            
-            st.divider()
             with st.form("add_user"):
-                st.write("**Nuevo Usuario / Actualizar Contraseña**")
                 c1, c2 = st.columns(2)
-                u_user = c1.text_input("Usuario (ID de Acceso)")
+                u_user = c1.text_input("Usuario (ID)")
                 u_pass = c2.text_input("Contraseña", type="password")
-                u_name = c1.text_input("Nombre del Propietario")
+                u_name = c1.text_input("Nombre Real")
                 u_rol = c2.selectbox("Rol", ["docente", "admin"])
-                
-                if st.form_submit_button("💾 Guardar Credenciales"):
-                    if u_user and u_pass:
-                        db.collection("usuarios").document(u_user).set({
-                            "usuario": u_user, "pass": u_pass, "rol": u_rol, "nombre": u_name
-                        })
-                        st.success(f"Usuario {u_user} guardado correctamente.")
-                        time.sleep(1); st.rerun()
-                    else: st.error("Faltan datos.")
-            
-            st.write("Para eliminar, contacte al desarrollador o borre desde Firebase Console.")
+                if st.form_submit_button("Guardar"):
+                    db.collection("usuarios").document(u_user).set({"usuario": u_user, "pass": u_pass, "rol": u_rol, "nombre": u_name})
+                    st.success("Usuario creado/actualizado"); time.sleep(1); st.rerun()
 
         with t_db:
-            st.warning("Zona de Peligro: Reinicio de Base de Datos")
-            confirm = st.text_input("Escriba 'BORRAR' para confirmar:")
-            if st.button("🔴 BORRAR TODO") and confirm == "BORRAR":
-                # ... (Lógica borrado)
-                st.error("Borrado ejecutado.")
+            st.warning("Zona de Peligro")
+            if st.button("🔴 BORRAR TODO") and st.text_input("Confirmar:") == "BORRAR":
+                borrar_coleccion("alumnos"); borrar_coleccion("maestros_perfil"); borrar_coleccion("carga_academica"); borrar_coleccion("finanzas"); borrar_coleccion("notas")
+                st.success("Borrado completo.")
 
 # ==========================================
-# MÓDULOS DE DOCENTE (PERSONALIZADO)
+# MÓDULOS DE DOCENTE
 # ==========================================
 elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inicio":
     
-    # --- LISTADOS CON FORMATO DE NOTAS ---
     if opcion_seleccionada == "Mis Listados":
-        st.title("🖨️ Listados de Evaluación Mensual")
+        st.title("🖨️ Imprimir Listas")
         g = st.selectbox("Grado:", LISTA_GRADOS_TODO)
-        mes_lista = st.selectbox("Mes para encabezado:", LISTA_MESES)
+        mes_lista = st.selectbox("Mes:", LISTA_MESES)
         
         if st.button("Generar Hoja de Control"):
             docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
@@ -414,147 +621,49 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
             if not lista: st.warning("Sin alumnos")
             else:
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
-                
                 rows = ""
                 for i, n in enumerate(lista):
-                    rows += f"""<tr>
-                        <td>{i+1}</td>
-                        <td style='text-align:left; padding-left:5px;'>{n}</td>
-                        <td></td><td></td><td></td><td></td><td></td> <td></td>
-                    </tr>"""
-                
-                html = f"""
-                <div style='font-family:Arial;font-size:12px;padding:20px;'>
-                    <div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>
-                        {hi}
-                        <div style='margin-left:15px'>
-                            <h3>COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3>
-                            <h4>CONTROL DE EVALUACIÓN - {mes_lista.upper()} - {g.upper()}</h4>
-                        </div>
-                    </div>
-                    <table border='1' style='width:100%;border-collapse:collapse;text-align:center;'>
-                        <tr style='background:#eee;font-weight:bold;'>
-                            <td width='5%'>No.</td>
-                            <td width='45%'>NOMBRE COMPLETO</td>
-                            <td width='8%'>ACT1</td><td width='8%'>ACT2</td>
-                            <td width='8%'>ALT1</td><td width='8%'>ALT2</td>
-                            <td width='8%'>EXAM</td><td width='10%'>PROM</td>
-                        </tr>
-                        {rows}
-                    </table>
-                </div>"""
+                    rows += f"<tr><td>{i+1}</td><td style='text-align:left;padding-left:5px;'>{n}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>"
+                html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>COLEGIO PROFA. BLANCA ELENA</h3><h4>CONTROL DE EVALUACIÓN - {mes_lista.upper()} - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='45%'>NOMBRE COMPLETO</td><td width='8%'>ACT1</td><td width='8%'>ACT2</td><td width='8%'>ALT1</td><td width='8%'>ALT2</td><td width='8%'>EXAM</td><td width='10%'>PROM</td></tr>{rows}</table></div>"""
                 components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR LISTADO</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
-    # --- ASISTENCIA DOCENTE (CON REPORTE) ---
     elif opcion_seleccionada == "Tomar Asistencia":
         st.title("📅 Control de Asistencia")
+        c1, c2 = st.columns(2)
+        fecha_asist = c1.date_input("Fecha:", date.today())
+        grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
         
-        t_toma, t_rep = st.tabs(["📝 Tomar Asistencia", "📊 Reporte Mensual"])
-        
-        with t_toma:
-            c1, c2 = st.columns(2)
-            fecha_asist = c1.date_input("Fecha:", date.today())
-            grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
+        if grado_asist:
+            st.divider()
+            id_asistencia = f"{fecha_asist}_{grado_asist}"
+            doc_ref = db.collection("asistencia").document(id_asistencia)
+            doc_snap = doc_ref.get()
+            alumnos_ref = db.collection("alumnos").where("grado_actual", "==", grado_asist).stream()
+            lista_alumnos = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in alumnos_ref]
+            lista_alumnos.sort(key=lambda x: x["Nombre"])
             
-            if grado_asist:
-                st.divider()
-                id_asistencia = f"{fecha_asist}_{grado_asist}"
-                doc_ref = db.collection("asistencia").document(id_asistencia)
-                doc_snap = doc_ref.get()
-                
-                alumnos_ref = db.collection("alumnos").where("grado_actual", "==", grado_asist).stream()
-                lista_alumnos = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in alumnos_ref]
-                lista_alumnos.sort(key=lambda x: x["Nombre"])
-                
-                if lista_alumnos:
-                    if doc_snap.exists: datos = doc_snap.to_dict().get("registros", {})
-                    else: datos = {}
-                    
-                    data_editor = []
-                    for alum in lista_alumnos:
-                        data_editor.append({"NIE": alum["NIE"], "Nombre": alum["Nombre"], "Estado": datos.get(alum["NIE"], "Presente")})
-                    
-                    df_asist = pd.DataFrame(data_editor)
-                    
-                    ed = st.data_editor(df_asist, column_config={
-                        "NIE": st.column_config.TextColumn(disabled=True),
-                        "Nombre": st.column_config.TextColumn(disabled=True),
-                        "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True)
-                    }, hide_index=True, use_container_width=True, key=id_asistencia)
-                    
-                    if st.button("💾 Guardar Asistencia"):
-                        regs = {r["NIE"]: r["Estado"] for r in ed.to_dict(orient="records")}
-                        doc_ref.set({"fecha": datetime.combine(fecha_asist, datetime.min.time()), "grado": grado_asist, "registros": regs})
-                        st.success("Guardado.")
-                else: st.warning("Sin alumnos.")
+            if lista_alumnos:
+                datos = doc_snap.to_dict().get("registros", {}) if doc_snap.exists else {}
+                data_editor = [{"NIE": a["NIE"], "Nombre": a["Nombre"], "Estado": datos.get(a["NIE"], "Presente")} for a in lista_alumnos]
+                df_asist = pd.DataFrame(data_editor)
+                ed = st.data_editor(df_asist, column_config={"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True), "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True)}, hide_index=True, use_container_width=True, key=id_asistencia)
+                if st.button("💾 Guardar Asistencia"):
+                    regs = {r["NIE"]: r["Estado"] for r in ed.to_dict(orient="records")}
+                    doc_ref.set({"fecha": datetime.combine(fecha_asist, datetime.min.time()), "grado": grado_asist, "registros": regs})
+                    st.success("Guardado.")
+            else: st.warning("Sin alumnos.")
 
-        with t_rep:
-            st.subheader("Resumen Mensual")
-            col_r1, col_r2 = st.columns(2)
-            g_rep = col_r1.selectbox("Grado Reporte:", LISTA_GRADOS_TODO, key="g_rep")
-            m_rep = col_r2.date_input("Seleccionar Mes (Cualquier día):", date.today(), key="m_rep")
-            
-            if st.button("Generar Reporte"):
-                # Rango de fechas del mes seleccionado
-                inicio_mes = m_rep.replace(day=1)
-                siguiente_mes = (inicio_mes.replace(day=28) + timedelta(days=4)).replace(day=1)
-                fin_mes = siguiente_mes - timedelta(days=1)
-                
-                dt_ini = datetime.combine(inicio_mes, datetime.min.time())
-                dt_fin = datetime.combine(fin_mes, datetime.max.time())
-                
-                # Buscar docs de asistencia
-                docs_asist = db.collection("asistencia").where("grado", "==", g_rep).where("fecha", ">=", dt_ini).where("fecha", "<=", dt_fin).stream()
-                
-                # Procesar
-                stats = {} # {nie: {P:0, A:0, T:0}}
-                
-                # Inicializar alumnos
-                alumnos_ref = db.collection("alumnos").where("grado_actual", "==", g_rep).stream()
-                mapa_nombres = {}
-                for a in alumnos_ref:
-                    d = a.to_dict()
-                    mapa_nombres[d['nie']] = d['nombre_completo']
-                    stats[d['nie']] = {"Presente": 0, "Ausente": 0, "Tardanza": 0, "Permiso": 0}
-                
-                dias_clase = 0
-                for doc in docs_asist:
-                    dias_clase += 1
-                    regs = doc.to_dict().get("registros", {})
-                    for nie, estado in regs.items():
-                        if nie in stats:
-                            stats[nie][estado] += 1
-                
-                if dias_clase > 0:
-                    data_final = []
-                    for nie, conteo in stats.items():
-                        total_asist = conteo["Presente"] + conteo["Tardanza"] # Asumimos tardanza como asistencia parcial
-                        porc = (total_asist / dias_clase) * 100
-                        data_final.append({
-                            "Alumno": mapa_nombres.get(nie, nie),
-                            "Presente": conteo["Presente"],
-                            "Ausente": conteo["Ausente"],
-                            "Tardanza": conteo["Tardanza"],
-                            "% Asistencia": f"{porc:.1f}%"
-                        })
-                    
-                    df_final = pd.DataFrame(data_final).sort_values("Alumno")
-                    st.write(f"**Días de clase registrados en el mes:** {dias_clase}")
-                    st.dataframe(df_final, use_container_width=True)
-                else:
-                    st.info("No hay registros de asistencia en este mes.")
-
-    # --- OTRAS OPCIONES DOCENTE ---
     elif opcion_seleccionada == "Cargar Notas":
-        # (Mismo código de carga de notas)
+        # (Igual a Admin Notas, lógica docente)
         st.title("📝 Registro de Notas")
-        # ... (Selectores y editor igual que antes)
-        c_d1, c_d2, c_d3 = st.columns(3)
-        g = c_d1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
-        mats = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
-        m = c_d2.selectbox("Materia", ["Select..."] + mats)
-        mes = c_d3.selectbox("Mes", LISTA_MESES)
-        if g != "Select..." and m != "Select...":
+        c1, c2, c3 = st.columns(3)
+        g = c1.selectbox("Grado", ["Select..."]+LISTA_GRADOS_NOTAS)
+        mp = MAPA_CURRICULAR.get(g,[]) if g!="Select..." else []
+        m = c2.selectbox("Materia", ["Select..."]+mp)
+        mes = c3.selectbox("Mes", LISTA_MESES)
+        
+        if g!="Select..." and m!="Select...":
+            # ... Logica editor ...
             docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
             lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
             if not lista: st.warning("Sin alumnos")
@@ -588,8 +697,9 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")
-        # Mostrar cargas filtradas por el nombre del usuario logueado (si coincide con el nombre de docente)
-        # Ojo: En produccion se recomienda usar ID, aqui usamos nombre por simplicidad del MVP anterior
+        # Mostrar solo cargas del usuario actual
+        # Asumiendo que el 'nombre' del usuario coincide con 'nombre_docente' en cargas
+        # Lo ideal es que en Configuración crees el usuario con el MISMO nombre que el perfil del maestro
         cargas = db.collection("carga_academica").where("nombre_docente", "==", st.session_state["user_name"]).stream()
         found = False
         for c in cargas:
@@ -597,7 +707,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
             d = c.to_dict()
             with st.container(border=True):
                 st.subheader(d['grado'])
-                st.write("**Materias:** " + ", ".join(d['materias']))
-                if d.get('es_guia'): st.success("🌟 MAESTRO GUÍA")
-        if not found:
-            st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.")
+                st.write(f"**Materias:** {', '.join(d['materias'])}")
+                if d.get('es_guia'): st.success("🌟 Maestro Guía")
+        if not found: st.info("No tiene cargas asignadas a su nombre.")

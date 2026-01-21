@@ -1,4 +1,4 @@
-import streamlit as st
+"""import streamlit as st
 import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
@@ -600,4 +600,4 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 st.write("**Materias:** " + ", ".join(d['materias']))
                 if d.get('es_guia'): st.success("🌟 MAESTRO GUÍA")
         if not found:
-            st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.")
+            st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.") """

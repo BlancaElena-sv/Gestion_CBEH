@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import base64
 import time
 import os
@@ -587,7 +587,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
         
-        t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Historial & Reportes"])
+        t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Historial & Reimpresión"])
 
         # 1. DASHBOARD
         with t_dash:
@@ -690,23 +690,53 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 components.html(f"""<html><body>{html_gasto}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
                 if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
-        # 4. HISTORIAL CON REIMPRESIÓN
+        # 4. HISTORIAL CON BUSCADOR
         with t_rep:
-            st.subheader("Historial y Reimpresión")
-            docs_hist = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).limit(50).stream()
-            data_raw = [{"id": d.id, **d.to_dict()} for d in docs_hist]
+            st.subheader("📜 Historial y Reimpresión")
             
-            if data_raw:
-                st.dataframe(pd.DataFrame(data_raw)[['fecha_legible', 'tipo', 'descripcion', 'monto']], use_container_width=True)
-                st.write("---")
-                st.markdown("#### 🔄 Reimpresión de Comprobantes")
-                # Selector de transacción
-                opciones = {f"{d['fecha_legible']} | {d['tipo'].upper()} | ${d['monto']} | {d.get('descripcion')}": d for d in data_raw}
-                sel = st.selectbox("Seleccione transacción para reimprimir:", ["Seleccionar..."] + list(opciones.keys()))
+            # --- FILTROS DE BÚSQUEDA ---
+            st.markdown("##### 🔍 Buscar Comprobante")
+            col_search1, col_search2, col_search3 = st.columns(3)
+            search_text = col_search1.text_input("Buscar (Nombre, NIE o Concepto):")
+            date_start = col_search2.date_input("Desde:", value=date.today().replace(day=1))
+            date_end = col_search3.date_input("Hasta:", value=date.today())
+            
+            # Convertir fechas a datetime para filtro
+            dt_start = datetime.combine(date_start, datetime.min.time())
+            dt_end = datetime.combine(date_end, datetime.max.time())
+            
+            # Consulta filtrada por fecha
+            query = db.collection("finanzas").where("fecha", ">=", dt_start).where("fecha", "<=", dt_end).order_by("fecha", direction=firestore.Query.DESCENDING)
+            docs = query.stream()
+            
+            data_filtered = []
+            for doc in docs:
+                d = doc.to_dict()
+                d['id'] = doc.id
+                # Filtro de texto en Python
+                s_term = search_text.lower()
+                match = (
+                    s_term in d.get('nombre_persona', '').lower() or 
+                    s_term in d.get('alumno_nie', '').lower() or 
+                    s_term in d.get('descripcion', '').lower() or
+                    s_term in d.get('id_short', '').lower()
+                )
+                if not search_text or match:
+                    data_filtered.append(d)
+            
+            # TABLA DE RESULTADOS
+            if data_filtered:
+                df_show = pd.DataFrame(data_filtered)
+                st.dataframe(df_show[['fecha_legible', 'id_short', 'tipo', 'nombre_persona', 'descripcion', 'monto']], use_container_width=True)
                 
-                if sel != "Seleccionar...":
-                    r = opciones[sel]
-                    if st.button("visualizar Comprobante Original"):
+                st.divider()
+                st.markdown("#### 🖨️ Seleccionar para Reimprimir")
+                options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_filtered}
+                selection = st.selectbox("Seleccione el movimiento filtrado:", ["Seleccionar..."] + list(options.keys()))
+                
+                if selection != "Seleccionar...":
+                    r = options[selection]
+                    if st.button("Visualizar Comprobante Original"):
                         logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
                         color_b = "#333" if r['tipo'] == 'ingreso' else "#d32f2f"
                         titulo = "COMPROBANTE DE INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE DE EGRESO"
@@ -716,7 +746,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         
                         html_reimp = f"""
                         <div style="border: 2px solid {color_b}; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;">
-                            <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
+                            <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: {color_b};">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
                             <hr>
                             <div style="padding: 10px;">
                                 <p><b>{etiqueta1}</b> {r.get('nombre_persona','-')}</p>
@@ -729,7 +759,8 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         </div>
                         """
                         components.html(f"""<html><body>{html_reimp}<br><center><button onclick="window.print()">🖨️ REIMPRIMIR</button></center></body></html>""", height=500)
-            else: st.info("No hay historial disponible.")
+            else:
+                st.warning("No se encontraron movimientos con esos criterios.")
 
     # --- 7. CONFIGURACIÓN ---
     elif opcion_seleccionada == "Configuración":

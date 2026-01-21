@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import base64
 import time
 import os
@@ -340,7 +340,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                             filas.append(f"<tr><td style='text-align:left'>{mat}</td><td>{n.get('Febrero','-')}</td><td>{n.get('Marzo','-')}</td><td>{n.get('Abril','-')}</td><td style='background:#eee'><b>{t1}</b></td><td>{n.get('Mayo','-')}</td><td>{n.get('Junio','-')}</td><td>{n.get('Julio','-')}</td><td style='background:#eee'><b>{t2}</b></td><td>{n.get('Agosto','-')}</td><td>{n.get('Septiembre','-')}</td><td>{n.get('Octubre','-')}</td><td style='background:#eee'><b>{t3}</b></td><td style='background:#333;color:white'><b>{fin}</b></td></tr>")
                     
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                    # SELLO CENTRADO ENTRE FIRMAS
                     sello = get_base64("sello.png"); hs = f'<img src="{sello}" height="80">' if sello else ""
                     
                     html = f"""
@@ -469,6 +468,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         st.markdown("#### Asignar Nueva Materia")
                         g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
                         mats_disp = MAPA_CURRICULAR.get(g_sel, [])
+                        
                         with st.form("add_carga_prof"):
                             st.write(f"Asignando a **{g_sel}**")
                             m_sel = st.multiselect("Seleccionar Materias", mats_disp)
@@ -518,7 +518,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     else: st.info("No hay historial financiero.")
             except Exception as e: st.error("Seleccione un docente.")
 
-    # --- 5. NOTAS ---
+    # --- 5. NOTAS (ADMIN Y VISUALIZACIÓN) ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Admin Notas (Vista Global)")
         c_sel_n1, c_sel_n2, c_sel_n3 = st.columns(3)
@@ -561,84 +561,170 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     batch.commit()
                     st.success("Guardado por Admin")
                 
-                # --- VISUALIZACIÓN ACUMULADA DETALLADA (NUEVO) ---
+                # --- VISUALIZACIÓN DETALLADA ---
                 st.divider()
-                st.subheader(f"📋 Registro Acumulado - {m}")
-                
-                # Para mostrar el detalle "tal cual", necesitamos iterar los meses y buscar en 'notas_mensuales'
+                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
                 rows_acumulados = []
-                # Columnas del reporte
-                if m == "Conducta":
-                    columnas_rep = ["Mes", "NIE", "Nombre", "Nota Conducta", "Promedio"]
-                else:
-                    columnas_rep = ["Mes", "NIE", "Nombre", "Act1", "Act2", "Alt1", "Alt2", "Examen", "Promedio"]
-
                 for mes_iter in LISTA_MESES:
                     id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
                     doc_h = db.collection("notas_mensuales").document(id_history).get()
                     if doc_h.exists:
                         data_h = doc_h.to_dict().get("detalles", {})
                         for nie_iter, notas_iter in data_h.items():
-                            # Buscar nombre
                             nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
-                            
                             if m == "Conducta":
-                                rows_acumulados.append({
-                                    "Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum,
-                                    "Nota Conducta": notas_iter.get("Nota Conducta", 0),
-                                    "Promedio": notas_iter.get("Promedio", 0)
-                                })
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
                             else:
-                                rows_acumulados.append({
-                                    "Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum,
-                                    "Act1": notas_iter.get("Act1 (25%)", 0),
-                                    "Act2": notas_iter.get("Act2 (25%)", 0),
-                                    "Alt1": notas_iter.get("Alt1 (10%)", 0),
-                                    "Alt2": notas_iter.get("Alt2 (10%)", 0),
-                                    "Examen": notas_iter.get("Examen (30%)", 0),
-                                    "Promedio": notas_iter.get("Promedio", 0)
-                                })
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
                 
                 if rows_acumulados:
                     df_ac = pd.DataFrame(rows_acumulados)
-                    # Ordenar por Mes (usando indice) y Nombre
                     df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
                     df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
                     st.dataframe(df_ac, use_container_width=True, hide_index=True)
                 else:
-                    st.info("No hay registros históricos detallados para esta materia.")
+                    st.info("No hay registros detallados aún.")
 
-    # --- 6. FINANZAS ---
+    # --- 6. FINANZAS (GLOBAL) ---
     elif opcion_seleccionada == "Finanzas":
-        st.title("💰 Finanzas")
-        if 'recibo' not in st.session_state: st.session_state.recibo = None
-        if st.session_state.recibo:
-            r = st.session_state.recibo
-            col = "#2e7d32" if r['tipo'] == 'ingreso' else "#c62828"
-            tit = "RECIBO INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE EGRESO"
-            img = get_base64("logo.png"); hi = f'<img src="{img}" height="60">' if img else ""
-            st.markdown("""<style>@media print { body * { visibility: hidden; } .ticket, .ticket * { visibility: visible; } .ticket { position: absolute; left: 0; top: 0; width: 100%; } }</style>""", unsafe_allow_html=True)
-            html = f"""<div class="ticket" style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;"><div style="background:{col};color:white;padding:15px;display:flex;justify-content:space-between;"><div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3></div></div><h4>{tit}</h4></div><div style="padding:20px;"><p><b>Fecha:</b> {r['fecha']}</p><p><b>Persona:</b> {r['persona']}</p><p><b>Concepto:</b> {r['desc']}</p><h1 style="text-align:right;color:{col};">${r['monto']:.2f}</h1></div></div>"""
-            st.markdown(html, unsafe_allow_html=True)
-            c1, c2 = st.columns([1,4])
-            if c1.button("Cerrar"): st.session_state.recibo = None; st.rerun()
-            with c2: components.html(f"""<script>function p(){{window.parent.print()}}</script><button onclick="p()" style="background:green;color:white;padding:10px;">🖨️ IMPRIMIR</button>""", height=60)
-        else:
-            t1, t2 = st.tabs(["Cobrar", "Pagar"])
-            with t1:
-                n = st.text_input("NIE:")
-                if st.button("Buscar para Cobro") and n:
-                    d = db.collection("alumnos").document(n).get()
-                    if d.exists: st.session_state.pa = d.to_dict()
-                if st.session_state.get("pa"):
-                    with st.form("fc"):
-                        st.info(f"Cobro a: {st.session_state.pa['nombre_completo']}")
-                        con = st.text_input("Concepto")
-                        mon = st.number_input("Monto", min_value=0.01)
-                        if st.form_submit_button("Cobrar"):
-                            data = {"tipo": "ingreso", "desc": con, "monto": mon, "persona": st.session_state.pa['nombre_completo'], "alumno_nie": n, "fecha": datetime.now().strftime("%d/%m/%Y")}
-                            db.collection("finanzas").add(data)
-                            st.session_state.recibo = data; st.session_state.pa = None; st.rerun()
+        st.title("💰 Administración Financiera")
+        
+        # PESTAÑAS: Dashboard, Cobros, Gastos, Reportes
+        t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Historial & Reportes"])
+
+        # 1. DASHBOARD / CORTE DE CAJA
+        with t_dash:
+            c_date, _ = st.columns([1, 2])
+            fecha_corte = c_date.date_input("Fecha de Corte", date.today())
+            fecha_str = fecha_corte.strftime("%d/%m/%Y")
+            
+            # Traer todo para calcular (MVP: Filtro en Python)
+            all_fin = db.collection("finanzas").stream()
+            data_hoy = []
+            ingreso_dia = 0.0
+            egreso_dia = 0.0
+            
+            for doc in all_fin:
+                d = doc.to_dict()
+                if d.get('fecha_legible') == fecha_str:
+                    data_hoy.append(d)
+                    if d['tipo'] == 'ingreso': ingreso_dia += d['monto']
+                    elif d['tipo'] == 'egreso': egreso_dia += d['monto']
+            
+            saldo_dia = ingreso_dia - egreso_dia
+            
+            kpi1, kpi2, kpi3 = st.columns(3)
+            kpi1.metric("Ingresos del Día", f"${ingreso_dia:.2f}", delta_color="normal")
+            kpi2.metric("Gastos del Día", f"${egreso_dia:.2f}", delta_color="inverse")
+            kpi3.metric("Saldo Neto", f"${saldo_dia:.2f}")
+            
+            st.divider()
+            st.subheader(f"Libro Diario - {fecha_str}")
+            if data_hoy:
+                df_hoy = pd.DataFrame(data_hoy)
+                st.dataframe(df_hoy[['descripcion', 'tipo', 'monto', 'nombre_persona']], use_container_width=True)
+                
+                # Ticket de Corte
+                if st.button("🖨️ Imprimir Corte del Día"):
+                    logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="40">' if logo else ""
+                    html_corte = f"""
+                    <div style="font-family:monospace;width:300px;margin:auto;border:1px solid black;padding:10px;">
+                        <div style="text-align:center;">{hi}<br><b>COLEGIO BLANCA ELENA</b><br>CORTE DE CAJA</div>
+                        <br>
+                        <b>FECHA:</b> {fecha_str}<br>
+                        <hr>
+                        <table width="100%">
+                            <tr><td>(+) INGRESOS:</td><td align="right">${ingreso_dia:.2f}</td></tr>
+                            <tr><td>(-) GASTOS:</td><td align="right">${egreso_dia:.2f}</td></tr>
+                            <tr><td><b>(=) SALDO:</b></td><td align="right"><b>${saldo_dia:.2f}</b></td></tr>
+                        </table>
+                        <br>
+                        <div style="text-align:center;margin-top:20px;">___________________<br>Firma Responsable</div>
+                    </div>
+                    """
+                    components.html(f"""<html><body>{html_corte}<br><center><button onclick="window.print()">IMPRIMIR</button></center></body></html>""", height=400)
+            else:
+                st.info("No hay movimientos registrados hoy.")
+
+        # 2. COBROS (ALUMNOS)
+        with t_ingreso:
+            n = st.text_input("Buscar NIE del Alumno para Cobro:")
+            if st.button("Buscar Alumno") and n:
+                d = db.collection("alumnos").document(n).get()
+                if d.exists: st.session_state.pago_alum = d.to_dict()
+                else: st.error("Alumno no encontrado")
+            
+            if "pago_alum" in st.session_state:
+                pa = st.session_state.pago_alum
+                st.info(f"Cobrando a: **{pa['nombre_completo']}**")
+                with st.form("form_cobro"):
+                    concepto = st.text_input("Concepto (Ej: Mensualidad Febrero)")
+                    monto = st.number_input("Monto ($)", min_value=0.01)
+                    notas_pago = st.text_input("Observaciones (Opcional)")
+                    if st.form_submit_button("✅ Registrar Ingreso"):
+                        recibo_data = {
+                            "tipo": "ingreso", "descripcion": concepto, "monto": monto,
+                            "alumno_nie": pa['nie'], "nombre_persona": pa['nombre_completo'],
+                            "observaciones": notas_pago,
+                            "fecha": firestore.SERVER_TIMESTAMP,
+                            "fecha_legible": datetime.now().strftime("%d/%m/%Y")
+                        }
+                        db.collection("finanzas").add(recibo_data)
+                        st.session_state.recibo_temp = recibo_data # Para imprimir
+                        st.success("Cobro registrado exitosamente")
+                        del st.session_state.pago_alum # Limpiar
+                        st.rerun()
+            
+            # Mostrar recibo recién generado
+            if "recibo_temp" in st.session_state:
+                r = st.session_state.recibo_temp
+                st.success("¡Pago Registrado! Imprima el recibo a continuación:")
+                logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                html_recibo = f"""<div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:400px;margin:auto;"><div style="text-align:center;">{hi}<h3>RECIBO DE INGRESO</h3></div><p><b>Fecha:</b> {r['fecha_legible']}</p><p><b>Alumno:</b> {r['nombre_persona']}</p><p><b>Concepto:</b> {r['descripcion']}</p><h2 style="text-align:center;">${r['monto']:.2f}</h2></div>"""
+                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR RECIBO</button></center></body></html>""", height=400)
+                if st.button("Cerrar Recibo"):
+                    del st.session_state.recibo_temp
+                    st.rerun()
+
+        # 3. GASTOS (OPERATIVOS)
+        with t_egreso:
+            st.subheader("Registro de Gastos Operativos")
+            with st.form("form_gasto"):
+                c1, c2 = st.columns(2)
+                desc_gasto = c1.text_input("Descripción del Gasto (Ej: Pago Luz del Sur)")
+                monto_gasto = c2.number_input("Monto ($)", min_value=0.01)
+                categoria = c1.selectbox("Categoría", ["Servicios Básicos", "Mantenimiento", "Papelería/Insumos", "Planilla Admin", "Otros"])
+                beneficiario = c2.text_input("Beneficiario / Proveedor")
+                
+                if st.form_submit_button("🔴 Registrar Salida de Dinero"):
+                    db.collection("finanzas").add({
+                        "tipo": "egreso", "descripcion": f"{categoria} - {desc_gasto}", 
+                        "monto": monto_gasto, "nombre_persona": beneficiario,
+                        "fecha": firestore.SERVER_TIMESTAMP,
+                        "fecha_legible": datetime.now().strftime("%d/%m/%Y")
+                    })
+                    st.success("Gasto registrado correctamente.")
+                    time.sleep(1); st.rerun()
+
+        # 4. HISTORIAL
+        with t_rep:
+            st.subheader("Historial Completo de Transacciones")
+            # Filtros
+            cf1, cf2 = st.columns(2)
+            f_tipo = cf1.multiselect("Filtrar por Tipo:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
+            
+            # Cargar datos (Optimización: limitar a últimos 100 si crece mucho)
+            docs_hist = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).limit(50).stream()
+            data_hist = [{"Fecha": d.to_dict().get('fecha_legible'), "Tipo": d.to_dict().get('tipo'), "Descripción": d.to_dict().get('descripcion'), "Monto": d.to_dict().get('monto'), "Responsable": d.to_dict().get('nombre_persona')} for d in docs_hist]
+            
+            if data_hist:
+                df_hist = pd.DataFrame(data_hist)
+                # Aplicar filtro visual
+                if f_tipo:
+                    df_hist = df_hist[df_hist['Tipo'].isin(f_tipo)]
+                st.dataframe(df_hist, use_container_width=True)
+            else:
+                st.info("Sin registros recientes.")
 
     # --- 7. CONFIGURACIÓN ---
     elif opcion_seleccionada == "Configuración":
@@ -680,7 +766,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
 
     elif opcion_seleccionada == "Cargar Notas":
         st.title("📝 Registro de Notas")
-        # SELECTORES LIBRES
         c_d1, c_d2, c_d3 = st.columns(3)
         g = c_d1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
         mats = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
@@ -723,7 +808,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 
                 # Visualización acumulada para docente también
                 st.divider()
-                st.subheader(f"📋 Registro Acumulado - {m}")
+                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
                 rows_acumulados = []
                 for mes_iter in LISTA_MESES:
                     id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")

@@ -468,6 +468,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         st.markdown("#### Asignar Nueva Materia")
                         g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
                         mats_disp = MAPA_CURRICULAR.get(g_sel, [])
+                        
                         with st.form("add_carga_prof"):
                             st.write(f"Asignando a **{g_sel}**")
                             m_sel = st.multiselect("Seleccionar Materias", mats_disp)
@@ -587,7 +588,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
         
-        t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Historial & Reimpresión"])
+        t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Reportes & Reimpresión"])
 
         # 1. DASHBOARD
         with t_dash:
@@ -690,77 +691,83 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 components.html(f"""<html><body>{html_gasto}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
                 if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
-        # 4. HISTORIAL CON BUSCADOR
+        # 4. HISTORIAL Y REPORTES AVANZADOS (NUEVO)
         with t_rep:
-            st.subheader("📜 Historial y Reimpresión")
+            st.subheader("📜 Generador de Reportes Financieros")
             
-            # --- FILTROS DE BÚSQUEDA ---
-            st.markdown("##### 🔍 Buscar Comprobante")
-            col_search1, col_search2, col_search3 = st.columns(3)
-            search_text = col_search1.text_input("Buscar (Nombre, NIE o Concepto):")
-            date_start = col_search2.date_input("Desde:", value=date.today().replace(day=1))
-            date_end = col_search3.date_input("Hasta:", value=date.today())
+            # FILTROS
+            c_f1, c_f2, c_f3, c_f4 = st.columns(4)
+            f_tipo = c_f1.multiselect("Tipo Transacción:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
+            f_inicio = c_f2.date_input("Desde:", date.today().replace(day=1))
+            f_fin = c_f3.date_input("Hasta:", date.today())
+            f_texto = c_f4.text_input("Buscar (Nombre/Concepto):")
             
-            # Convertir fechas a datetime para filtro
-            dt_start = datetime.combine(date_start, datetime.min.time())
-            dt_end = datetime.combine(date_end, datetime.max.time())
+            # LOGICA DE FILTRADO
+            dt_inicio = datetime.combine(f_inicio, datetime.min.time())
+            dt_fin = datetime.combine(f_fin, datetime.max.time())
             
-            # Consulta filtrada por fecha
-            query = db.collection("finanzas").where("fecha", ">=", dt_start).where("fecha", "<=", dt_end).order_by("fecha", direction=firestore.Query.DESCENDING)
+            query = db.collection("finanzas").where("fecha", ">=", dt_inicio).where("fecha", "<=", dt_fin).order_by("fecha", direction=firestore.Query.DESCENDING)
             docs = query.stream()
             
-            data_filtered = []
+            data_rep = []
+            tot_ing = 0.0
+            tot_egr = 0.0
+            
             for doc in docs:
                 d = doc.to_dict()
                 d['id'] = doc.id
-                # Filtro de texto en Python
-                s_term = search_text.lower()
-                match = (
-                    s_term in d.get('nombre_persona', '').lower() or 
-                    s_term in d.get('alumno_nie', '').lower() or 
-                    s_term in d.get('descripcion', '').lower() or
-                    s_term in d.get('id_short', '').lower()
-                )
-                if not search_text or match:
-                    data_filtered.append(d)
+                # Filtros Python (Texto y Tipo)
+                cumple_texto = (f_texto.lower() in d.get('nombre_persona','').lower() or f_texto.lower() in d.get('descripcion','').lower() or f_texto.lower() in d.get('id_short','').lower())
+                cumple_tipo = d['tipo'] in f_tipo
+                
+                if cumple_texto and cumple_tipo:
+                    data_rep.append(d)
+                    if d['tipo'] == 'ingreso': tot_ing += d['monto']
+                    elif d['tipo'] == 'egreso': tot_egr += d['monto']
             
-            # TABLA DE RESULTADOS
-            if data_filtered:
-                df_show = pd.DataFrame(data_filtered)
-                st.dataframe(df_show[['fecha_legible', 'id_short', 'tipo', 'nombre_persona', 'descripcion', 'monto']], use_container_width=True)
+            # TARJETAS
+            st.divider()
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Total Ingresos", f"${tot_ing:.2f}", border=True)
+            k2.metric("Total Egresos", f"${tot_egr:.2f}", delta_color="inverse", border=True)
+            k3.metric("Balance Periodo", f"${tot_ing - tot_egr:.2f}", border=True)
+            st.divider()
+
+            if data_rep:
+                df_rep = pd.DataFrame(data_rep)
+                st.dataframe(df_rep[['fecha_legible', 'tipo', 'nombre_persona', 'descripcion', 'monto']], use_container_width=True)
                 
-                st.divider()
-                st.markdown("#### 🖨️ Seleccionar para Reimprimir")
-                options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_filtered}
-                selection = st.selectbox("Seleccione el movimiento filtrado:", ["Seleccionar..."] + list(options.keys()))
-                
-                if selection != "Seleccionar...":
-                    r = options[selection]
-                    if st.button("Visualizar Comprobante Original"):
-                        logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                        color_b = "#333" if r['tipo'] == 'ingreso' else "#d32f2f"
-                        titulo = "COMPROBANTE DE INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE DE EGRESO"
-                        etiqueta1 = "RECIBIMOS DE:" if r['tipo'] == 'ingreso' else "PAGADO A:"
-                        etiqueta2 = "Entregado Por" if r['tipo'] == 'ingreso' else "Autorizado Por"
-                        etiqueta3 = "Recibido (Caja)" if r['tipo'] == 'ingreso' else "Recibido Conforme"
-                        
-                        html_reimp = f"""
-                        <div style="border: 2px solid {color_b}; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;">
-                            <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: {color_b};">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
-                            <hr>
-                            <div style="padding: 10px;">
-                                <p><b>{etiqueta1}</b> {r.get('nombre_persona','-')}</p>
-                                <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p>
-                                <p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p>
-                                <p><b>OBSERVACIONES:</b> {r.get('observaciones','')}</p>
+                # --- IMPRESIÓN REPORTE ---
+                if st.button("🖨️ Imprimir Reporte Detallado"):
+                    logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
+                    rows_html = ""
+                    for item in data_rep:
+                        color_row = "#e8f5e9" if item['tipo'] == 'ingreso' else "#ffebee"
+                        rows_html += f"<tr style='background:{color_row};'><td>{item['fecha_legible']}</td><td>{item.get('id_short','-')}</td><td>{item['nombre_persona']}</td><td>{item['descripcion']}</td><td align='right'>${item['monto']:.2f}</td></tr>"
+                    
+                    html_reporte = f"""
+                    <div style="font-family:Arial; padding:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:15px;">
+                                {hi}
+                                <div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">REPORTE FINANCIERO</p></div>
                             </div>
-                            <br><br>
-                            <table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta2}</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta3}</td></tr></table>
+                            <div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')} <b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div>
                         </div>
-                        """
-                        components.html(f"""<html><body>{html_reimp}<br><center><button onclick="window.print()">🖨️ REIMPRIMIR</button></center></body></html>""", height=500)
-            else:
-                st.warning("No se encontraron movimientos con esos criterios.")
+                        <br>
+                        <div style="display:flex; gap:20px; margin-bottom:20px;">
+                            <div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div>
+                            <div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div>
+                            <div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd">
+                            <tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Ref</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>
+                            {rows_html}
+                        </table>
+                        <br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div>
+                    </div>
+                    """
+                    components.html(f"""<html><body>{html_reporte}<br><center><button onclick="window.print()" style="background:#333; color:white; padding:10px 20px; cursor:pointer;">🖨️ IMPRIMIR REPORTE PDF</button></center></body></html>""", height=600, scrolling=True)
 
     # --- 7. CONFIGURACIÓN ---
     elif opcion_seleccionada == "Configuración":

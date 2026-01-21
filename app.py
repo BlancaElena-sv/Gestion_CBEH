@@ -113,7 +113,6 @@ MAPA_CURRICULAR = {
 }
 
 LISTA_GRADOS_TODO = list(MAPA_CURRICULAR.keys())
-# Grados que usan el sistema de notas numéricas (1º a 9º)
 LISTA_GRADOS_NOTAS = [g for g in LISTA_GRADOS_TODO if "Kinder" not in g and "Prepa" not in g]
 LISTA_MESES = ["Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre"]
 
@@ -165,19 +164,19 @@ with st.sidebar:
 # 5. CONTENIDO PRINCIPAL
 # ==========================================
 
-# --- INICIO (DASHBOARD NUEVO) ---
+# --- INICIO (DASHBOARD EDITABLE) ---
 if opcion == "Inicio":
     st.title("🍎 Tablero Institucional 2026")
     
     # 1. Métricas Clave
     c1, c2, c3 = st.columns(3)
-    c1.metric("Ciclo Escolar", "2026")
-    c2.metric("Usuario", st.session_state['user_name'])
+    c1.metric("Ciclo Lectivo", "2026")
+    c2.metric("Usuario Activo", st.session_state['user_name'])
     c3.metric("Rol", st.session_state['user_role'].upper())
     
     st.markdown("---")
     
-    # 2. Dashboard de Actividades (Solicitud Específica)
+    # 2. Dashboard de Actividades
     st.subheader("📅 Agenda de Actividades")
     
     col_izq, col_der = st.columns([1, 1])
@@ -185,7 +184,7 @@ if opcion == "Inicio":
     with col_izq:
         with st.container(border=True):
             st.markdown("### 📌 Estado Actual")
-            st.info("**PERIODO DE INSCRIPCIÓN**")
+            st.info("**PERIODO DE INSCRIPCIÓN**") # <--- EDITAR AQUÍ EL ESTADO
             st.markdown("""
             Actualmente el sistema está habilitado para:
             - Registro de nuevos estudiantes.
@@ -196,16 +195,19 @@ if opcion == "Inicio":
     with col_der:
         with st.container(border=True):
             st.markdown("### 🚀 Próximo Evento Importante")
-            st.success("**INICIO DE CLASES**")
-            st.metric("Fecha Programada", "19 de Enero", "2026")
+            st.success("**INICIO DE CLASES**") # <--- EDITAR AQUÍ EL TÍTULO DEL EVENTO
+            # AQUÍ ES DONDE CAMBIAS LA FECHA (EN EL SEGUNDO PARÁMETRO)
+            st.metric("Fecha Programada", "26 de Enero", "2026") 
             st.markdown("Todo el personal docente y administrativo debe estar preparado para recibir a los estudiantes.")
 
-    # 3. Cronograma Rápido (Tabla simple alimentada por ti)
+    # 3. Cronograma (Tabla Editable aquí mismo en el código)
     st.markdown("### 🗓️ Cronograma Enero 2026")
+    
+    # <--- EDITA ESTA LISTA PARA CAMBIAR LA TABLA DE ACTIVIDADES
     cronograma_data = [
-        {"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"},
-        {"Fecha": "15 Ene", "Actividad": "Reunión de Personal Docente", "Estado": "Pendiente"},
-        {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"},
+        {"Fecha": "02 Ene - 25 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"},
+        {"Fecha": "15 Ene", "Actividad": "Reunión de Personal Docente", "Estado": "Finalizado"},
+        {"Fecha": "26 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"}, # <--- FECHA CORREGIDA
         {"Fecha": "30 Ene", "Actividad": "Entrega de Planificaciones", "Estado": "Pendiente"}
     ]
     st.table(pd.DataFrame(cronograma_data))
@@ -244,7 +246,7 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
                     })
                     st.success("Guardado")
 
-    # --- MAESTROS (CARGA ACADÉMICA MEJORADA) ---
+    # --- MAESTROS (CARGA ACADÉMICA) ---
     elif opcion == "Maestros":
         st.title("👩‍🏫 Gestión Docente")
         t1, t2, t3 = st.tabs(["Registro", "Asignar Carga 2026", "Admin Cargas"])
@@ -324,6 +326,7 @@ if st.session_state["user_role"] == "admin" and opcion != "Inicio":
                 if not nm: st.warning("Sin notas")
                 else:
                     filas = []
+                    # Usar la malla correcta
                     malla = MAPA_CURRICULAR.get(a['grado_actual'], [])
                     for mat in malla:
                         if mat in nm:

@@ -144,7 +144,7 @@ with st.sidebar:
     
     if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada
     if st.session_state.last_page != opcion_seleccionada:
-        keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum", "prof_view", "sel_prof_idx", "edit_prof_mode"]
+        keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum", "prof_view", "sel_prof_idx", "edit_prof_mode", "gasto_temp"]
         for key in keys_to_clear:
             if key in st.session_state: del st.session_state[key]
         st.session_state.last_page = opcion_seleccionada
@@ -298,19 +298,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         if sel_recibo != "Seleccionar...":
                             p_obj = opciones_recibo[sel_recibo]
                             if st.button("Visualizar Recibo"):
+                                col = "#2e7d32"
                                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                                html_recibo = f"""
-                                <div style="border:2px solid black;padding:20px;font-family:Arial;max-width:700px;margin:auto;">
-                                    <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:0;font-size:12px;">San Felipe, Ilopango</p><p><b>COMPROBANTE DE INGRESO (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0;color:red;">NO VALIDO</h4><p>{p_obj['fecha_legible']}</p></td></tr></table>
-                                    <hr>
-                                    <p><b>RECIBIMOS DE:</b> {p_obj.get('nombre_persona')}</p>
-                                    <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px;">${p_obj['monto']:.2f}</span></p>
-                                    <p><b>POR CONCEPTO DE:</b> {p_obj['descripcion']}</p>
-                                    <br><br>
-                                    <table width="100%"><tr><td align="center" style="border-top:1px solid black;">Entregado Por</td><td width="10%"></td><td align="center" style="border-top:1px solid black;">Recibido Caja</td></tr></table>
-                                </div>
-                                """
-                                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR</button></center></body></html>""", height=450, scrolling=True)
+                                html_recibo = f"""<div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:700px;margin:auto;"><div style="background:{col};color:white;padding:15px;display:flex;justify-content:space-between;"><div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3><p style="margin:0;font-size:12px;">COPIA DE RECIBO</p></div></div><h4>RECIBO DE INGRESO</h4></div><div style="padding:20px;"><p><b>Fecha:</b> {p_obj['fecha_legible']}</p><p><b>Alumno:</b> {p_obj.get('nombre_persona')}</p><p><b>Concepto:</b> {p_obj['descripcion']}</p><p><b>Detalle:</b> {p_obj.get('observaciones','-')}</p><h1 style="text-align:right;color:{col};">${p_obj['monto']:.2f}</h1></div></div>"""
+                                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()" style="background:green;color:white;padding:10px;">🖨️ IMPRIMIR COPIA</button></center></body></html>""", height=400, scrolling=True)
                     else: st.info("Sin pagos registrados.")
                 with col_fin2:
                     st.markdown("### 🎫 Solvencia")
@@ -396,7 +387,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         db.collection("alumnos").document(a['nie']).update(update_data)
                         st.success("Expediente actualizado."); time.sleep(1); st.rerun()
 
-    # --- 4. MAESTROS (ROBUSTO) ---
+    # --- 4. MAESTROS ---
     elif opcion_seleccionada == "Maestros":
         st.title("👩‍🏫 Gestión Docente Pro")
         docs_m = db.collection("maestros_perfil").stream()
@@ -477,7 +468,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         st.markdown("#### Asignar Nueva Materia")
                         g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
                         mats_disp = MAPA_CURRICULAR.get(g_sel, [])
-                        
                         with st.form("add_carga_prof"):
                             st.write(f"Asignando a **{g_sel}**")
                             m_sel = st.multiselect("Seleccionar Materias", mats_disp)
@@ -527,7 +517,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     else: st.info("No hay historial financiero.")
             except Exception as e: st.error("Seleccione un docente.")
 
-    # --- 5. NOTAS (ADMIN Y VISUALIZACIÓN) ---
+    # --- 5. NOTAS ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Admin Notas (Vista Global)")
         c_sel_n1, c_sel_n2, c_sel_n3 = st.columns(3)
@@ -570,7 +560,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     batch.commit()
                     st.success("Guardado por Admin")
                 
-                # --- VISUALIZACIÓN DETALLADA ---
                 st.divider()
                 st.subheader(f"📋 Registro Acumulado Detallado - {m}")
                 rows_acumulados = []
@@ -598,7 +587,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
         
-        # PESTAÑAS
         t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Historial & Reportes"])
 
         # 1. DASHBOARD
@@ -619,12 +607,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     elif d['tipo'] == 'egreso': egreso_dia += d['monto']
             
             saldo_dia = ingreso_dia - egreso_dia
-            
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric("Ingresos del Día", f"${ingreso_dia:.2f}", delta_color="normal")
             kpi2.metric("Gastos del Día", f"${egreso_dia:.2f}", delta_color="inverse")
             kpi3.metric("Saldo Neto", f"${saldo_dia:.2f}")
-            
             st.divider()
             st.subheader(f"Libro Diario - {fecha_str}")
             if data_hoy:
@@ -636,7 +622,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     components.html(f"""<html><body>{html_corte}<br><center><button onclick="window.print()">IMPRIMIR</button></center></body></html>""", height=400)
             else: st.info("No hay movimientos registrados hoy.")
 
-        # 2. COBROS (ALUMNOS)
+        # 2. COBROS
         with t_ingreso:
             n = st.text_input("Buscar NIE del Alumno para Cobro:")
             if st.button("Buscar Alumno") and n:
@@ -657,8 +643,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         recibo_data = {
                             "tipo": "ingreso", "descripcion": concepto_full, "monto": monto,
                             "alumno_nie": pa['nie'], "nombre_persona": pa['nombre_completo'],
-                            "observaciones": obs,
-                            "fecha": firestore.SERVER_TIMESTAMP,
+                            "observaciones": obs, "fecha": firestore.SERVER_TIMESTAMP,
                             "fecha_legible": datetime.now().strftime("%d/%m/%Y"),
                             "id_short": str(int(time.time()))[-6:]
                         }
@@ -668,31 +653,15 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         del st.session_state.pago_alum
                         st.rerun()
             
-            # IMPRESION FORMAL INGRESO
             if "recibo_temp" in st.session_state:
                 r = st.session_state.recibo_temp
                 st.success("¡Pago Registrado! Imprima el comprobante:")
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                html_recibo = f"""
-                <div style="border: 2px solid #333; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;">
-                    <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE INGRESO</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
-                    <hr>
-                    <div style="padding: 10px;">
-                        <p><b>RECIBIMOS DE:</b> {r['nombre_persona']}</p>
-                        <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p>
-                        <p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p>
-                        <p><b>OBSERVACIONES:</b> {r['observaciones']}</p>
-                    </div>
-                    <br><br>
-                    <table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Entregado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido (Caja)</td></tr></table>
-                </div>
-                """
+                html_recibo = f"""<div style="border: 2px solid #333; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE INGRESO</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>RECIBIMOS DE:</b> {r['nombre_persona']}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p><p><b>OBSERVACIONES:</b> {r['observaciones']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Entregado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido (Caja)</td></tr></table></div>"""
                 components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
-                if st.button("Cerrar Comprobante"):
-                    del st.session_state.recibo_temp
-                    st.rerun()
+                if st.button("Cerrar Comprobante"): del st.session_state.recibo_temp; st.rerun()
 
-        # 3. GASTOS (FORMALES)
+        # 3. GASTOS
         with t_egreso:
             st.subheader("Registro de Gastos Operativos")
             with st.form("form_gasto"):
@@ -701,56 +670,66 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 det_g = c2.text_input("Detalle (Ej: Recibo Luz del Sur)")
                 monto_g = c1.number_input("Monto ($)", min_value=0.01)
                 beneficiario = c2.text_input("Pagado a (Nombre/Empresa)")
-                
                 if st.form_submit_button("🔴 Registrar Salida"):
                     concepto_full = f"{tipo_g} - {det_g}" if det_g else tipo_g
                     gasto_data = {
-                        "tipo": "egreso", "descripcion": concepto_full, 
-                        "monto": monto_g, "nombre_persona": beneficiario,
-                        "fecha": firestore.SERVER_TIMESTAMP,
-                        "fecha_legible": datetime.now().strftime("%d/%m/%Y"),
+                        "tipo": "egreso", "descripcion": concepto_full, "monto": monto_g, "nombre_persona": beneficiario,
+                        "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"),
                         "id_short": str(int(time.time()))[-6:]
                     }
                     db.collection("finanzas").add(gasto_data)
                     st.session_state.gasto_temp = gasto_data
-                    st.success("Gasto registrado correctamente.")
+                    st.success("Gasto registrado.")
                     st.rerun()
 
-            # IMPRESION FORMAL GASTO
             if "gasto_temp" in st.session_state:
                 r = st.session_state.gasto_temp
                 st.warning("Gasto registrado. Imprima el comprobante:")
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                html_gasto = f"""
-                <div style="border: 2px solid #d32f2f; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;">
-                    <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE EGRESO (GASTO)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
-                    <hr>
-                    <div style="padding: 10px;">
-                        <p><b>PAGADO A:</b> {r['nombre_persona']}</p>
-                        <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p>
-                        <p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p>
-                    </div>
-                    <br><br>
-                    <table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Autorizado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido Conforme</td></tr></table>
-                </div>
-                """
+                html_gasto = f"""<div style="border: 2px solid #d32f2f; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE EGRESO (GASTO)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>PAGADO A:</b> {r['nombre_persona']}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Autorizado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido Conforme</td></tr></table></div>"""
                 components.html(f"""<html><body>{html_gasto}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
-                if st.button("Cerrar Comprobante Gasto"):
-                    del st.session_state.gasto_temp
-                    st.rerun()
+                if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
-        # 4. HISTORIAL
+        # 4. HISTORIAL CON REIMPRESIÓN
         with t_rep:
-            st.subheader("Historial Completo")
-            cf1, cf2 = st.columns(2)
-            f_tipo = cf1.multiselect("Filtrar por Tipo:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
+            st.subheader("Historial y Reimpresión")
             docs_hist = db.collection("finanzas").order_by("fecha", direction=firestore.Query.DESCENDING).limit(50).stream()
-            data_hist = [{"Fecha": d.to_dict().get('fecha_legible'), "Tipo": d.to_dict().get('tipo'), "Descripción": d.to_dict().get('descripcion'), "Monto": d.to_dict().get('monto'), "Responsable": d.to_dict().get('nombre_persona')} for d in docs_hist]
-            if data_hist:
-                df_hist = pd.DataFrame(data_hist)
-                if f_tipo: df_hist = df_hist[df_hist['Tipo'].isin(f_tipo)]
-                st.dataframe(df_hist, use_container_width=True)
-            else: st.info("Sin registros recientes.")
+            data_raw = [{"id": d.id, **d.to_dict()} for d in docs_hist]
+            
+            if data_raw:
+                st.dataframe(pd.DataFrame(data_raw)[['fecha_legible', 'tipo', 'descripcion', 'monto']], use_container_width=True)
+                st.write("---")
+                st.markdown("#### 🔄 Reimpresión de Comprobantes")
+                # Selector de transacción
+                opciones = {f"{d['fecha_legible']} | {d['tipo'].upper()} | ${d['monto']} | {d.get('descripcion')}": d for d in data_raw}
+                sel = st.selectbox("Seleccione transacción para reimprimir:", ["Seleccionar..."] + list(opciones.keys()))
+                
+                if sel != "Seleccionar...":
+                    r = opciones[sel]
+                    if st.button("visualizar Comprobante Original"):
+                        logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                        color_b = "#333" if r['tipo'] == 'ingreso' else "#d32f2f"
+                        titulo = "COMPROBANTE DE INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE DE EGRESO"
+                        etiqueta1 = "RECIBIMOS DE:" if r['tipo'] == 'ingreso' else "PAGADO A:"
+                        etiqueta2 = "Entregado Por" if r['tipo'] == 'ingreso' else "Autorizado Por"
+                        etiqueta3 = "Recibido (Caja)" if r['tipo'] == 'ingreso' else "Recibido Conforme"
+                        
+                        html_reimp = f"""
+                        <div style="border: 2px solid {color_b}; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;">
+                            <table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table>
+                            <hr>
+                            <div style="padding: 10px;">
+                                <p><b>{etiqueta1}</b> {r.get('nombre_persona','-')}</p>
+                                <p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p>
+                                <p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p>
+                                <p><b>OBSERVACIONES:</b> {r.get('observaciones','')}</p>
+                            </div>
+                            <br><br>
+                            <table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta2}</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta3}</td></tr></table>
+                        </div>
+                        """
+                        components.html(f"""<html><body>{html_reimp}<br><center><button onclick="window.print()">🖨️ REIMPRIMIR</button></center></body></html>""", height=500)
+            else: st.info("No hay historial disponible.")
 
     # --- 7. CONFIGURACIÓN ---
     elif opcion_seleccionada == "Configuración":

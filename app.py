@@ -142,7 +142,6 @@ with st.sidebar:
     else:
         opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Cargar Notas", "Ver Mis Cargas"])
     
-    # Limpieza de sesión
     if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada
     if st.session_state.last_page != opcion_seleccionada:
         keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum", "prof_view", "sel_prof_idx", "edit_prof_mode"]
@@ -318,6 +317,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                             html = f"""<div style="font-family:monospace;width:300px;margin:auto;padding:10px;border:1px dashed black;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;">{hi}<b>COLEGIO BLANCA ELENA</b></div><h4 style="background:black;color:white;margin:5px 0;">SOLVENCIA EXAMEN</h4><div style="text-align:left;font-size:11px;"><b>ALUMNO:</b> {a['nombre_completo']}<br><b>NIE:</b> {a['nie']}<br><b>PERIODO:</b> {periodo}<br><b>ESTADO:</b> SOLVENTE ✅</div><br><table border="1" style="width:100%;font-size:10px;border-collapse:collapse;text-align:center;"><tr><td>LUN</td><td>MAR</td><td>MIE</td><td>JUE</td><td>VIE</td></tr><tr><td height="30"></td><td></td><td></td><td></td><td></td></tr></table><br><span style="font-size:9px;">Fecha: {fecha}</span></div>"""
                             components.html(f"""<html><body>{html}<br><center><button onclick="window.print()">🖨️ IMPRIMIR</button></center><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=350)
 
+            # --- 3. BOLETA (CON SELLO) ---
             with tabs[2]:
                 st.subheader("Boleta Oficial")
                 notas = db.collection("notas").where("nie", "==", a['nie']).stream()
@@ -338,8 +338,22 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                             t3 = redondear_mined((n.get("Agosto",0)+n.get("Septiembre",0)+n.get("Octubre",0))/3)
                             fin = redondear_mined((t1+t2+t3)/3)
                             filas.append(f"<tr><td style='text-align:left'>{mat}</td><td>{n.get('Febrero','-')}</td><td>{n.get('Marzo','-')}</td><td>{n.get('Abril','-')}</td><td style='background:#eee'><b>{t1}</b></td><td>{n.get('Mayo','-')}</td><td>{n.get('Junio','-')}</td><td>{n.get('Julio','-')}</td><td style='background:#eee'><b>{t2}</b></td><td>{n.get('Agosto','-')}</td><td>{n.get('Septiembre','-')}</td><td>{n.get('Octubre','-')}</td><td style='background:#eee'><b>{t3}</b></td><td style='background:#333;color:white'><b>{fin}</b></td></tr>")
+                    
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                    html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><div style='display:flex;justify-content:space-between;text-align:center;padding:0 50px;'><div style='border-top:1px solid black;width:30%'>Orientador</div><div style='border-top:1px solid black;width:30%'>Dirección</div></div></div>"""
+                    sello = get_base64("sello.png"); hs = f'<img src="{sello}" height="80">' if sello else ""
+                    
+                    html = f"""
+                    <div style='font-family:Arial;font-size:12px;padding:20px;'>
+                        <div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div>
+                        <p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p>
+                        <table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table>
+                        <br><br><br>
+                        <div style='display:flex;justify-content:space-between;align-items:end;padding:0 50px;'>
+                            <div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Orientador</div></div>
+                            <div style='text-align:center;'>{hs}</div>
+                            <div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Dirección</div></div>
+                        </div>
+                    </div>"""
                     components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
             with tabs[3]:
@@ -498,11 +512,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 })
                                 st.success("Registrado"); time.sleep(0.5); st.rerun()
                     
-                    # CONSULTA CORREGIDA (SIN ORDER_BY COMPUESTO)
+                    # CONSULTA CORREGIDA
                     movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
                     lista_movs = [m.to_dict() for m in movs]
-                    # Ordenar en Python
-                    lista_movs.sort(key=lambda x: x.get('fecha', 0), reverse=True) # Requiere que 'fecha' sea sortable o usar fecha_legible
+                    lista_movs.sort(key=lambda x: x.get('fecha', 0), reverse=True)
                     
                     if lista_movs:
                         data_show = [{"Fecha": m.get('fecha_legible','-'), "Descripción": m.get('descripcion','-'), "Monto": m.get('monto',0)} for m in lista_movs]
@@ -511,14 +524,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             except Exception as e:
                 st.error("Seleccione un docente para ver detalles.")
 
-    # --- 5. NOTAS ---
+    # --- 5. NOTAS (ADMIN Y VISUALIZACIÓN) ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Admin Notas (Vista Global)")
-        # SELECTORES FUERA DEL FORMULARIO PARA DINAMISMO
+        # SELECTORES FUERA DEL FORMULARIO
         c_sel_n1, c_sel_n2, c_sel_n3 = st.columns(3)
         g = c_sel_n1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
-        
-        # Dinámico
         mats_pos = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
         m = c_sel_n2.selectbox("Materia", ["Select..."] + mats_pos)
         mes = c_sel_n3.selectbox("Mes", LISTA_MESES)
@@ -544,7 +555,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 # Editor
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
                 
-                # Botón Guardar
                 if st.button("Guardar Notas"):
                     batch = db.batch()
                     detalles = {}
@@ -558,6 +568,30 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
                     st.success("Guardado por Admin")
+                
+                # --- VISUALIZACIÓN ACUMULADA (NUEVO) ---
+                st.divider()
+                st.subheader(f"📋 Registro Acumulado - {m}")
+                # Recuperar todas las notas de esta materia y grado
+                all_notes = db.collection("notas").where("grado", "==", g).where("materia", "==", m).stream()
+                data_acc = []
+                for n in all_notes:
+                    d = n.to_dict()
+                    # Necesitamos cruzar con el nombre, que no siempre está en el documento 'notas' (solo NIE)
+                    # Optimizacion: Usar el diccionario 'lista' que ya tenemos cargado arriba
+                    nombre_alum = next((x['Nombre'] for x in lista if x['NIE'] == d['nie']), d['nie'])
+                    data_acc.append({"Nombre": nombre_alum, "Mes": d['mes'], "Nota": d['promedio_final']})
+                
+                if data_acc:
+                    df_acc = pd.DataFrame(data_acc)
+                    # Pivotar: Filas=Nombre, Columnas=Mes, Valor=Nota
+                    pivot = df_acc.pivot_table(index="Nombre", columns="Mes", values="Nota", aggfunc='first')
+                    # Reordenar columnas de meses si es posible
+                    cols_present = [mes for mes in LISTA_MESES if mes in pivot.columns]
+                    pivot = pivot[cols_present]
+                    st.dataframe(pivot, use_container_width=True)
+                else:
+                    st.info("Aún no hay registros históricos para esta materia.")
 
     # --- 6. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
@@ -631,7 +665,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
 
     elif opcion_seleccionada == "Cargar Notas":
         st.title("📝 Registro de Notas")
-        # SELECTORES LIBRES
+        # IGUAL QUE ADMIN PERO SOLO PARA DOCENTE
         c_d1, c_d2, c_d3 = st.columns(3)
         g = c_d1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
         mats = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
@@ -671,6 +705,22 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
                     st.success("Guardado")
+                
+                # Visualización acumulada para docente también
+                st.divider()
+                st.subheader(f"📋 Registro Acumulado - {m}")
+                all_notes = db.collection("notas").where("grado", "==", g).where("materia", "==", m).stream()
+                data_acc = []
+                for n in all_notes:
+                    d = n.to_dict()
+                    nombre_alum = next((x['Nombre'] for x in lista if x['NIE'] == d['nie']), d['nie'])
+                    data_acc.append({"Nombre": nombre_alum, "Mes": d['mes'], "Nota": d['promedio_final']})
+                if data_acc:
+                    df_acc = pd.DataFrame(data_acc)
+                    pivot = df_acc.pivot_table(index="Nombre", columns="Mes", values="Nota", aggfunc='first')
+                    cols_present = [mes for mes in LISTA_MESES if mes in pivot.columns]
+                    pivot = pivot[cols_present]
+                    st.dataframe(pivot, use_container_width=True)
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")

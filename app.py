@@ -59,8 +59,11 @@ if "user_id" not in st.session_state: st.session_state["user_id"] = None
 def login():
     col_izq, col_centro, col_der = st.columns([1, 2, 1])
     with col_centro:
-        try: st.image("logo.png", width=180) 
-        except: st.warning("⚠️")
+        try: 
+            st.image("logo.png", width=180) 
+        except: 
+            st.warning("⚠️")
+            
         st.markdown("<h1 style='text-align: left; color: #1E3A8A;'>EduManager</h1>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: left; color: #555;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
         st.write("") 
@@ -126,7 +129,7 @@ LISTA_GRADOS_NOTAS = [g for g in LISTA_GRADOS_TODO if "Kinder" not in g and "Pre
 LISTA_MESES = ["Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre"]
 
 # ==========================================
-# 3. FUNCIONES AUXILIARES & VALIDACIONES
+# 3. FUNCIONES AUXILIARES
 # ==========================================
 def subir_archivo(archivo, ruta):
     if not archivo or not db: return None
@@ -138,9 +141,14 @@ def subir_archivo(archivo, ruta):
         return blob.public_url
     except: return None
 
+# --- FUNCIÓN CORREGIDA (SINTAXIS EXPANDIDA) ---
 def get_base64(path):
-    try: with open(path, "rb") as f: return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
-    except: return ""
+    try:
+        with open(path, "rb") as f:
+            return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+    except:
+        return ""
+# ---------------------------------------------
 
 def redondear_mined(valor):
     if valor is None: return 0.0
@@ -158,27 +166,16 @@ def borrar_coleccion(coll_name, batch_size=10):
         deleted += 1
     if deleted >= batch_size: return borrar_coleccion(coll_name, batch_size)
 
-# --- FUNCIÓN CRÍTICA: DETECTOR DE DUPLICADOS ---
 def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
-    # Verifica si existe una transacción con el mismo ID, misma descripción HOY (para evitar doble clic)
-    # y en general si es el mismo concepto.
-    
-    # 1. Filtramos por el ID (alumno o maestro) y la descripción exacta
     docs = db.collection(coleccion).where(campo_id, "==", id_valor).where("descripcion", "==", descripcion).stream()
-    
     hoy = date.today()
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
         if fecha_db:
-            # Convertir a objeto date para comparar
             if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
-            
-            # Si la fecha es de HOY, es un duplicado seguro (doble clic)
-            # O si es el mismo mes y es un pago mensual (lógica opcional, aquí estricto por día)
-            if f_obj == hoy:
-                return True
+            if f_obj == hoy: return True
     return False
 
 # ==========================================
@@ -302,10 +299,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     else: st.error("No existe")
             else:
                 g = st.selectbox("Filtrar Grado", ["Todos"] + LISTA_GRADOS_TODO)
-                if g != "Todos":
-                    res = [d.to_dict() for d in db.collection("alumnos").where("grado_actual", "==", g).stream()]
-                else:
-                    res = [d.to_dict() for d in db.collection("alumnos").limit(20).stream()]
+                q = db.collection("alumnos")
+                if g != "Todos": q = q.where("grado_actual", "==", g)
+                res = [d.to_dict() for d in q.stream()]
                 sel = st.selectbox("Seleccionar Alumno", ["Seleccionar..."] + [f"{r['nie']} - {r['nombre_completo']}" for r in res])
                 if sel != "Seleccionar...":
                     nie_sel = sel.split(" - ")[0]
@@ -331,33 +327,51 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     color = "green" if est == "Activo" else "red"
                     st.markdown(f"<h3 style='color:{color};text-align:center;border:2px solid {color};padding:5px;border-radius:10px;'>{est.upper()}</h3>", unsafe_allow_html=True)
 
-            tabs = st.tabs(["📋 Datos", "💰 Solvencia", "📊 Boleta", "⚙️ Edición"])
-
+            tabs = st.tabs(["📋 Datos y Documentos", "💰 Historial y Solvencia", "📊 Boleta de Notas", "⚙️ Edición Expediente"])
+            
             with tabs[0]:
-                st.write(f"**Responsable:** {a.get('encargado',{}).get('nombre')}")
-                st.write(f"**Teléfono:** {a.get('encargado',{}).get('telefono')}")
-                st.subheader("📂 Documentos")
-                docs = a.get('documentos',{}).get('doc_urls', [])
-                if a.get('documentos',{}).get('doc_url'): docs.append(a.get('documentos',{}).get('doc_url'))
-                if docs:
-                    for i, url in enumerate(list(set(docs))):
-                        with st.expander(f"👁️ Visualizar Documento {i+1}"):
-                            g_view = f"https://docs.google.com/gview?embedded=true&url={url}"
-                            st.markdown(f'<iframe src="{g_view}" width="100%" height="500px" style="border:none;"></iframe>', unsafe_allow_html=True)
-                            st.caption(f"[Enlace Directo]({url})")
-                else: st.info("Sin documentos.")
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    st.subheader("Datos Personales")
+                    st.write(f"**Responsable:** {a.get('encargado',{}).get('nombre')}")
+                    st.write(f"**Teléfono:** {a.get('encargado',{}).get('telefono')}")
+                    st.write(f"**Dirección:** {a.get('encargado',{}).get('direccion')}")
+                with col_d2:
+                    st.subheader("📂 Documentos")
+                    docs = a.get('documentos',{}).get('doc_urls', [])
+                    if a.get('documentos',{}).get('doc_url'): docs.append(a.get('documentos',{}).get('doc_url'))
+                    if docs:
+                        for i, url in enumerate(list(set(docs))):
+                            with st.expander(f"👁️ Visualizar Documento {i+1}"):
+                                g_view = f"https://docs.google.com/gview?embedded=true&url={url}"
+                                st.markdown(f'<iframe src="{g_view}" width="100%" height="500px" style="border:none;"></iframe>', unsafe_allow_html=True)
+                                st.caption(f"[Enlace Directo]({url})")
+                    else: st.info("Sin documentos.")
 
             with tabs[1]:
-                st.subheader("Estado de Cuenta")
-                pagos = db.collection("finanzas").where("alumno_nie", "==", a['nie']).where("tipo", "==", "ingreso").stream()
-                raw_pagos = [{"id": p.id, **p.to_dict()} for p in pagos]
-                if raw_pagos:
-                    st.dataframe(pd.DataFrame(raw_pagos)[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
-                else: st.info("Sin pagos.")
-                periodo = st.selectbox("Periodo Solvencia:", ["I Trimestre", "II Trimestre", "III Trimestre", "Final"])
-                if st.button("Generar Taco"):
-                    if not raw_pagos: st.error("No tiene pagos registrados.")
-                    else:
+                col_fin1, col_fin2 = st.columns([2,1])
+                with col_fin1:
+                    st.subheader("Historial de Pagos")
+                    pagos = db.collection("finanzas").where("alumno_nie", "==", a['nie']).where("tipo", "==", "ingreso").stream()
+                    raw_pagos = [{"id": p.id, **p.to_dict()} for p in pagos]
+                    if raw_pagos:
+                        df_pagos = pd.DataFrame(raw_pagos)
+                        st.dataframe(df_pagos[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
+                        st.write("---")
+                        st.write("**🖨️ Reimprimir Recibo Histórico**")
+                        opciones_recibo = {f"{p['fecha_legible']} - {p['descripcion']} (${p['monto']})": p for p in raw_pagos}
+                        sel_recibo = st.selectbox("Seleccione un pago:", ["Seleccionar..."] + list(opciones_recibo.keys()))
+                        if sel_recibo != "Seleccionar...":
+                            p_obj = opciones_recibo[sel_recibo]
+                            if st.button("Visualizar Recibo"):
+                                logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                                html_recibo = f"""<div style="border: 2px solid #333; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE INGRESO (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {p_obj.get('id_short','000')}</h4><p style="font-size:12px;">{p_obj['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>RECIBIMOS DE:</b> {p_obj.get('nombre_persona')}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${p_obj['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {p_obj['descripcion']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Entregado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido (Caja)</td></tr></table></div>"""
+                                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COPIA</button></center></body></html>""", height=400, scrolling=True)
+                    else: st.info("Sin pagos registrados.")
+                with col_fin2:
+                    st.markdown("### 🎫 Solvencia")
+                    periodo = st.selectbox("Examen:", ["I Trimestre", "II Trimestre", "III Trimestre", "Final"])
+                    if st.button("Generar Taco"):
                         fecha = datetime.now().strftime("%d/%m/%Y")
                         logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="40">' if logo else ""
                         html = f"""<div style="font-family:monospace;width:300px;margin:auto;padding:10px;border:1px dashed black;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;">{hi}<b>COLEGIO BLANCA ELENA</b></div><h4 style="background:black;color:white;margin:5px 0;">SOLVENCIA EXAMEN</h4><div style="text-align:left;font-size:11px;"><b>ALUMNO:</b> {a['nombre_completo']}<br><b>NIE:</b> {a['nie']}<br><b>PERIODO:</b> {periodo}<br><b>ESTADO:</b> SOLVENTE ✅</div><br><table border="1" style="width:100%;font-size:10px;border-collapse:collapse;text-align:center;"><tr><td>LUN</td><td>MAR</td><td>MIE</td><td>JUE</td><td>VIE</td></tr><tr><td height="30"></td><td></td><td></td><td></td><td></td></tr></table><br><span style="font-size:9px;">Fecha: {fecha}</span></div>"""
@@ -474,7 +488,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 db.collection("maestros_perfil").document(pid).update(upd)
                                 st.session_state.edit_prof_mode = False
                                 st.success("Actualizado"); time.sleep(1); st.rerun()
-                    
                     tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
                     with tabs_m[0]:
                         c_asig, c_tabla = st.columns([1, 2])
@@ -497,7 +510,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                     st.write(", ".join(cd['materias']))
                                     if st.button("Eliminar", key=c.id):
                                         db.collection("carga_academica").document(c.id).delete(); st.rerun()
-                    
                     with tabs_m[1]:
                         with st.expander("➕ Registrar Movimiento"):
                             with st.form("ffin"):
@@ -505,9 +517,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 monto = st.number_input("Monto", min_value=0.01)
                                 desc = st.text_input("Detalle")
                                 if st.form_submit_button("Registrar"):
-                                    # CHECK ANTI DUPLICADOS PARA MAESTRO
+                                    # CHECK DUPLICADOS MAESTRO
                                     if existe_duplicado("finanzas", "docente_id", pid, f"{tipo} - {desc}"):
-                                        st.error("⛔ Transacción duplicada detectada (Mismo maestro, mismo concepto, hoy).")
+                                        st.error("⛔ Transacción duplicada.")
                                     else:
                                         db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'], "descripcion": f"{tipo} - {desc}", "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
                                         st.success("Registrado")
@@ -518,9 +530,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         else: st.info("Sin historial.")
                 except Exception as e: st.error(f"Error cargando docente: {e}")
 
-    # --- 5. ASISTENCIA GLOBAL ---
+    # --- 5. ASISTENCIA GLOBAL (INTEGRADO) ---
     elif opcion_seleccionada == "Asistencia Global":
-        st.title("📅 Reporte de Asistencia")
+        st.title("📅 Reporte de Asistencia Global")
         c1, c2 = st.columns(2)
         g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
         m = c2.date_input("Mes", date.today())
@@ -536,8 +548,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 data_doc = d.to_dict()
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                # Manejar fecha
-                if isinstance(fecha_doc, datetime): f_mes = fecha_doc.month
+                if hasattr(fecha_doc, 'month'): f_mes = fecha_doc.month
                 else: f_mes = datetime.fromtimestamp(fecha_doc.timestamp()).month
                 if f_mes == target_month:
                     total_dias += 1
@@ -551,12 +562,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 st.dataframe(pd.DataFrame(data), use_container_width=True)
             else: st.info("No hay tomas de asistencia registradas para este mes.")
 
-    # --- 6. NOTAS (CALCULO INSTANTANEO) ---
+    # --- 6. NOTAS (CALCULO AUTOMATICO) ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Admin Notas")
         c1, c2, c3 = st.columns(3)
         g = c1.selectbox("Grado", ["Select..."]+LISTA_GRADOS_NOTAS)
-        mp = MAPA_CURRICULAR.get(g,[]) if g!="Select...": []
+        mp = MAPA_CURRICULAR.get(g,[]) if g!="Select..." else []
         m = c2.selectbox("Materia", ["Select..."]+mp)
         mes = c3.selectbox("Mes", LISTA_MESES)
         
@@ -569,19 +580,18 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 id_doc = f"{g}_{m}_{mes}".replace(" ","_")
                 cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
                 doc_ref = db.collection("notas_mensuales").document(id_doc).get()
-                
                 if doc_ref.exists:
                     dd = doc_ref.to_dict().get('detalles', {})
                     for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
                 else:
                     for c in cols: df[c] = 0.0
                 
-                # CALCULO
                 if m == "Conducta": df["Promedio"] = df[cols[0]]
                 else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + df["Examen (30%)"]*0.30).apply(redondear_mined)
 
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
+                
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
                 if st.button("Guardar"):
                     batch = db.batch()
@@ -619,7 +629,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
                     st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
-    # --- 7. FINANZAS (CON PESTAÑAS, SIN ERRORES Y CON VALIDACIÓN) ---
+    # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
         t1, t2, t3, t4 = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Reportes & Reimpresión"])
@@ -669,7 +679,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     monto = st.number_input("Monto ($)", min_value=0.01)
                     obs = st.text_input("Observaciones")
                     if st.form_submit_button("✅ Registrar Ingreso"):
-                        # CHECK ANTI DUPLICADOS ALUMNO
                         desc_full = f"{tipo_c} - {det_c}"
                         if existe_duplicado("finanzas", "alumno_nie", n, desc_full):
                             st.error("⛔ Transacción duplicada (Mismo alumno, mismo concepto hoy).")
@@ -690,11 +699,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         with t3:
             with st.form("fg"):
                 tp = st.selectbox("Gasto", ["Salario", "Servicios", "Mantenimiento", "Otros"])
-                # LÓGICA VINCULACIÓN MAESTROS EN GASTOS
+                # LOGICA MAESTROS
                 maestro_seleccionado = None
                 per = ""
                 if tp == "Salario":
-                    # Cargar maestros para vincular ID
                     ms = db.collection("maestros_perfil").stream()
                     l_ms = {m.to_dict()['nombre']: m.id for m in ms}
                     nom_sel = st.selectbox("Seleccionar Maestro:", list(l_ms.keys()))
@@ -704,20 +712,16 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 
                 mt = st.number_input("Monto", min_value=0.01)
                 det_g = st.text_input("Detalle")
-                
                 if st.form_submit_button("Registrar"):
                     desc_full = f"{tp} - {det_g}"
-                    # CHECK ANTI DUPLICADOS GASTO
                     duplicado = False
                     if tp == "Salario" and maestro_seleccionado:
                         if existe_duplicado("finanzas", "docente_id", maestro_seleccionado, desc_full): duplicado = True
                     
-                    if duplicado:
-                        st.error("⛔ Pago duplicado detectado (Mismo maestro/concepto hoy).")
+                    if duplicado: st.error("⛔ Pago duplicado detectado.")
                     else:
                         gasto_data = {"tipo": "egreso", "descripcion": desc_full, "monto": mt, "nombre_persona": per, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"), "id_short": str(int(time.time()))[-6:]}
                         if maestro_seleccionado: gasto_data["docente_id"] = maestro_seleccionado
-                        
                         db.collection("finanzas").add(gasto_data)
                         st.session_state.gasto_temp = gasto_data
                         st.success("Registrado"); time.sleep(1); st.rerun()
@@ -755,8 +759,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             if data_raw:
                 st.dataframe(pd.DataFrame(data_raw)[['fecha_legible','tipo','descripcion','monto']], use_container_width=True)
                 
-                # Reimpresión
-                st.markdown("#### 🔄 Reimpresión")
                 options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_raw}
                 selection = st.selectbox("Seleccione transacción:", ["Seleccionar..."] + list(options.keys()))
                 if selection != "Seleccionar...":
@@ -875,17 +877,14 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
                 else:
                     for c in cols: df[c] = 0.0
-                
-                # CALCULO REAL TIME
-                if m == "Conducta":
-                    df["Promedio"] = df[cols[0]]
-                else:
-                    df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + 
-                                      df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + 
-                                      df["Examen (30%)"]*0.30).apply(redondear_mined)
-
+                df["Promedio"] = 0.0
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
+                
+                # CALCULO REAL TIME
+                if m == "Conducta": df["Promedio"] = df[cols[0]]
+                else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + df["Examen (30%)"]*0.30).apply(redondear_mined)
+
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
                 if st.button("Guardar"):
                     batch = db.batch()
@@ -902,6 +901,26 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     batch.commit()
                     st.success("Guardado")
                     time.sleep(1); st.rerun()
+                
+                st.divider()
+                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
+                rows_acumulados = []
+                for mes_iter in LISTA_MESES:
+                    id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
+                    doc_h = db.collection("notas_mensuales").document(id_history).get()
+                    if doc_h.exists:
+                        data_h = doc_h.to_dict().get("detalles", {})
+                        for nie_iter, notas_iter in data_h.items():
+                            nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
+                            if m == "Conducta":
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
+                            else:
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
+                if rows_acumulados:
+                    df_ac = pd.DataFrame(rows_acumulados)
+                    df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
+                    df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
+                    st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")

@@ -40,7 +40,6 @@ try:
 except: st.stop()
 
 # --- USUARIOS Y ROLES ---
-# En un futuro esto puede ir a la base de datos, por ahora está hardcoded para MVP
 USUARIOS = {
     "david": {"pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"},
     "directora": {"pass": "dir2026", "rol": "admin", "nombre": "Dirección"},
@@ -166,18 +165,55 @@ with st.sidebar:
 # 5. CONTENIDO PRINCIPAL
 # ==========================================
 
-# --- INICIO (COMÚN) ---
+# --- INICIO (DASHBOARD NUEVO) ---
 if opcion == "Inicio":
-    st.title("🍎 Panel de Control 2026")
+    st.title("🍎 Tablero Institucional 2026")
+    
+    # 1. Métricas Clave
     c1, c2, c3 = st.columns(3)
-    c1.metric("Ciclo Lectivo", "2026")
-    c2.metric("Usuario Activo", st.session_state['user_name'])
+    c1.metric("Ciclo Escolar", "2026")
+    c2.metric("Usuario", st.session_state['user_name'])
     c3.metric("Rol", st.session_state['user_role'].upper())
+    
+    st.markdown("---")
+    
+    # 2. Dashboard de Actividades (Solicitud Específica)
+    st.subheader("📅 Agenda de Actividades")
+    
+    col_izq, col_der = st.columns([1, 1])
+    
+    with col_izq:
+        with st.container(border=True):
+            st.markdown("### 📌 Estado Actual")
+            st.info("**PERIODO DE INSCRIPCIÓN**")
+            st.markdown("""
+            Actualmente el sistema está habilitado para:
+            - Registro de nuevos estudiantes.
+            - Actualización de expedientes.
+            - Recepción de documentación legal.
+            """)
+            
+    with col_der:
+        with st.container(border=True):
+            st.markdown("### 🚀 Próximo Evento Importante")
+            st.success("**INICIO DE CLASES**")
+            st.metric("Fecha Programada", "19 de Enero", "2026")
+            st.markdown("Todo el personal docente y administrativo debe estar preparado para recibir a los estudiantes.")
+
+    # 3. Cronograma Rápido (Tabla simple alimentada por ti)
+    st.markdown("### 🗓️ Cronograma Enero 2026")
+    cronograma_data = [
+        {"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"},
+        {"Fecha": "15 Ene", "Actividad": "Reunión de Personal Docente", "Estado": "Pendiente"},
+        {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"},
+        {"Fecha": "30 Ene", "Actividad": "Entrega de Planificaciones", "Estado": "Pendiente"}
+    ]
+    st.table(pd.DataFrame(cronograma_data))
 
 # ==========================================
 # MÓDULOS DE ADMINISTRADOR
 # ==========================================
-if st.session_state["user_role"] == "admin":
+if st.session_state["user_role"] == "admin" and opcion != "Inicio":
 
     # --- INSCRIPCIÓN ---
     if opcion == "Inscripción":
@@ -218,7 +254,7 @@ if st.session_state["user_role"] == "admin":
                 cod = st.text_input("Código")
                 nom = st.text_input("Nombre")
                 if st.form_submit_button("Guardar"):
-                    db.collection("maestros_perfil").add({"codigo": cod, "nombre": nom})
+                    db.collection("maestros_perfil").add({"codigo": cod, "nombre": nom, "activo": True})
                     st.success("Docente guardado")
 
         with t2:
@@ -228,7 +264,7 @@ if st.session_state["user_role"] == "admin":
                 p = st.selectbox("Docente", list(profs.keys()) if profs else [])
                 g = st.selectbox("Grado", LISTA_GRADOS_TODO)
                 
-                # Carga dinámica de materias según el grado seleccionado (Visualmente todas las del mapa)
+                # Carga dinámica de materias
                 materias_grado = MAPA_CURRICULAR.get(g, [])
                 m = st.multiselect("Materias (Malla 2026)", materias_grado)
                 
@@ -288,7 +324,6 @@ if st.session_state["user_role"] == "admin":
                 if not nm: st.warning("Sin notas")
                 else:
                     filas = []
-                    # Usar la malla correcta
                     malla = MAPA_CURRICULAR.get(a['grado_actual'], [])
                     for mat in malla:
                         if mat in nm:
@@ -337,20 +372,17 @@ if st.session_state["user_role"] == "admin":
                             db.collection("finanzas").add(data)
                             st.session_state.recibo = data; st.session_state.pa = None; st.rerun()
 
-    # --- NOTAS ADMIN (MISMA LÓGICA QUE DOCENTE PERO GLOBAL) ---
+    # --- NOTAS ADMIN ---
     elif opcion == "Notas (Admin)":
-        st.info("Utilice el módulo para corregir notas globales.")
-        # (Aquí iría la misma lógica de "Cargar Notas" del docente)
+        st.info("Módulo de Administración de Notas (Ver todas las materias).")
+        # (Aquí se podría replicar la lógica de carga de notas)
 
 # ==========================================
 # MÓDULOS DE DOCENTE
 # ==========================================
-elif st.session_state["user_role"] == "docente":
+elif st.session_state["user_role"] == "docente" and opcion != "Inicio":
     
-    if opcion == "Inicio":
-        st.title(f"👋 Hola, {st.session_state['user_name']}")
-    
-    elif opcion == "Mis Listados":
+    if opcion == "Mis Listados":
         st.title("🖨️ Imprimir Listas")
         g = st.selectbox("Grado:", LISTA_GRADOS_TODO)
         if st.button("Generar"):
@@ -365,10 +397,8 @@ elif st.session_state["user_role"] == "docente":
 
     elif opcion == "Cargar Notas":
         st.title("📝 Registro de Notas")
-        # Solo grados numéricos
         g = st.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
         
-        # Materias según grado
         mat_pos = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
         m = st.selectbox("Materia", ["Select..."] + mat_pos)
         mes = st.selectbox("Mes", LISTA_MESES)
@@ -408,11 +438,9 @@ elif st.session_state["user_role"] == "docente":
                         detalles[r["NIE"]] = {c: r[c] for c in cols}
                         detalles[r["NIE"]]["Promedio"] = round(prom, 1)
                         
-                        # Guardar Individual
                         ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
                         batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": round(prom, 1)})
                     
-                    # Guardar Grupal
                     db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
-                    st.success("✅ Guardado")
+                    st.success("Guardado")

@@ -142,9 +142,10 @@ with st.sidebar:
     else:
         opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Cargar Notas", "Ver Mis Cargas"])
     
+    # Limpieza de sesión
     if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada
     if st.session_state.last_page != opcion_seleccionada:
-        keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum", "prof_view"]
+        keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum", "prof_view", "sel_prof_idx", "edit_prof_mode"]
         for key in keys_to_clear:
             if key in st.session_state: del st.session_state[key]
         st.session_state.last_page = opcion_seleccionada
@@ -176,7 +177,6 @@ if opcion_seleccionada == "Inicio":
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
         st.metric("Fecha", "19 de Enero", "2026")
-    
     cronograma = [
         {"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"},
         {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"},
@@ -222,7 +222,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     # --- CONSULTA ALUMNOS ---
     elif opcion_seleccionada == "Consulta Alumnos":
         st.title("🔎 Expediente Electrónico")
-        
         col_search, col_res = st.columns([1, 3])
         with col_search:
             st.markdown("### 🔍 Búsqueda")
@@ -372,8 +371,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 current_docs.append(url)
                                 update_data["documentos.doc_urls"] = current_docs
                         db.collection("alumnos").document(a['nie']).update(update_data)
-                        # Actualizar estado local para ver cambios inmediatos
-                        st.session_state.alum_view.update(update_data)
                         st.success("Expediente actualizado."); time.sleep(1); st.rerun()
 
     # --- 4. MAESTROS (ROBUSTO) ---
@@ -391,10 +388,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         
         col_sel, _ = st.columns([2, 1])
         with col_sel:
-            # Recuperar selección previa si existe
+            # Recuperar selección previa
             idx = 0
-            if 'sel_prof_idx' in st.session_state:
-                idx = st.session_state.sel_prof_idx
+            if 'sel_prof_idx' in st.session_state: idx = st.session_state.sel_prof_idx
             sel_prof = st.selectbox("Seleccionar Docente:", opciones_prof, index=idx)
 
         st.markdown("---")
@@ -455,17 +451,14 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
 
                 with tabs_m[0]:
-                    # SOLUCION DEFINITIVA SELECTORES DINÁMICOS: FUERA DEL FORM
+                    # SELECTORES FUERA DEL FORM
                     c_asig, c_tabla = st.columns([1, 2])
                     with c_asig:
                         st.markdown("#### Asignar Nueva Materia")
-                        # 1. Selectores LIBRES para que actualicen al instante
                         g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
                         mats_disp = MAPA_CURRICULAR.get(g_sel, [])
                         
-                        # 2. Formulario solo para el botón
                         with st.form("add_carga_prof"):
-                            # Usamos los valores seleccionados arriba
                             st.write(f"Asignando a **{g_sel}**")
                             m_sel = st.multiselect("Seleccionar Materias", mats_disp)
                             guia = st.checkbox("¿Es Guía?")
@@ -505,9 +498,15 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 })
                                 st.success("Registrado"); time.sleep(0.5); st.rerun()
                     
-                    movs = db.collection("finanzas").where("docente_id", "==", pid).order_by("fecha", direction=firestore.Query.DESCENDING).stream()
-                    data_movs = [{"Fecha": m.to_dict()['fecha_legible'], "Descripción": m.to_dict()['descripcion'], "Monto": m.to_dict()['monto']} for m in movs]
-                    if data_movs: st.dataframe(pd.DataFrame(data_movs), use_container_width=True)
+                    # CONSULTA CORREGIDA (SIN ORDER_BY COMPUESTO)
+                    movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
+                    lista_movs = [m.to_dict() for m in movs]
+                    # Ordenar en Python
+                    lista_movs.sort(key=lambda x: x.get('fecha', 0), reverse=True) # Requiere que 'fecha' sea sortable o usar fecha_legible
+                    
+                    if lista_movs:
+                        data_show = [{"Fecha": m.get('fecha_legible','-'), "Descripción": m.get('descripcion','-'), "Monto": m.get('monto',0)} for m in lista_movs]
+                        st.dataframe(pd.DataFrame(data_show), use_container_width=True)
                     else: st.info("No hay historial financiero.")
             except Exception as e:
                 st.error("Seleccione un docente para ver detalles.")
@@ -515,10 +514,15 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     # --- 5. NOTAS ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Admin Notas (Vista Global)")
-        g = st.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
-        mat_pos = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
-        m = st.selectbox("Materia", ["Select..."] + mat_pos)
-        mes = st.selectbox("Mes", LISTA_MESES)
+        # SELECTORES FUERA DEL FORMULARIO PARA DINAMISMO
+        c_sel_n1, c_sel_n2, c_sel_n3 = st.columns(3)
+        g = c_sel_n1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
+        
+        # Dinámico
+        mats_pos = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
+        m = c_sel_n2.selectbox("Materia", ["Select..."] + mats_pos)
+        mes = c_sel_n3.selectbox("Mes", LISTA_MESES)
+        
         if g != "Select..." and m != "Select...":
             docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
             lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
@@ -536,8 +540,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 df["Promedio"] = 0.0
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0, max_value=10, step=0.1)
+                
+                # Editor
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
-                if st.button("Guardar (Admin)"):
+                
+                # Botón Guardar
+                if st.button("Guardar Notas"):
                     batch = db.batch()
                     detalles = {}
                     for _, r in ed.iterrows():
@@ -586,12 +594,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     # --- 7. CONFIGURACIÓN ---
     elif opcion_seleccionada == "Configuración":
         st.header("⚙️ Configuración")
-        st.write("Zona administrativa.")
-        
+        st.warning("Zona administrativa.")
         st.divider()
         st.subheader("⚠️ Zona de Peligro")
         st.warning("Esta acción eliminará TODOS los alumnos, maestros, notas y finanzas. No se puede deshacer.")
-        
         confirm = st.text_input("Escriba 'BORRAR' para confirmar el reinicio de la base de datos:")
         if st.button("🔴 REINICIAR BASE DE DATOS COMPLETA") and confirm == "BORRAR":
             with st.spinner("Eliminando todo..."):
@@ -604,3 +610,68 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             st.success("✅ Base de datos reiniciada correctamente.")
             time.sleep(2)
             st.rerun()
+
+# ==========================================
+# MÓDULOS DE DOCENTE
+# ==========================================
+elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inicio":
+    
+    if opcion_seleccionada == "Mis Listados":
+        st.title("🖨️ Imprimir Listas")
+        g = st.selectbox("Grado:", LISTA_GRADOS_TODO)
+        if st.button("Generar"):
+            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            lista = sorted([d.to_dict()['nombre_completo'] for d in docs])
+            if not lista: st.warning("Sin alumnos")
+            else:
+                rows = "".join([f"<tr><td>{i+1}</td><td style='text-align:left'>{n}</td><td></td><td></td><td></td><td></td><td></td></tr>" for i, n in enumerate(lista)])
+                img = get_base64("logo.png"); hi = f'<img src="{img}" height="50">' if img else ""
+                html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>COLEGIO PROFA. BLANCA ELENA</h3><h4>LISTADO DE ASISTENCIA - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='40%'>NOMBRE</td><td width='10%'></td><td width='10%'></td><td width='10%'></td><td width='10%'></td><td width='10%'></td></tr>{rows}</table></div>"""
+                components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+
+    elif opcion_seleccionada == "Cargar Notas":
+        st.title("📝 Registro de Notas")
+        # SELECTORES LIBRES
+        c_d1, c_d2, c_d3 = st.columns(3)
+        g = c_d1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
+        mats = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
+        m = c_d2.selectbox("Materia", ["Select..."] + mats)
+        mes = c_d3.selectbox("Mes", LISTA_MESES)
+        
+        if g != "Select..." and m != "Select...":
+            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
+            if not lista: st.warning("Sin alumnos")
+            else:
+                df = pd.DataFrame(lista).sort_values("Nombre")
+                id_doc = f"{g}_{m}_{mes}".replace(" ","_")
+                cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
+                doc_ref = db.collection("notas_mensuales").document(id_doc).get()
+                if doc_ref.exists:
+                    dd = doc_ref.to_dict().get('detalles', {})
+                    for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
+                else:
+                    for c in cols: df[c] = 0.0
+                df["Promedio"] = 0.0
+                cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
+                for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0, max_value=10, step=0.1)
+                
+                ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
+                
+                if st.button("Guardar"):
+                    batch = db.batch()
+                    detalles = {}
+                    for _, r in ed.iterrows():
+                        if m == "Conducta": prom = r[cols[0]]
+                        else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
+                        detalles[r["NIE"]] = {c: r[c] for c in cols}
+                        detalles[r["NIE"]]["Promedio"] = round(prom, 1)
+                        ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
+                        batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": round(prom, 1)})
+                    db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
+                    batch.commit()
+                    st.success("Guardado")
+
+    elif opcion_seleccionada == "Ver Mis Cargas":
+        st.title("📋 Mi Carga Académica")
+        st.info("Aquí podrá visualizar las asignaturas que tiene asignadas.")

@@ -39,11 +39,15 @@ try:
     conexion_exitosa = True
 except: st.stop()
 
-# --- USUARIOS Y ROLES ---
+# --- GESTIÓN DE USUARIOS (SIMULACIÓN DB) ---
+# En producción, esto debería venir de una colección 'usuarios' en Firestore
 USUARIOS = {
     "david": {"pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"},
     "directora": {"pass": "dir2026", "rol": "admin", "nombre": "Dirección"},
-    "profe": {"pass": "profe123", "rol": "docente", "nombre": "Panel Docente"}
+    # Ejemplos de maestros individuales
+    "profe_juan": {"pass": "juan123", "rol": "docente", "nombre": "Prof. Juan Pérez"},
+    "profe_maria": {"pass": "maria123", "rol": "docente", "nombre": "Prof. María López"},
+    "profe": {"pass": "profe123", "rol": "docente", "nombre": "Docente General"}
 }
 
 def login():
@@ -59,8 +63,9 @@ def login():
                     st.session_state["logged_in"] = True
                     st.session_state["user_role"] = USUARIOS[user]["rol"]
                     st.session_state["user_name"] = USUARIOS[user]["nombre"]
+                    st.session_state["user_id"] = user
                     st.rerun()
-                else: st.error("Acceso Denegado")
+                else: st.error("Usuario o contraseña incorrectos")
 
 def logout():
     for key in list(st.session_state.keys()):
@@ -129,7 +134,7 @@ def borrar_coleccion(coll_name, batch_size=10):
         return borrar_coleccion(coll_name, batch_size)
 
 # ==========================================
-# 4. BARRA LATERAL
+# 4. BARRA LATERAL (SEGMENTACIÓN DE ROLES)
 # ==========================================
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
@@ -137,11 +142,16 @@ with st.sidebar:
     
     st.info(f"👤 **{st.session_state['user_name']}**")
     
+    # MENÚ SEGÚN ROL - AQUÍ ESTÁ LA CLAVE DE LA SEGURIDAD
     if st.session_state["user_role"] == "admin":
-        opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Notas", "Finanzas", "Configuración"])
+        opcion_seleccionada = st.radio("Menú Admin:", 
+            ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Asistencia (Global)", "Notas", "Finanzas", "Configuración"])
     else:
-        opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Cargar Notas", "Ver Mis Cargas"])
+        # MENÚ DOCENTE RESTRINGIDO
+        opcion_seleccionada = st.radio("Menú Docente:", 
+            ["Inicio", "Mis Listados", "Tomar Asistencia", "Cargar Notas", "Ver Mis Cargas"])
     
+    # Limpieza de sesión al cambiar de módulo
     if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada
     if st.session_state.last_page != opcion_seleccionada:
         keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum", "prof_view", "sel_prof_idx", "edit_prof_mode", "gasto_temp"]
@@ -261,7 +271,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     color = "green" if est == "Activo" else "red"
                     st.markdown(f"<h3 style='color:{color};text-align:center;border:2px solid {color};padding:5px;border-radius:10px;'>{est.upper()}</h3>", unsafe_allow_html=True)
 
-            tabs = st.tabs(["📋 Datos y Documentos", "💰 Historial y Solvencia", "📊 Boleta de Notas", "⚙️ Edición Expediente"])
+            tabs = st.tabs(["📋 Datos", "💰 Solvencia", "📊 Boleta", "⚙️ Edición"])
 
             with tabs[0]:
                 col_d1, col_d2 = st.columns(2)
@@ -298,10 +308,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         if sel_recibo != "Seleccionar...":
                             p_obj = opciones_recibo[sel_recibo]
                             if st.button("Visualizar Recibo"):
-                                col = "#2e7d32"
                                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                                html_recibo = f"""<div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:700px;margin:auto;"><div style="background:{col};color:white;padding:15px;display:flex;justify-content:space-between;"><div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3><p style="margin:0;font-size:12px;">COPIA DE RECIBO</p></div></div><h4>RECIBO DE INGRESO</h4></div><div style="padding:20px;"><p><b>Fecha:</b> {p_obj['fecha_legible']}</p><p><b>Alumno:</b> {p_obj.get('nombre_persona')}</p><p><b>Concepto:</b> {p_obj['descripcion']}</p><p><b>Detalle:</b> {p_obj.get('observaciones','-')}</p><h1 style="text-align:right;color:{col};">${p_obj['monto']:.2f}</h1></div></div>"""
-                                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()" style="background:green;color:white;padding:10px;">🖨️ IMPRIMIR COPIA</button></center></body></html>""", height=400, scrolling=True)
+                                html_recibo = f"""<div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:700px;margin:auto;"><div style="background:#2e7d32;color:white;padding:15px;display:flex;justify-content:space-between;"><div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3><p style="margin:0;font-size:12px;">COPIA DE RECIBO</p></div></div><h4>RECIBO DE INGRESO</h4></div><div style="padding:20px;"><p><b>Fecha:</b> {p_obj['fecha_legible']}</p><p><b>Alumno:</b> {p_obj.get('nombre_persona')}</p><p><b>Concepto:</b> {p_obj['descripcion']}</p><p><b>Detalle:</b> {p_obj.get('observaciones','-')}</p><h1 style="text-align:right;color:#2e7d32;">${p_obj['monto']:.2f}</h1></div></div>"""
+                                components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COPIA</button></center></body></html>""", height=400, scrolling=True)
                     else: st.info("Sin pagos registrados.")
                 with col_fin2:
                     st.markdown("### 🎫 Solvencia")
@@ -309,7 +318,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     tiene_pagos = len(raw_pagos) > 0
                     if not tiene_pagos:
                         st.error("⛔ ALUMNO INSOLVENTE")
-                        st.caption("No se registran pagos. Bloqueado.")
+                        st.caption("No se registran pagos.")
                     else:
                         if st.button("Generar Taco"):
                             fecha = datetime.now().strftime("%d/%m/%Y")
@@ -317,7 +326,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                             html = f"""<div style="font-family:monospace;width:300px;margin:auto;padding:10px;border:1px dashed black;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;">{hi}<b>COLEGIO BLANCA ELENA</b></div><h4 style="background:black;color:white;margin:5px 0;">SOLVENCIA EXAMEN</h4><div style="text-align:left;font-size:11px;"><b>ALUMNO:</b> {a['nombre_completo']}<br><b>NIE:</b> {a['nie']}<br><b>PERIODO:</b> {periodo}<br><b>ESTADO:</b> SOLVENTE ✅</div><br><table border="1" style="width:100%;font-size:10px;border-collapse:collapse;text-align:center;"><tr><td>LUN</td><td>MAR</td><td>MIE</td><td>JUE</td><td>VIE</td></tr><tr><td height="30"></td><td></td><td></td><td></td><td></td></tr></table><br><span style="font-size:9px;">Fecha: {fecha}</span></div>"""
                             components.html(f"""<html><body>{html}<br><center><button onclick="window.print()">🖨️ IMPRIMIR</button></center><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=350)
 
-            # 3. BOLETA
             with tabs[2]:
                 st.subheader("Boleta Oficial")
                 notas = db.collection("notas").where("nie", "==", a['nie']).stream()
@@ -342,18 +350,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
                     sello = get_base64("sello.png"); hs = f'<img src="{sello}" height="80">' if sello else ""
                     
-                    html = f"""
-                    <div style='font-family:Arial;font-size:12px;padding:20px;'>
-                        <div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div>
-                        <p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p>
-                        <table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table>
-                        <br><br><br>
-                        <div style='display:flex;justify-content:space-between;align-items:end;padding:0 50px;'>
-                            <div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Orientador</div></div>
-                            <div style='text-align:center;'>{hs}</div>
-                            <div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Dirección</div></div>
-                        </div>
-                    </div>"""
+                    html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><br><div style='display:flex;justify-content:space-between;align-items:end;padding:0 50px;'><div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Orientador</div></div><div style='text-align:center;'>{hs}</div><div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Dirección</div></div></div></div>"""
                     components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
             with tabs[3]:
@@ -426,7 +423,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                             "fecha_ingreso": datetime.now().strftime("%d/%m/%Y"),
                             "activo": True
                         })
-                        st.success("Docente registrado exitosamente."); time.sleep(1); st.rerun()
+                        st.success("Docente registrado."); time.sleep(1); st.rerun()
                     else: st.error("El nombre es obligatorio.")
         else:
             try:
@@ -438,16 +435,13 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     with c1: st.image(prof_data.get('foto_url', "https://via.placeholder.com/150"), width=120)
                     with c2:
                         st.title(prof_data['nombre'])
-                        st.caption(f"Código: {prof_data.get('codigo','S/C')} | Ingreso: {prof_data.get('fecha_ingreso','-')}")
+                        st.caption(f"Código: {prof_data.get('codigo','S/C')}")
                         st.write(f"📞 {prof_data.get('telefono','-')} | 📧 {prof_data.get('email','-')}")
                     with c3:
-                        if st.button("✏️ Editar Perfil"):
-                            st.session_state.edit_prof_mode = True
+                        if st.button("✏️ Editar Perfil"): st.session_state.edit_prof_mode = True
 
                 if st.session_state.get("edit_prof_mode"):
                     with st.form("edit_prof_form"):
-                        st.write("---")
-                        st.write("**Edición Rápida**")
                         nc = st.text_input("Nombre", prof_data['nombre'])
                         nt = st.text_input("Teléfono", prof_data.get('telefono',''))
                         nf = st.file_uploader("Actualizar Foto", ["jpg", "png"])
@@ -468,9 +462,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         st.markdown("#### Asignar Nueva Materia")
                         g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
                         mats_disp = MAPA_CURRICULAR.get(g_sel, [])
-                        
                         with st.form("add_carga_prof"):
-                            st.write(f"Asignando a **{g_sel}**")
                             m_sel = st.multiselect("Seleccionar Materias", mats_disp)
                             guia = st.checkbox("¿Es Guía?")
                             if st.form_submit_button("Guardar Carga"):
@@ -493,7 +485,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         else: st.info("Sin carga asignada.")
 
                 with tabs_m[1]:
-                    st.subheader("Expediente Financiero del Docente")
+                    st.subheader("Expediente Financiero")
                     with st.expander("➕ Registrar Movimiento", expanded=False):
                         with st.form("fin_prof"):
                             c1, c2, c3 = st.columns(3)
@@ -518,14 +510,72 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     else: st.info("No hay historial financiero.")
             except Exception as e: st.error("Seleccione un docente.")
 
-    # --- 5. NOTAS ---
+    # --- 5. ASISTENCIA (NUEVO) ---
+    elif opcion_seleccionada == "Asistencia (Global)":
+        st.title("📅 Control de Asistencia Global")
+        c1, c2 = st.columns(2)
+        fecha_asist = c1.date_input("Fecha:", date.today())
+        grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
+        
+        if grado_asist:
+            st.divider()
+            id_asistencia = f"{fecha_asist}_{grado_asist}"
+            doc_ref = db.collection("asistencia").document(id_asistencia)
+            doc_snap = doc_ref.get()
+            
+            # Buscar alumnos del grado
+            alumnos_ref = db.collection("alumnos").where("grado_actual", "==", grado_asist).stream()
+            lista_alumnos = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in alumnos_ref]
+            lista_alumnos.sort(key=lambda x: x["Nombre"])
+            
+            if not lista_alumnos:
+                st.warning("No hay alumnos inscritos en este grado.")
+            else:
+                # Preparar datos
+                if doc_snap.exists:
+                    datos_guardados = doc_snap.to_dict().get("registros", {})
+                else:
+                    datos_guardados = {}
+                
+                # Crear DataFrame para el editor
+                data_editor = []
+                for alum in lista_alumnos:
+                    estado = datos_guardados.get(alum["NIE"], "Presente")
+                    data_editor.append({"NIE": alum["NIE"], "Nombre": alum["Nombre"], "Estado": estado})
+                
+                df_asist = pd.DataFrame(data_editor)
+                
+                st.write(f"**Asistencia: {grado_asist} - {fecha_asist.strftime('%d/%m/%Y')}**")
+                
+                editor_config = {
+                    "NIE": st.column_config.TextColumn(disabled=True),
+                    "Nombre": st.column_config.TextColumn(disabled=True),
+                    "Estado": st.column_config.SelectboxColumn(
+                        "Estado",
+                        options=["Presente", "Ausente", "Tardanza", "Permiso"],
+                        required=True
+                    )
+                }
+                
+                resultado_edicion = st.data_editor(df_asist, column_config=editor_config, hide_index=True, use_container_width=True, key=id_asistencia)
+                
+                if st.button("💾 Guardar Asistencia"):
+                    registros_final = {row["NIE"]: row["Estado"] for row in resultado_edicion.to_dict(orient="records")}
+                    doc_ref.set({
+                        "fecha": datetime.combine(fecha_asist, datetime.min.time()),
+                        "grado": grado_asist,
+                        "registros": registros_final
+                    })
+                    st.success("Asistencia guardada correctamente.")
+
+    # --- 6. NOTAS ---
     elif opcion_seleccionada == "Notas":
-        st.title("📊 Admin Notas (Vista Global)")
-        c_sel_n1, c_sel_n2, c_sel_n3 = st.columns(3)
-        g = c_sel_n1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
+        st.title("📊 Admin Notas")
+        c1, c2, c3 = st.columns(3)
+        g = c1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS)
         mats_pos = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
-        m = c_sel_n2.selectbox("Materia", ["Select..."] + mats_pos)
-        mes = c_sel_n3.selectbox("Mes", LISTA_MESES)
+        m = c2.selectbox("Materia", ["Select..."] + mats_pos)
+        mes = c3.selectbox("Mes", LISTA_MESES)
         
         if g != "Select..." and m != "Select...":
             docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
@@ -546,7 +596,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0, max_value=10, step=0.1)
                 
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
-                
                 if st.button("Guardar Notas"):
                     batch = db.batch()
                     detalles = {}
@@ -559,7 +608,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": round(prom, 1)})
                     db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
-                    st.success("Guardado por Admin")
+                    st.success("Guardado")
                 
                 st.divider()
                 st.subheader(f"📋 Registro Acumulado Detallado - {m}")
@@ -575,19 +624,15 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
                             else:
                                 rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                
                 if rows_acumulados:
                     df_ac = pd.DataFrame(rows_acumulados)
                     df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
                     df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
                     st.dataframe(df_ac, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No hay registros detallados aún.")
 
-    # --- 6. FINANZAS (GLOBAL) ---
+    # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
-        
         t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Reportes & Reimpresión"])
 
         # 1. DASHBOARD
@@ -599,29 +644,26 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             data_hoy = []
             ingreso_dia = 0.0
             egreso_dia = 0.0
-            
             for doc in all_fin:
                 d = doc.to_dict()
                 if d.get('fecha_legible') == fecha_str:
                     data_hoy.append(d)
                     if d['tipo'] == 'ingreso': ingreso_dia += d['monto']
                     elif d['tipo'] == 'egreso': egreso_dia += d['monto']
-            
             saldo_dia = ingreso_dia - egreso_dia
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric("Ingresos del Día", f"${ingreso_dia:.2f}", delta_color="normal")
             kpi2.metric("Gastos del Día", f"${egreso_dia:.2f}", delta_color="inverse")
             kpi3.metric("Saldo Neto", f"${saldo_dia:.2f}")
             st.divider()
-            st.subheader(f"Libro Diario - {fecha_str}")
             if data_hoy:
                 df_hoy = pd.DataFrame(data_hoy)
                 st.dataframe(df_hoy[['descripcion', 'tipo', 'monto', 'nombre_persona']], use_container_width=True)
-                if st.button("🖨️ Imprimir Corte del Día"):
+                if st.button("🖨️ Imprimir Corte"):
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="40">' if logo else ""
                     html_corte = f"""<div style="font-family:monospace;width:300px;margin:auto;border:1px solid black;padding:10px;"><div style="text-align:center;">{hi}<br><b>COLEGIO BLANCA ELENA</b><br>CORTE DE CAJA</div><br><b>FECHA:</b> {fecha_str}<br><hr><table width="100%"><tr><td>(+) INGRESOS:</td><td align="right">${ingreso_dia:.2f}</td></tr><tr><td>(-) GASTOS:</td><td align="right">${egreso_dia:.2f}</td></tr><tr><td><b>(=) SALDO:</b></td><td align="right"><b>${saldo_dia:.2f}</b></td></tr></table><br><div style="text-align:center;margin-top:20px;">___________________<br>Firma Responsable</div></div>"""
                     components.html(f"""<html><body>{html_corte}<br><center><button onclick="window.print()">IMPRIMIR</button></center></body></html>""", height=400)
-            else: st.info("No hay movimientos registrados hoy.")
+            else: st.info("No hay movimientos hoy.")
 
         # 2. COBROS
         with t_ingreso:
@@ -629,7 +671,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             if st.button("Buscar Alumno") and n:
                 d = db.collection("alumnos").document(n).get()
                 if d.exists: st.session_state.pago_alum = d.to_dict()
-                else: st.error("Alumno no encontrado")
+                else: st.error("No encontrado")
             
             if "pago_alum" in st.session_state:
                 pa = st.session_state.pago_alum
@@ -638,7 +680,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     tipo_c = st.selectbox("Tipo de Cobro", ["Colegiatura", "Matrícula", "Uniformes", "Otros"])
                     det_c = st.text_input("Detalle (Ej: Mes de Marzo)")
                     monto = st.number_input("Monto ($)", min_value=0.01)
-                    obs = st.text_input("Observaciones Adicionales")
+                    obs = st.text_input("Observaciones")
                     if st.form_submit_button("✅ Registrar Ingreso"):
                         concepto_full = f"{tipo_c} - {det_c}" if det_c else tipo_c
                         recibo_data = {
@@ -656,7 +698,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             
             if "recibo_temp" in st.session_state:
                 r = st.session_state.recibo_temp
-                st.success("¡Pago Registrado! Imprima el comprobante:")
+                st.success("¡Pago Registrado!")
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
                 html_recibo = f"""<div style="border: 2px solid #333; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE INGRESO</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>RECIBIMOS DE:</b> {r['nombre_persona']}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p><p><b>OBSERVACIONES:</b> {r['observaciones']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Entregado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido (Caja)</td></tr></table></div>"""
                 components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
@@ -664,7 +706,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
         # 3. GASTOS
         with t_egreso:
-            st.subheader("Registro de Gastos Operativos")
+            st.subheader("Registro de Gastos")
             with st.form("form_gasto"):
                 c1, c2 = st.columns(2)
                 tipo_g = c1.selectbox("Tipo de Gasto", ["Salario", "Servicios", "Mantenimiento", "Otros"])
@@ -685,24 +727,21 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
             if "gasto_temp" in st.session_state:
                 r = st.session_state.gasto_temp
-                st.warning("Gasto registrado. Imprima el comprobante:")
+                st.warning("Gasto registrado.")
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
                 html_gasto = f"""<div style="border: 2px solid #d32f2f; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE EGRESO (GASTO)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>PAGADO A:</b> {r['nombre_persona']}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Autorizado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido Conforme</td></tr></table></div>"""
                 components.html(f"""<html><body>{html_gasto}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
                 if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
-        # 4. HISTORIAL Y REPORTES AVANZADOS (NUEVO)
+        # 4. HISTORIAL Y REPORTE
         with t_rep:
-            st.subheader("📜 Generador de Reportes Financieros")
-            
-            # FILTROS
+            st.subheader("📜 Reportes Financieros")
             c_f1, c_f2, c_f3, c_f4 = st.columns(4)
-            f_tipo = c_f1.multiselect("Tipo Transacción:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
+            f_tipo = c_f1.multiselect("Tipo:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
             f_inicio = c_f2.date_input("Desde:", date.today().replace(day=1))
             f_fin = c_f3.date_input("Hasta:", date.today())
-            f_texto = c_f4.text_input("Buscar (Nombre/Concepto):")
+            f_texto = c_f4.text_input("Buscar:")
             
-            # LOGICA DE FILTRADO
             dt_inicio = datetime.combine(f_inicio, datetime.min.time())
             dt_fin = datetime.combine(f_fin, datetime.max.time())
             
@@ -716,60 +755,52 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             for doc in docs:
                 d = doc.to_dict()
                 d['id'] = doc.id
-                # Filtros Python (Texto y Tipo)
-                cumple_texto = (f_texto.lower() in d.get('nombre_persona','').lower() or f_texto.lower() in d.get('descripcion','').lower() or f_texto.lower() in d.get('id_short','').lower())
-                cumple_tipo = d['tipo'] in f_tipo
-                
-                if cumple_texto and cumple_tipo:
+                c_txt = (f_texto.lower() in d.get('nombre_persona','').lower() or f_texto.lower() in d.get('descripcion','').lower() or f_texto.lower() in d.get('id_short','').lower())
+                c_typ = d['tipo'] in f_tipo
+                if c_txt and c_typ:
                     data_rep.append(d)
                     if d['tipo'] == 'ingreso': tot_ing += d['monto']
                     elif d['tipo'] == 'egreso': tot_egr += d['monto']
             
-            # TARJETAS
             st.divider()
             k1, k2, k3 = st.columns(3)
             k1.metric("Total Ingresos", f"${tot_ing:.2f}", border=True)
             k2.metric("Total Egresos", f"${tot_egr:.2f}", delta_color="inverse", border=True)
-            k3.metric("Balance Periodo", f"${tot_ing - tot_egr:.2f}", border=True)
+            k3.metric("Balance", f"${tot_ing - tot_egr:.2f}", border=True)
             st.divider()
 
             if data_rep:
                 df_rep = pd.DataFrame(data_rep)
                 st.dataframe(df_rep[['fecha_legible', 'tipo', 'nombre_persona', 'descripcion', 'monto']], use_container_width=True)
                 
-                # --- IMPRESIÓN REPORTE ---
-                if st.button("🖨️ Imprimir Reporte Detallado"):
+                # REIMPRESIÓN
+                st.markdown("#### 🔄 Reimpresión")
+                options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_rep}
+                selection = st.selectbox("Seleccione transacción para reimprimir:", ["Seleccionar..."] + list(options.keys()))
+                
+                if selection != "Seleccionar...":
+                    r = options[selection]
+                    if st.button("Visualizar Original"):
+                        logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                        color_b = "#333" if r['tipo'] == 'ingreso' else "#d32f2f"
+                        titulo = "COMPROBANTE DE INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE DE EGRESO"
+                        etiqueta1 = "RECIBIMOS DE:" if r['tipo'] == 'ingreso' else "PAGADO A:"
+                        etiqueta2 = "Entregado Por" if r['tipo'] == 'ingreso' else "Autorizado Por"
+                        etiqueta3 = "Recibido (Caja)" if r['tipo'] == 'ingreso' else "Recibido Conforme"
+                        html_reimp = f"""<div style="border: 2px solid {color_b}; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: {color_b};">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>{etiqueta1}</b> {r.get('nombre_persona','-')}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p><p><b>OBSERVACIONES:</b> {r.get('observaciones','')}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta2}</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta3}</td></tr></table></div>"""
+                        components.html(f"""<html><body>{html_reimp}<br><center><button onclick="window.print()">🖨️ REIMPRIMIR</button></center></body></html>""", height=500)
+
+                # REPORTE GENERAL
+                if st.button("🖨️ Imprimir Reporte General"):
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
                     rows_html = ""
                     for item in data_rep:
                         color_row = "#e8f5e9" if item['tipo'] == 'ingreso' else "#ffebee"
                         rows_html += f"<tr style='background:{color_row};'><td>{item['fecha_legible']}</td><td>{item.get('id_short','-')}</td><td>{item['nombre_persona']}</td><td>{item['descripcion']}</td><td align='right'>${item['monto']:.2f}</td></tr>"
-                    
-                    html_reporte = f"""
-                    <div style="font-family:Arial; padding:20px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;">
-                            <div style="display:flex; align-items:center; gap:15px;">
-                                {hi}
-                                <div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">REPORTE FINANCIERO</p></div>
-                            </div>
-                            <div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')} <b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div>
-                        </div>
-                        <br>
-                        <div style="display:flex; gap:20px; margin-bottom:20px;">
-                            <div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div>
-                            <div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div>
-                            <div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div>
-                        </div>
-                        <table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd">
-                            <tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Ref</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>
-                            {rows_html}
-                        </table>
-                        <br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div>
-                    </div>
-                    """
+                    html_reporte = f"""<div style="font-family:Arial; padding:20px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;"><div style="display:flex; align-items:center; gap:15px;">{hi}<div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">REPORTE FINANCIERO</p></div></div><div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')} <b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div></div><br><div style="display:flex; gap:20px; margin-bottom:20px;"><div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div><div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div><div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div></div><table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd"><tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Ref</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>{rows_html}</table><br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div></div>"""
                     components.html(f"""<html><body>{html_reporte}<br><center><button onclick="window.print()" style="background:#333; color:white; padding:10px 20px; cursor:pointer;">🖨️ IMPRIMIR REPORTE PDF</button></center></body></html>""", height=600, scrolling=True)
 
-    # --- 7. CONFIGURACIÓN ---
+    # --- 8. CONFIGURACIÓN ---
     elif opcion_seleccionada == "Configuración":
         st.header("⚙️ Configuración")
         st.warning("Zona administrativa.")
@@ -806,6 +837,53 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 img = get_base64("logo.png"); hi = f'<img src="{img}" height="50">' if img else ""
                 html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>COLEGIO PROFA. BLANCA ELENA</h3><h4>LISTADO DE ASISTENCIA - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='40%'>NOMBRE</td><td width='10%'></td><td width='10%'></td><td width='10%'></td><td width='10%'></td><td width='10%'></td></tr>{rows}</table></div>"""
                 components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+
+    elif opcion_seleccionada == "Tomar Asistencia":
+        st.title("📅 Control de Asistencia")
+        c1, c2 = st.columns(2)
+        fecha_asist = c1.date_input("Fecha:", date.today())
+        grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
+        
+        if grado_asist:
+            st.divider()
+            id_asistencia = f"{fecha_asist}_{grado_asist}"
+            doc_ref = db.collection("asistencia").document(id_asistencia)
+            doc_snap = doc_ref.get()
+            
+            alumnos_ref = db.collection("alumnos").where("grado_actual", "==", grado_asist).stream()
+            lista_alumnos = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in alumnos_ref]
+            lista_alumnos.sort(key=lambda x: x["Nombre"])
+            
+            if not lista_alumnos:
+                st.warning("No hay alumnos inscritos en este grado.")
+            else:
+                if doc_snap.exists: datos_guardados = doc_snap.to_dict().get("registros", {})
+                else: datos_guardados = {}
+                
+                data_editor = []
+                for alum in lista_alumnos:
+                    estado = datos_guardados.get(alum["NIE"], "Presente")
+                    data_editor.append({"NIE": alum["NIE"], "Nombre": alum["Nombre"], "Estado": estado})
+                
+                df_asist = pd.DataFrame(data_editor)
+                st.write(f"**Asistencia: {grado_asist} - {fecha_asist.strftime('%d/%m/%Y')}**")
+                
+                editor_config = {
+                    "NIE": st.column_config.TextColumn(disabled=True),
+                    "Nombre": st.column_config.TextColumn(disabled=True),
+                    "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True)
+                }
+                
+                resultado_edicion = st.data_editor(df_asist, column_config=editor_config, hide_index=True, use_container_width=True, key=id_asistencia)
+                
+                if st.button("💾 Guardar Asistencia"):
+                    registros_final = {row["NIE"]: row["Estado"] for row in resultado_edicion.to_dict(orient="records")}
+                    doc_ref.set({
+                        "fecha": datetime.combine(fecha_asist, datetime.min.time()),
+                        "grado": grado_asist,
+                        "registros": registros_final
+                    })
+                    st.success("Asistencia guardada correctamente.")
 
     elif opcion_seleccionada == "Cargar Notas":
         st.title("📝 Registro de Notas")

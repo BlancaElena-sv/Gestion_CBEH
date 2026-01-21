@@ -141,14 +141,14 @@ def subir_archivo(archivo, ruta):
         return blob.public_url
     except: return None
 
-# --- FUNCIÓN CORREGIDA (SINTAXIS EXPANDIDA) ---
+# --- CORRECCIÓN DE SINTAXIS AQUÍ ---
 def get_base64(path):
     try:
         with open(path, "rb") as f:
             return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
     except:
         return ""
-# ---------------------------------------------
+# -----------------------------------
 
 def redondear_mined(valor):
     if valor is None: return 0.0
@@ -166,17 +166,29 @@ def borrar_coleccion(coll_name, batch_size=10):
         deleted += 1
     if deleted >= batch_size: return borrar_coleccion(coll_name, batch_size)
 
+# --- VALIDACIÓN DE DUPLICADOS MEJORADA ---
 def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
+    # Consulta básica
     docs = db.collection(coleccion).where(campo_id, "==", id_valor).where("descripcion", "==", descripcion).stream()
+    
     hoy = date.today()
+    found = False
+    
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
         if fecha_db:
-            if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
-            else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
-            if f_obj == hoy: return True
-    return False
+            # Manejo robusto de fechas (Timestamp o Datetime)
+            if isinstance(fecha_db, datetime): 
+                f_obj = fecha_db.date()
+            else: 
+                # Asumimos que es Timestamp de Google
+                f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
+            
+            if f_obj == hoy:
+                found = True
+                break
+    return found
 
 # ==========================================
 # 4. BARRA LATERAL
@@ -299,9 +311,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     else: st.error("No existe")
             else:
                 g = st.selectbox("Filtrar Grado", ["Todos"] + LISTA_GRADOS_TODO)
-                q = db.collection("alumnos")
-                if g != "Todos": q = q.where("grado_actual", "==", g)
-                res = [d.to_dict() for d in q.stream()]
+                if g != "Todos":
+                    res = [d.to_dict() for d in db.collection("alumnos").where("grado_actual", "==", g).stream()]
+                else:
+                    res = [d.to_dict() for d in db.collection("alumnos").limit(20).stream()]
                 sel = st.selectbox("Seleccionar Alumno", ["Seleccionar..."] + [f"{r['nie']} - {r['nombre_completo']}" for r in res])
                 if sel != "Seleccionar...":
                     nie_sel = sel.split(" - ")[0]
@@ -488,6 +501,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 db.collection("maestros_perfil").document(pid).update(upd)
                                 st.session_state.edit_prof_mode = False
                                 st.success("Actualizado"); time.sleep(1); st.rerun()
+                    
                     tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
                     with tabs_m[0]:
                         c_asig, c_tabla = st.columns([1, 2])
@@ -510,6 +524,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                     st.write(", ".join(cd['materias']))
                                     if st.button("Eliminar", key=c.id):
                                         db.collection("carga_academica").document(c.id).delete(); st.rerun()
+                    
                     with tabs_m[1]:
                         with st.expander("➕ Registrar Movimiento"):
                             with st.form("ffin"):
@@ -518,10 +533,11 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 desc = st.text_input("Detalle")
                                 if st.form_submit_button("Registrar"):
                                     # CHECK DUPLICADOS MAESTRO
-                                    if existe_duplicado("finanzas", "docente_id", pid, f"{tipo} - {desc}"):
-                                        st.error("⛔ Transacción duplicada.")
+                                    desc_full = f"{tipo} - {desc}"
+                                    if existe_duplicado("finanzas", "docente_id", pid, desc_full):
+                                        st.error("⛔ Transacción duplicada (Mismo concepto hoy).")
                                     else:
-                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'], "descripcion": f"{tipo} - {desc}", "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
+                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'], "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
                                         st.success("Registrado")
                         movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
                         lm = [m.to_dict() for m in movs]
@@ -530,7 +546,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         else: st.info("Sin historial.")
                 except Exception as e: st.error(f"Error cargando docente: {e}")
 
-    # --- 5. ASISTENCIA GLOBAL (INTEGRADO) ---
+    # --- 5. ASISTENCIA GLOBAL (NUEVO) ---
     elif opcion_seleccionada == "Asistencia Global":
         st.title("📅 Reporte de Asistencia Global")
         c1, c2 = st.columns(2)
@@ -548,7 +564,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 data_doc = d.to_dict()
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                if hasattr(fecha_doc, 'month'): f_mes = fecha_doc.month
+                if isinstance(fecha_doc, datetime): f_mes = fecha_doc.month
                 else: f_mes = datetime.fromtimestamp(fecha_doc.timestamp()).month
                 if f_mes == target_month:
                     total_dias += 1
@@ -580,18 +596,23 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 id_doc = f"{g}_{m}_{mes}".replace(" ","_")
                 cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
                 doc_ref = db.collection("notas_mensuales").document(id_doc).get()
+                
                 if doc_ref.exists:
                     dd = doc_ref.to_dict().get('detalles', {})
                     for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
                 else:
                     for c in cols: df[c] = 0.0
                 
-                if m == "Conducta": df["Promedio"] = df[cols[0]]
-                else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + df["Examen (30%)"]*0.30).apply(redondear_mined)
+                # CALCULO REAL TIME
+                if m == "Conducta":
+                    df["Promedio"] = df[cols[0]]
+                else:
+                    df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + 
+                                      df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + 
+                                      df["Examen (30%)"]*0.30).apply(redondear_mined)
 
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
-                
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
                 if st.button("Guardar"):
                     batch = db.batch()
@@ -699,10 +720,11 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         with t3:
             with st.form("fg"):
                 tp = st.selectbox("Gasto", ["Salario", "Servicios", "Mantenimiento", "Otros"])
-                # LOGICA MAESTROS
+                # LÓGICA VINCULACIÓN MAESTROS EN GASTOS
                 maestro_seleccionado = None
                 per = ""
                 if tp == "Salario":
+                    # Cargar maestros para vincular ID
                     ms = db.collection("maestros_perfil").stream()
                     l_ms = {m.to_dict()['nombre']: m.id for m in ms}
                     nom_sel = st.selectbox("Seleccionar Maestro:", list(l_ms.keys()))
@@ -712,16 +734,20 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 
                 mt = st.number_input("Monto", min_value=0.01)
                 det_g = st.text_input("Detalle")
+                
                 if st.form_submit_button("Registrar"):
                     desc_full = f"{tp} - {det_g}"
+                    # CHECK ANTI DUPLICADOS GASTO
                     duplicado = False
                     if tp == "Salario" and maestro_seleccionado:
                         if existe_duplicado("finanzas", "docente_id", maestro_seleccionado, desc_full): duplicado = True
                     
-                    if duplicado: st.error("⛔ Pago duplicado detectado.")
+                    if duplicado:
+                        st.error("⛔ Pago duplicado detectado (Mismo maestro/concepto hoy).")
                     else:
                         gasto_data = {"tipo": "egreso", "descripcion": desc_full, "monto": mt, "nombre_persona": per, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"), "id_short": str(int(time.time()))[-6:]}
                         if maestro_seleccionado: gasto_data["docente_id"] = maestro_seleccionado
+                        
                         db.collection("finanzas").add(gasto_data)
                         st.session_state.gasto_temp = gasto_data
                         st.success("Registrado"); time.sleep(1); st.rerun()
@@ -759,6 +785,8 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             if data_raw:
                 st.dataframe(pd.DataFrame(data_raw)[['fecha_legible','tipo','descripcion','monto']], use_container_width=True)
                 
+                # Reimpresión
+                st.markdown("#### 🔄 Reimpresión")
                 options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_raw}
                 selection = st.selectbox("Seleccione transacción:", ["Seleccionar..."] + list(options.keys()))
                 if selection != "Seleccionar...":
@@ -846,12 +874,34 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
             lista_alumnos.sort(key=lambda x: x["Nombre"])
             if lista_alumnos:
                 datos = doc_snap.to_dict().get("registros", {}) if doc_snap.exists else {}
-                data_editor = [{"NIE": a["NIE"], "Nombre": a["Nombre"], "Estado": datos.get(a["NIE"], "Presente")} for a in lista_alumnos]
+                observaciones = doc_snap.to_dict().get("observaciones", {}) if doc_snap.exists else {}
+                
+                data_editor = []
+                for alum in lista_alumnos:
+                    data_editor.append({
+                        "NIE": alum["NIE"], 
+                        "Nombre": alum["Nombre"], 
+                        "Estado": datos.get(alum["NIE"], "Presente"),
+                        "Observación": observaciones.get(alum["NIE"], "")
+                    })
+                
                 df_asist = pd.DataFrame(data_editor)
-                ed = st.data_editor(df_asist, column_config={"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True), "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True)}, hide_index=True, use_container_width=True, key=id_asistencia)
+                ed = st.data_editor(df_asist, column_config={
+                    "NIE": st.column_config.TextColumn(disabled=True),
+                    "Nombre": st.column_config.TextColumn(disabled=True),
+                    "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True),
+                    "Observación": st.column_config.TextColumn(width="medium")
+                }, hide_index=True, use_container_width=True, key=id_asistencia)
+                
                 if st.button("💾 Guardar Asistencia"):
                     regs = {r["NIE"]: r["Estado"] for r in ed.to_dict(orient="records")}
-                    doc_ref.set({"fecha": datetime.combine(fecha_asist, datetime.min.time()), "grado": grado_asist, "registros": regs})
+                    obs_regs = {r["NIE"]: r["Observación"] for r in ed.to_dict(orient="records")}
+                    doc_ref.set({
+                        "fecha": datetime.combine(fecha_asist, datetime.min.time()), 
+                        "grado": grado_asist, 
+                        "registros": regs,
+                        "observaciones": obs_regs
+                    })
                     st.success("Guardado.")
             else: st.warning("Sin alumnos.")
 
@@ -901,26 +951,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     batch.commit()
                     st.success("Guardado")
                     time.sleep(1); st.rerun()
-                
-                st.divider()
-                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
-                rows_acumulados = []
-                for mes_iter in LISTA_MESES:
-                    id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
-                    doc_h = db.collection("notas_mensuales").document(id_history).get()
-                    if doc_h.exists:
-                        data_h = doc_h.to_dict().get("detalles", {})
-                        for nie_iter, notas_iter in data_h.items():
-                            nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
-                            if m == "Conducta":
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                            else:
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                if rows_acumulados:
-                    df_ac = pd.DataFrame(rows_acumulados)
-                    df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
-                    df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
-                    st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")

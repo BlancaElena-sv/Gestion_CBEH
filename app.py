@@ -256,7 +256,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
             tabs = st.tabs(["📋 Datos y Documentos", "💰 Historial y Solvencia", "📊 Boleta de Notas", "⚙️ Edición Expediente"])
 
-            # 1. DATOS
+            # 1. DATOS Y DOCUMENTOS (CORREGIDO: VISUALIZACIÓN INCRUSTADA)
             with tabs[0]:
                 col_d1, col_d2 = st.columns(2)
                 with col_d1:
@@ -268,12 +268,16 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     st.subheader("📂 Documentos")
                     docs = a.get('documentos',{}).get('doc_urls', [])
                     if a.get('documentos',{}).get('doc_url'): docs.append(a.get('documentos',{}).get('doc_url'))
+                    
                     if docs:
                         for i, url in enumerate(list(set(docs))):
-                            st.link_button(f"📄 Ver Documento {i+1}", url)
+                            # AQUÍ ESTÁ EL CAMBIO: Expander con iframe para ver ahí mismo
+                            with st.expander(f"👁️ Visualizar Documento {i+1}"):
+                                st.markdown(f'<iframe src="{url}" width="100%" height="500px" style="border:none;"></iframe>', unsafe_allow_html=True)
+                                st.caption(f"¿No carga? [Abrir en nueva pestaña]({url})")
                     else: st.info("Sin documentos.")
 
-            # 2. FINANCIERO (CON REIMPRESIÓN)
+            # 2. FINANCIERO
             with tabs[1]:
                 col_fin1, col_fin2 = st.columns([2,1])
                 
@@ -283,40 +287,21 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     raw_pagos = [{"id": p.id, **p.to_dict()} for p in pagos]
                     
                     if raw_pagos:
-                        # Convertir a DF para visualización
                         df_pagos = pd.DataFrame(raw_pagos)
                         st.dataframe(df_pagos[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
-                        
                         st.write("---")
                         st.write("**🖨️ Reimprimir Recibo Histórico**")
-                        # Selector de recibo para reimprimir
                         opciones_recibo = {f"{p['fecha_legible']} - {p['descripcion']} (${p['monto']})": p for p in raw_pagos}
                         sel_recibo = st.selectbox("Seleccione un pago para ver el recibo:", ["Seleccionar..."] + list(opciones_recibo.keys()))
                         
                         if sel_recibo != "Seleccionar...":
                             p_obj = opciones_recibo[sel_recibo]
                             if st.button("Visualizar Recibo Seleccionado"):
-                                # GENERAR HTML RECIBO
                                 col = "#2e7d32"
                                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                                html_recibo = f"""
-                                <div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:700px;margin:auto;">
-                                    <div style="background:{col};color:white;padding:15px;display:flex;justify-content:space-between;">
-                                        <div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3><p style="margin:0;font-size:12px;">COPIA DE RECIBO</p></div></div>
-                                        <h4>RECIBO DE INGRESO</h4>
-                                    </div>
-                                    <div style="padding:20px;">
-                                        <p><b>Fecha:</b> {p_obj['fecha_legible']}</p>
-                                        <p><b>Alumno:</b> {p_obj.get('nombre_persona')}</p>
-                                        <p><b>Concepto:</b> {p_obj['descripcion']}</p>
-                                        <p><b>Detalle:</b> {p_obj.get('observaciones','-')}</p>
-                                        <h1 style="text-align:right;color:{col};">${p_obj['monto']:.2f}</h1>
-                                    </div>
-                                </div>
-                                """
+                                html_recibo = f"""<div style="font-family:Arial;border:1px solid #ccc;padding:20px;background:white;color:black;max-width:700px;margin:auto;"><div style="background:{col};color:white;padding:15px;display:flex;justify-content:space-between;"><div style="display:flex;gap:10px;">{hi}<div><h3 style="margin:0;color:white;">COLEGIO BLANCA ELENA</h3><p style="margin:0;font-size:12px;">COPIA DE RECIBO</p></div></div><h4>RECIBO DE INGRESO</h4></div><div style="padding:20px;"><p><b>Fecha:</b> {p_obj['fecha_legible']}</p><p><b>Alumno:</b> {p_obj.get('nombre_persona')}</p><p><b>Concepto:</b> {p_obj['descripcion']}</p><p><b>Detalle:</b> {p_obj.get('observaciones','-')}</p><h1 style="text-align:right;color:{col};">${p_obj['monto']:.2f}</h1></div></div>"""
                                 components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()" style="background:green;color:white;padding:10px;">🖨️ IMPRIMIR COPIA</button></center></body></html>""", height=400, scrolling=True)
-                    else:
-                        st.info("Sin pagos registrados.")
+                    else: st.info("Sin pagos registrados.")
 
                 with col_fin2:
                     st.markdown("### 🎫 Solvencia")
@@ -357,9 +342,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                             filas.append(f"<tr><td style='text-align:left'>{mat}</td><td>{n.get('Febrero','-')}</td><td>{n.get('Marzo','-')}</td><td>{n.get('Abril','-')}</td><td style='background:#eee'><b>{t1}</b></td><td>{n.get('Mayo','-')}</td><td>{n.get('Junio','-')}</td><td>{n.get('Julio','-')}</td><td style='background:#eee'><b>{t2}</b></td><td>{n.get('Agosto','-')}</td><td>{n.get('Septiembre','-')}</td><td>{n.get('Octubre','-')}</td><td style='background:#eee'><b>{t3}</b></td><td style='background:#333;color:white'><b>{fin}</b></td></tr>")
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
                     html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><div style='display:flex;justify-content:space-between;text-align:center;padding:0 50px;'><div style='border-top:1px solid black;width:30%'>Orientador</div><div style='border-top:1px solid black;width:30%'>Dirección</div></div></div>"""
-                    components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+                    components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
-            # 4. EDICIÓN COMPLETA
+            # 4. EDICIÓN
             with tabs[3]:
                 st.subheader("Gestión del Expediente")
                 with st.form("edit_full"):
@@ -367,33 +352,24 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     nn = c1.text_input("Nombres", a['nombres'])
                     na = c2.text_input("Apellidos", a['apellidos'])
                     ng = c1.selectbox("Grado", LISTA_GRADOS_TODO, index=LISTA_GRADOS_TODO.index(a['grado_actual']) if a['grado_actual'] in LISTA_GRADOS_TODO else 0)
-                    nt = c2.selectbox("Turno", ["Matutino", "Vespertino"], index=0) # Index 0 por defecto si no coincide
+                    nt = c2.selectbox("Turno", ["Matutino", "Vespertino"], index=0)
                     ne = c1.selectbox("Estado", ["Activo", "Inactivo", "Retirado"], index=["Activo", "Inactivo", "Retirado"].index(a.get('estado', 'Activo')))
                     nres = c2.text_input("Responsable", a.get('encargado',{}).get('nombre',''))
                     ntel = c1.text_input("Teléfono", a.get('encargado',{}).get('telefono',''))
                     ndir = c2.text_area("Dirección", a.get('encargado',{}).get('direccion',''))
-                    
                     st.markdown("---")
                     st.write("**Adjuntar Nuevo Documento:**")
                     new_doc = st.file_uploader("Subir PDF/Imagen", ["pdf", "jpg", "png"])
-                    
                     if st.form_submit_button("💾 Guardar Cambios"):
-                        update_data = {
-                            "nombres": nn, "apellidos": na, "nombre_completo": f"{nn} {na}",
-                            "grado_actual": ng, "turno": nt, "estado": ne,
-                            "encargado": {"nombre": nres, "telefono": ntel, "direccion": ndir}
-                        }
-                        
+                        update_data = {"nombres": nn, "apellidos": na, "nombre_completo": f"{nn} {na}", "grado_actual": ng, "turno": nt, "estado": ne, "encargado": {"nombre": nres, "telefono": ntel, "direccion": ndir}}
                         if new_doc:
                             url = subir_archivo(new_doc, f"expedientes/{a['nie']}")
                             if url:
                                 current_docs = a.get('documentos',{}).get('doc_urls', [])
                                 current_docs.append(url)
                                 update_data["documentos.doc_urls"] = current_docs
-                        
                         db.collection("alumnos").document(a['nie']).update(update_data)
-                        st.success("Expediente actualizado.")
-                        time.sleep(1); st.rerun()
+                        st.success("Expediente actualizado."); time.sleep(1); st.rerun()
 
     # --- 4. MAESTROS ---
     elif opcion_seleccionada == "Maestros":

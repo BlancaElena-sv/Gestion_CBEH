@@ -206,7 +206,7 @@ if opcion == "Inicio":
     # <--- EDITA ESTA LISTA PARA CAMBIAR LA TABLA DE ACTIVIDADES
     cronograma_data = [
         {"Fecha": "02 Ene - 25 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"},
-        {"Fecha": "15 Ene", "Actividad": "Reunión de Personal Docente", "Estado": "Finalizado"},
+        {"Fecha": "15 Ene", "Actividad": "inicio de año laboral docentes", "Estado": "Finalizado"},
         {"Fecha": "26 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"}, # <--- FECHA CORREGIDA
         {"Fecha": "30 Ene", "Actividad": "Entrega de Planificaciones", "Estado": "Pendiente"}
     ]

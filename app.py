@@ -57,24 +57,18 @@ if "user_name" not in st.session_state: st.session_state["user_name"] = None
 if "user_id" not in st.session_state: st.session_state["user_id"] = None
 
 def login():
-    # --- PANTALLA DE LOGIN CENTRADA ---
-    # Usamos columnas vacias a los lados para centrar el contenido
-    c1, c2, c3 = st.columns([1, 2, 1])
-    
-    with c2:
+    col_izq, col_centro, col_der = st.columns([1, 2, 1])
+    with col_centro:
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        try:
-            # Centrar imagen usando columnas anidadas dentro de la central
-            ic1, ic2, ic3 = st.columns([1,1,1])
-            with ic2:
-                st.image("logo.png", use_container_width=True)
-        except:
+        try: 
+            st.image("logo.png", width=180) 
+        except: 
             st.warning("⚠️")
-        
-        st.markdown("<h1 style='text-align: center; color: #1E3A8A; margin-bottom: 0;'>EduManager</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center; color: #555; margin-top: 0;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
-        st.write("") 
+            
+        st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>EduManager</h1>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center; color: #555;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
+        st.write("") 
 
         with st.form("login_form"):
             user = st.text_input("Usuario")
@@ -105,13 +99,7 @@ def login():
                 else: st.error("⚠️ Sin conexión.")
 
         st.info("¿Olvidó su credencial? Solicite restablecimiento con la Administración.")
-        st.markdown(
-            """
-            <div style='text-align: center; color: grey; font-size: 11px; margin-top: 40px;'>
-                <p>© 2026 David Fuentes Development | Todos los derechos reservados.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
+        st.markdown("<div style='text-align: center; color: grey; font-size: 11px; margin-top: 40px;'><p>© 2026 David Fuentes Development | Todos los derechos reservados.</p></div>", unsafe_allow_html=True)
 
 def logout():
     for key in list(st.session_state.keys()): del st.session_state[key]
@@ -178,17 +166,22 @@ def borrar_coleccion(coll_name, batch_size=10):
         deleted += 1
     if deleted >= batch_size: return borrar_coleccion(coll_name, batch_size)
 
-# --- VERIFICACIÓN DE DUPLICADOS ROBUSTA ---
+# --- VERIFICACIÓN DE DUPLICADOS (CORREGIDA SIN ERROR DE INDICE) ---
 def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
+    # 1. Filtramos solo por campos simples (igualdad)
     docs = db.collection("finanzas").where("docente_id", "==", docente_id).where("tipo", "==", "egreso").stream()
+    
     hoy = date.today()
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
+        
+        # 2. Filtramos la fecha en Python
         if fecha_db:
             if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
             
+            # Chequeo estricto: Misma fecha Y descripción contiene "Salario"
             if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
                 return True
     return False
@@ -211,7 +204,9 @@ def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
 with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.warning("Falta logo.png")
-    st.write(f"👤 **{st.session_state['user_name']}**")
+    
+    # Nombre limpio sin asteriscos
+    st.write(f"👤 {st.session_state['user_name']}")
     
     if st.session_state["user_role"] == "admin":
         opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Asistencia Global", "Notas", "Finanzas", "Configuración (Usuarios)"])
@@ -246,10 +241,15 @@ if opcion_seleccionada == "Inicio":
         q_prof = db.collection("maestros_perfil").where("nombre", "==", st.session_state["user_name"]).stream()
         found_prof = None
         for p in q_prof: found_prof = p.to_dict()
+        
         col_p1, col_p2 = st.columns([1, 4])
         with col_p1:
-            if found_prof and found_prof.get('foto_url'): st.image(found_prof['foto_url'], width=150)
-            else: st.image("https://via.placeholder.com/150", width=150)
+            # Fallback para imagen
+            if found_prof and found_prof.get('foto_url'):
+                st.image(found_prof['foto_url'], width=150)
+            else:
+                # Mostrar emoji grande si no hay foto
+                st.markdown("<h1 style='text-align: center;'>👤</h1>", unsafe_allow_html=True)
         with col_p2:
             st.subheader(f"Bienvenido, {st.session_state['user_name']}")
             st.info("Panel Docente - EduManager")
@@ -546,7 +546,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 monto = st.number_input("Monto", min_value=0.01)
                                 desc = st.text_input("Detalle")
                                 if st.form_submit_button("Registrar"):
-                                    # CHECK DUPLICADOS MAESTRO
+                                    # CHECK DUPLICADOS MAESTRO (CORREGIDO)
                                     desc_full = f"{tipo} - {desc}"
                                     if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
                                          st.error("⛔ Transacción duplicada (Salario hoy).")
@@ -560,7 +560,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         else: st.info("Sin historial.")
                 except Exception as e: st.error(f"Error cargando docente: {e}")
 
-    # --- 5. ASISTENCIA GLOBAL ---
+    # --- 5. ASISTENCIA GLOBAL (CON RANGO FECHAS) ---
     elif opcion_seleccionada == "Asistencia Global":
         st.title("📅 Reporte de Asistencia Global")
         c1, c2, c3 = st.columns(3)
@@ -569,24 +569,20 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         f_fin = c3.date_input("Hasta:", date.today())
         
         if st.button("Generar Reporte"):
-            # Lógica de reporte simplificada para evitar errores de fecha en query
             docs = db.collection("asistencia").where("grado", "==", g).stream()
-            
             stats = {}
             alums = db.collection("alumnos").where("grado_actual", "==", g).stream()
             for a in alums: stats[a.to_dict()['nie']] = {"Nombre": a.to_dict()['nombre_completo'], "P": 0, "A": 0, "Obs": []}
-            
             total_dias = 0
             
             for d in docs:
                 data_doc = d.to_dict()
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                # Manejar fecha en Python
                 if isinstance(fecha_doc, datetime): f_obj = fecha_doc.date()
                 else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp()).date()
                 
-                # FILTRO DE RANGO EN PYTHON (SEGURO)
+                # FILTRO DE RANGO EN PYTHON
                 if f_ini <= f_obj <= f_fin:
                     total_dias += 1
                     regs = data_doc.get('registros', {})
@@ -628,7 +624,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 else:
                     for c in cols: df[c] = 0.0
                 
-                # CALCULO REAL TIME
                 if m == "Conducta":
                     df["Promedio"] = df[cols[0]]
                 else:
@@ -785,8 +780,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
         with t4:
+            st.subheader("📜 Reportes Financieros")
             c_f1, c_f2, c_f3, c_f4 = st.columns(4)
-            # 1. Filtro Rango Rápido
+            # Filtro Rango Rápido
             filtro_rango = c_f1.selectbox("Rango de Tiempo", ["Este Mes", "Mes Pasado", "Últimos 3 Meses", "Últimos 6 Meses", "Este Año", "Personalizado"])
             
             # Lógica de fechas automática
@@ -1035,6 +1031,26 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     batch.commit()
                     st.success("Guardado")
                     time.sleep(1); st.rerun()
+                
+                st.divider()
+                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
+                rows_acumulados = []
+                for mes_iter in LISTA_MESES:
+                    id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
+                    doc_h = db.collection("notas_mensuales").document(id_history).get()
+                    if doc_h.exists:
+                        data_h = doc_h.to_dict().get("detalles", {})
+                        for nie_iter, notas_iter in data_h.items():
+                            nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
+                            if m == "Conducta":
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
+                            else:
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
+                if rows_acumulados:
+                    df_ac = pd.DataFrame(rows_acumulados)
+                    df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
+                    df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
+                    st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")

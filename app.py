@@ -141,14 +141,12 @@ def subir_archivo(archivo, ruta):
         return blob.public_url
     except: return None
 
-# --- CORRECCIÓN DE SINTAXIS (Expandida para evitar error) ---
 def get_base64(path):
     try:
         with open(path, "rb") as f:
             return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
     except:
         return ""
-# -----------------------------------------------------------
 
 def redondear_mined(valor):
     if valor is None: return 0.0
@@ -166,25 +164,37 @@ def borrar_coleccion(coll_name, batch_size=10):
         deleted += 1
     if deleted >= batch_size: return borrar_coleccion(coll_name, batch_size)
 
-# --- VERIFICACIÓN DE DUPLICADOS ESTRICTA (SALARIOS) ---
+# --- VERIFICACIÓN DE DUPLICADOS ROBUSTA (SIN FILTRO DE FECHA EN QUERY) ---
 def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
-    # Obtener inicio y fin del día de hoy
-    hoy_inicio = datetime.combine(date.today(), datetime.min.time())
-    hoy_fin = datetime.combine(date.today(), datetime.max.time())
+    # 1. Filtramos SOLO por docente y tipo (esto no da error)
+    docs = db.collection("finanzas").where("docente_id", "==", docente_id).where("tipo", "==", "egreso").stream()
     
-    # Buscar si ya existe un egreso para este docente HOY que contenga "Salario" en la descripción
-    docs = db.collection("finanzas")\
-        .where("docente_id", "==", docente_id)\
-        .where("tipo", "==", "egreso")\
-        .where("fecha", ">=", hoy_inicio)\
-        .where("fecha", "<=", hoy_fin)\
-        .stream()
+    hoy = date.today()
     
     for d in docs:
         data = d.to_dict()
-        # Si ya hay un salario hoy, devolver True (Es duplicado)
-        if "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
-            return True
+        fecha_db = data.get("fecha")
+        
+        # 2. Filtramos la fecha AQUÍ en Python (memoria)
+        if fecha_db:
+            if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
+            else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
+            
+            # Si la fecha es HOY y la descripción contiene "Salario", es duplicado
+            if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
+                return True
+    return False
+
+def existe_duplicado_alumno(id_alumno, descripcion):
+    docs = db.collection("finanzas").where("alumno_nie", "==", id_alumno).where("descripcion", "==", descripcion).stream()
+    hoy = date.today()
+    for d in docs:
+        data = d.to_dict()
+        fecha_db = data.get("fecha")
+        if fecha_db:
+            if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
+            else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
+            if f_obj == hoy: return True
     return False
 
 # ==========================================
@@ -395,6 +405,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     dd = doc.to_dict()
                     if dd['materia'] not in nm: nm[dd['materia']] = {}
                     nm[dd['materia']][dd['mes']] = dd['promedio_final']
+                
                 filas = []
                 malla = MAPA_CURRICULAR.get(a['grado_actual'], [])
                 for mat in malla:
@@ -528,11 +539,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 monto = st.number_input("Monto", min_value=0.01)
                                 desc = st.text_input("Detalle")
                                 if st.form_submit_button("Registrar"):
-                                    # --- VALIDACIÓN DUPLICADOS ---
-                                    if tipo == "Pago Salario (Egreso)" and verificar_pago_duplicado_hoy(pid, "Salario"):
-                                        st.error("⛔ Transacción bloqueada: Ya existe un pago de salario para este docente hoy.")
+                                    # CHECK DUPLICADOS MAESTRO
+                                    desc_full = f"{tipo} - {desc}"
+                                    if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
+                                         st.error("⛔ Transacción duplicada (Salario hoy).")
                                     else:
-                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'], "descripcion": f"{tipo} - {desc}", "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
+                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'], "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
                                         st.success("Registrado")
                         movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
                         lm = [m.to_dict() for m in movs]
@@ -541,16 +553,16 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         else: st.info("Sin historial.")
                 except Exception as e: st.error(f"Error cargando docente: {e}")
 
-    # --- 5. ASISTENCIA GLOBAL (CON RANGO DE FECHAS) ---
+    # --- 5. ASISTENCIA GLOBAL (CON RANGO FECHAS) ---
     elif opcion_seleccionada == "Asistencia Global":
         st.title("📅 Reporte de Asistencia Global")
         c1, c2, c3 = st.columns(3)
         g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
-        f_ini = c2.date_input("Desde:", date.today().replace(day=1))
+        f_ini = c2.date_input("Desde:", date.today())
         f_fin = c3.date_input("Hasta:", date.today())
         
         if st.button("Generar Reporte"):
-            # Lógica de reporte con rango de fechas
+            # Lógica de reporte simplificada para evitar errores de fecha en query
             docs = db.collection("asistencia").where("grado", "==", g).stream()
             
             stats = {}
@@ -563,31 +575,24 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 data_doc = d.to_dict()
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                # Manejo de Timestamp
+                # Manejar fecha en Python
                 if isinstance(fecha_doc, datetime): f_obj = fecha_doc.date()
                 else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp()).date()
-
+                
+                # FILTRO DE RANGO EN PYTHON (SEGURO)
                 if f_ini <= f_obj <= f_fin:
                     total_dias += 1
                     regs = data_doc.get('registros', {})
-                    obs_regs = data_doc.get('observaciones', {})
+                    obs = data_doc.get('observaciones', {})
                     for nie, est in regs.items():
                         if nie in stats: 
                             if est == "Presente": stats[nie]["P"] += 1
                             elif est == "Ausente": 
                                 stats[nie]["A"] += 1
-                                if obs_regs.get(nie): stats[nie]["Obs"].append(f"{f_obj.strftime('%d/%m')}: {obs_regs[nie]}")
+                                if obs.get(nie): stats[nie]["Obs"].append(f"{f_obj.strftime('%d/%m')}: {obs[nie]}")
             
             if total_dias > 0:
-                data = []
-                for v in stats.values():
-                    data.append({
-                        "Alumno": v["Nombre"], 
-                        "Asistencias": v["P"], 
-                        "Faltas": v["A"], 
-                        "% Asist": f"{(v['P']/total_dias)*100:.0f}%",
-                        "Observaciones": ", ".join(v["Obs"])
-                    })
+                data = [{"Alumno": v["Nombre"], "Asistencias": v["P"], "Faltas": v["A"], "% Asist": f"{(v['P']/total_dias)*100:.0f}%", "Observaciones": ", ".join(v["Obs"])} for v in stats.values()]
                 st.dataframe(pd.DataFrame(data), use_container_width=True)
             else: st.info("No hay tomas de asistencia registradas para este periodo.")
 
@@ -714,7 +719,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     obs = st.text_input("Observaciones")
                     if st.form_submit_button("✅ Registrar Ingreso"):
                         desc_full = f"{tipo_c} - {det_c}"
-                        if existe_duplicado("finanzas", "alumno_nie", n, desc_full):
+                        if existe_duplicado_alumno(n, desc_full):
                             st.error("⛔ Transacción duplicada (Mismo alumno, mismo concepto hoy).")
                         else:
                             recibo_data = {"tipo": "ingreso", "descripcion": desc_full, "monto": monto, "alumno_nie": n, "nombre_persona": pa['nombre_completo'], "observaciones": obs, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"), "id_short": str(int(time.time()))[-6:]}
@@ -750,12 +755,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 
                 if st.form_submit_button("Registrar"):
                     desc_full = f"{tp} - {det_g}"
-                    # CHECK ANTI DUPLICADOS GASTO
                     duplicado = False
-                    # Verificar si es salario y ya se pagó hoy a este ID
                     if tp == "Salario" and maestro_seleccionado:
-                        if verificar_pago_duplicado_hoy(maestro_seleccionado, "Salario"):
-                            duplicado = True
+                        if verificar_pago_duplicado_hoy(maestro_seleccionado, "Salario"): duplicado = True
                     
                     if duplicado:
                         st.error("⛔ Pago duplicado detectado (Salario ya registrado hoy para este docente).")

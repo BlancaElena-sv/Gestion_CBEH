@@ -256,7 +256,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
             tabs = st.tabs(["📋 Datos y Documentos", "💰 Historial y Solvencia", "📊 Boleta de Notas", "⚙️ Edición Expediente"])
 
-            # 1. DATOS Y DOCUMENTOS (CORREGIDO: VISUALIZACIÓN INCRUSTADA)
+            # 1. DATOS Y DOCUMENTOS (CORREGIDO CON VISOR GOOGLE)
             with tabs[0]:
                 col_d1, col_d2 = st.columns(2)
                 with col_d1:
@@ -271,21 +271,20 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     
                     if docs:
                         for i, url in enumerate(list(set(docs))):
-                            # AQUÍ ESTÁ EL CAMBIO: Expander con iframe para ver ahí mismo
                             with st.expander(f"👁️ Visualizar Documento {i+1}"):
-                                st.markdown(f'<iframe src="{url}" width="100%" height="500px" style="border:none;"></iframe>', unsafe_allow_html=True)
-                                st.caption(f"¿No carga? [Abrir en nueva pestaña]({url})")
+                                # SOLUCIÓN: Usar el Visor de Google Docs para forzar renderizado sin descarga
+                                google_viewer = f"https://docs.google.com/gview?embedded=true&url={url}"
+                                st.markdown(f'<iframe src="{google_viewer}" width="100%" height="500px" style="border:none;"></iframe>', unsafe_allow_html=True)
+                                st.caption(f"[Enlace Directo (Respaldo)]({url})")
                     else: st.info("Sin documentos.")
 
             # 2. FINANCIERO
             with tabs[1]:
                 col_fin1, col_fin2 = st.columns([2,1])
-                
                 with col_fin1:
                     st.subheader("Historial de Pagos")
                     pagos = db.collection("finanzas").where("alumno_nie", "==", a['nie']).where("tipo", "==", "ingreso").stream()
                     raw_pagos = [{"id": p.id, **p.to_dict()} for p in pagos]
-                    
                     if raw_pagos:
                         df_pagos = pd.DataFrame(raw_pagos)
                         st.dataframe(df_pagos[['fecha_legible', 'descripcion', 'monto']], use_container_width=True)
@@ -293,7 +292,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         st.write("**🖨️ Reimprimir Recibo Histórico**")
                         opciones_recibo = {f"{p['fecha_legible']} - {p['descripcion']} (${p['monto']})": p for p in raw_pagos}
                         sel_recibo = st.selectbox("Seleccione un pago para ver el recibo:", ["Seleccionar..."] + list(opciones_recibo.keys()))
-                        
                         if sel_recibo != "Seleccionar...":
                             p_obj = opciones_recibo[sel_recibo]
                             if st.button("Visualizar Recibo Seleccionado"):
@@ -307,7 +305,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     st.markdown("### 🎫 Solvencia")
                     periodo = st.selectbox("Examen:", ["I Trimestre", "II Trimestre", "III Trimestre", "Final"])
                     tiene_pagos = len(raw_pagos) > 0
-                    
                     if not tiene_pagos:
                         st.error("⛔ ALUMNO INSOLVENTE")
                         st.caption("No se registran pagos. Bloqueado.")
@@ -327,7 +324,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     dd = doc.to_dict()
                     if dd['materia'] not in nm: nm[dd['materia']] = {}
                     nm[dd['materia']][dd['mes']] = dd['promedio_final']
-                
                 if not nm: st.warning("Sin notas")
                 else:
                     filas = []
@@ -344,7 +340,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {a['nombre_completo']} | <b>Grado:</b> {a['grado_actual']} | <b>Guía:</b> {maestro_guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><div style='display:flex;justify-content:space-between;text-align:center;padding:0 50px;'><div style='border-top:1px solid black;width:30%'>Orientador</div><div style='border-top:1px solid black;width:30%'>Dirección</div></div></div>"""
                     components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
-            # 4. EDICIÓN
+            # 4. EDICIÓN (CON CAMBIO DE FOTO)
             with tabs[3]:
                 st.subheader("Gestión del Expediente")
                 with st.form("edit_full"):
@@ -357,17 +353,30 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     nres = c2.text_input("Responsable", a.get('encargado',{}).get('nombre',''))
                     ntel = c1.text_input("Teléfono", a.get('encargado',{}).get('telefono',''))
                     ndir = c2.text_area("Dirección", a.get('encargado',{}).get('direccion',''))
+                    
                     st.markdown("---")
-                    st.write("**Adjuntar Nuevo Documento:**")
-                    new_doc = st.file_uploader("Subir PDF/Imagen", ["pdf", "jpg", "png"])
+                    st.write("📸 **Actualizar Foto de Perfil (Carnet):**")
+                    new_foto = st.file_uploader("Subir nueva foto", ["jpg", "png", "jpeg"], key="up_foto")
+                    
+                    st.write("📄 **Adjuntar Documento Extra:**")
+                    new_doc = st.file_uploader("Subir PDF/Imagen", ["pdf", "jpg", "png"], key="up_doc")
+                    
                     if st.form_submit_button("💾 Guardar Cambios"):
                         update_data = {"nombres": nn, "apellidos": na, "nombre_completo": f"{nn} {na}", "grado_actual": ng, "turno": nt, "estado": ne, "encargado": {"nombre": nres, "telefono": ntel, "direccion": ndir}}
+                        
+                        # LOGICA FOTO
+                        if new_foto:
+                            url_foto = subir_archivo(new_foto, f"expedientes/{a['nie']}")
+                            if url_foto: update_data["documentos.foto_url"] = url_foto
+                        
+                        # LOGICA DOCS
                         if new_doc:
                             url = subir_archivo(new_doc, f"expedientes/{a['nie']}")
                             if url:
                                 current_docs = a.get('documentos',{}).get('doc_urls', [])
                                 current_docs.append(url)
                                 update_data["documentos.doc_urls"] = current_docs
+                        
                         db.collection("alumnos").document(a['nie']).update(update_data)
                         st.success("Expediente actualizado."); time.sleep(1); st.rerun()
 

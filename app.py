@@ -168,7 +168,6 @@ if opcion_seleccionada == "Inicio":
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
         st.metric("Fecha", "Lunes 26 de Enero", "2026")
-        st.metric("Fecha", "Lunes 2 de Febrero", "2026")
     cronograma = [
         {"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"},
         {"Fecha": "15 Ene", "Actividad": "Inicio año laboral Maestros", "Estado": "Programado"},

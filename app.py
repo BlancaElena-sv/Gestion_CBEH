@@ -627,12 +627,15 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
                     st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
-    # --- 7. FINANZAS (COMPLETO) ---
+    # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
-        t_dash, t_ingreso, t_egreso, t_rep = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Reportes & Reimpresión"])
-        # (LOGICA DE FINANZAS DE v24, LA QUE FUNCIONA BIEN, AQUI ABAJO)
-        with t_dash:
+        
+        # AQUÍ ESTABA EL ERROR: Definimos las pestañas AL PRINCIPIO
+        t1, t2, t3, t4 = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Reportes & Reimpresión"])
+
+        # 1. DASHBOARD
+        with t1:
             c_date, _ = st.columns([1, 2])
             fecha_corte = c_date.date_input("Fecha de Corte", date.today())
             fecha_str = fecha_corte.strftime("%d/%m/%Y")
@@ -640,18 +643,21 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             data_hoy = []
             ingreso_dia = 0.0
             egreso_dia = 0.0
+            
             for doc in all_fin:
                 d = doc.to_dict()
                 if d.get('fecha_legible') == fecha_str:
                     data_hoy.append(d)
                     if d['tipo'] == 'ingreso': ingreso_dia += d['monto']
                     elif d['tipo'] == 'egreso': egreso_dia += d['monto']
+            
             saldo_dia = ingreso_dia - egreso_dia
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric("Ingresos del Día", f"${ingreso_dia:.2f}", delta_color="normal")
             kpi2.metric("Gastos del Día", f"${egreso_dia:.2f}", delta_color="inverse")
             kpi3.metric("Saldo Neto", f"${saldo_dia:.2f}")
             st.divider()
+            st.subheader(f"Libro Diario - {fecha_str}")
             if data_hoy:
                 df_hoy = pd.DataFrame(data_hoy)
                 st.dataframe(df_hoy[['descripcion', 'tipo', 'monto', 'nombre_persona']], use_container_width=True)
@@ -659,9 +665,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="40">' if logo else ""
                     html_corte = f"""<div style="font-family:monospace;width:300px;margin:auto;border:1px solid black;padding:10px;"><div style="text-align:center;">{hi}<br><b>COLEGIO BLANCA ELENA</b><br>CORTE DE CAJA</div><br><b>FECHA:</b> {fecha_str}<br><hr><table width="100%"><tr><td>(+) INGRESOS:</td><td align="right">${ingreso_dia:.2f}</td></tr><tr><td>(-) GASTOS:</td><td align="right">${egreso_dia:.2f}</td></tr><tr><td><b>(=) SALDO:</b></td><td align="right"><b>${saldo_dia:.2f}</b></td></tr></table><br><div style="text-align:center;margin-top:20px;">___________________<br>Firma Responsable</div></div>"""
                     components.html(f"""<html><body>{html_corte}<br><center><button onclick="window.print()">IMPRIMIR</button></center></body></html>""", height=400)
-            else: st.info("No hay movimientos hoy.")
+            else: st.info("No hay movimientos registrados hoy.")
 
-        with t_ingreso:
+        # 2. COBROS
+        with t2:
             n = st.text_input("Buscar NIE del Alumno para Cobro:")
             if st.button("Buscar Alumno") and n:
                 d = db.collection("alumnos").document(n).get()
@@ -695,44 +702,105 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 r = st.session_state.recibo_temp
                 st.success("¡Pago Registrado!")
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                html_recibo = f"""<div style="border: 2px solid #333; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE INGRESO</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>RECIBIMOS DE:</b> {r['nombre_persona']}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p><p><b>OBSERVACIONES:</b> {r['observaciones']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Entregado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido (Caja)</td></tr></table></div>"""
+                html_recibo = f"""<div style="border: 2px solid #333; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE INGRESO</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>RECIBIMOS DE:</b> {r['nombre_persona']}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Entregado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido (Caja)</td></tr></table></div>"""
                 components.html(f"""<html><body>{html_recibo}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
                 if st.button("Cerrar Comprobante"): del st.session_state.recibo_temp; st.rerun()
 
+        # 3. GASTOS
         with t3:
-            with st.form("fg"):
-                tp = st.selectbox("Gasto", ["Salario", "Servicios", "Mantenimiento", "Otros"])
-                mt = st.number_input("Monto", min_value=0.01)
-                per = st.text_input("Pagado a")
-                det_g = st.text_input("Detalle")
-                if st.form_submit_button("Registrar"):
-                    gasto = {"tipo": "egreso", "descripcion": f"{tp} - {det_g}", "monto": mt, "nombre_persona": per, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"), "id_short": str(int(time.time()))[-6:]}
-                    db.collection("finanzas").add(gasto)
-                    st.session_state.gasto_temp = gasto
-                    st.success("Registrado"); time.sleep(1); st.rerun()
+            st.subheader("Registro de Gastos")
+            with st.form("form_gasto"):
+                c1, c2 = st.columns(2)
+                tipo_g = c1.selectbox("Tipo de Gasto", ["Salario", "Servicios", "Mantenimiento", "Otros"])
+                det_g = c2.text_input("Detalle (Ej: Recibo Luz del Sur)")
+                monto_g = c1.number_input("Monto ($)", min_value=0.01)
+                beneficiario = c2.text_input("Pagado a (Nombre/Empresa)")
+                if st.form_submit_button("🔴 Registrar Salida"):
+                    concepto_full = f"{tipo_g} - {det_g}" if det_g else tipo_g
+                    gasto_data = {
+                        "tipo": "egreso", "descripcion": concepto_full, "monto": monto_g, "nombre_persona": beneficiario,
+                        "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"),
+                        "id_short": str(int(time.time()))[-6:]
+                    }
+                    db.collection("finanzas").add(gasto_data)
+                    st.session_state.gasto_temp = gasto_data
+                    st.success("Gasto registrado.")
+                    st.rerun()
+
             if "gasto_temp" in st.session_state:
                 r = st.session_state.gasto_temp
+                st.warning("Gasto registrado.")
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
                 html_gasto = f"""<div style="border: 2px solid #d32f2f; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:0; font-size:12px;"><b>COMPROBANTE DE EGRESO (GASTO)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: #d32f2f;">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>PAGADO A:</b> {r['nombre_persona']}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">Autorizado Por</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">Recibido Conforme</td></tr></table></div>"""
                 components.html(f"""<html><body>{html_gasto}<br><center><button onclick="window.print()">🖨️ IMPRIMIR COMPROBANTE</button></center></body></html>""", height=500)
                 if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
+        # 4. HISTORIAL Y REPORTE
         with t4:
-            c1, c2, c3 = st.columns(3)
-            txt = c1.text_input("Buscar")
-            # Logica de reporte simple sin ordenamiento de base de datos
-            docs_hist = db.collection("finanzas").stream() 
-            data_raw = []
-            for d in docs_hist:
-                dic = d.to_dict()
-                if txt.lower() in dic.get('descripcion','').lower() or txt.lower() in dic.get('nombre_persona','').lower():
-                    data_raw.append(dic)
+            st.subheader("📜 Reportes Financieros")
+            c_f1, c_f2, c_f3, c_f4 = st.columns(4)
+            f_tipo = c_f1.multiselect("Tipo:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
+            f_inicio = c_f2.date_input("Desde:", date.today().replace(day=1))
+            f_fin = c_f3.date_input("Hasta:", date.today())
+            f_texto = c_f4.text_input("Buscar:")
             
-            # Ordenar en python
-            data_raw.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
+            dt_inicio = datetime.combine(f_inicio, datetime.min.time())
+            dt_fin = datetime.combine(f_fin, datetime.max.time())
             
-            if data_raw:
-                st.dataframe(pd.DataFrame(data_raw)[['fecha_legible','tipo','descripcion','monto']], use_container_width=True)
+            query = db.collection("finanzas").where("fecha", ">=", dt_inicio).where("fecha", "<=", dt_fin).order_by("fecha", direction=firestore.Query.DESCENDING)
+            docs = query.stream()
+            
+            data_rep = []
+            tot_ing = 0.0
+            tot_egr = 0.0
+            
+            for doc in docs:
+                d = doc.to_dict()
+                d['id'] = doc.id
+                c_txt = (f_texto.lower() in d.get('nombre_persona','').lower() or f_texto.lower() in d.get('descripcion','').lower() or f_texto.lower() in d.get('id_short','').lower())
+                c_typ = d['tipo'] in f_tipo
+                if c_txt and c_typ:
+                    data_rep.append(d)
+                    if d['tipo'] == 'ingreso': tot_ing += d['monto']
+                    elif d['tipo'] == 'egreso': tot_egr += d['monto']
+            
+            st.divider()
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Total Ingresos", f"${tot_ing:.2f}", border=True)
+            k2.metric("Total Egresos", f"${tot_egr:.2f}", delta_color="inverse", border=True)
+            k3.metric("Balance", f"${tot_ing - tot_egr:.2f}", border=True)
+            st.divider()
+
+            if data_rep:
+                df_rep = pd.DataFrame(data_rep)
+                st.dataframe(df_rep[['fecha_legible', 'tipo', 'nombre_persona', 'descripcion', 'monto']], use_container_width=True)
+                
+                # REIMPRESIÓN
+                st.markdown("#### 🔄 Reimpresión")
+                options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_rep}
+                selection = st.selectbox("Seleccione transacción para reimprimir:", ["Seleccionar..."] + list(options.keys()))
+                
+                if selection != "Seleccionar...":
+                    r = options[selection]
+                    if st.button("Visualizar Original"):
+                        logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                        color_b = "#333" if r['tipo'] == 'ingreso' else "#d32f2f"
+                        titulo = "COMPROBANTE DE INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE DE EGRESO"
+                        etiqueta1 = "RECIBIMOS DE:" if r['tipo'] == 'ingreso' else "PAGADO A:"
+                        etiqueta2 = "Entregado Por" if r['tipo'] == 'ingreso' else "Autorizado Por"
+                        etiqueta3 = "Recibido (Caja)" if r['tipo'] == 'ingreso' else "Recibido Conforme"
+                        html_reimp = f"""<div style="border: 2px solid {color_b}; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: {color_b};">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>{etiqueta1}</b> {r.get('nombre_persona','-')}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p><p><b>OBSERVACIONES:</b> {r.get('observaciones','')}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta2}</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta3}</td></tr></table></div>"""
+                        components.html(f"""<html><body>{html_reimp}<br><center><button onclick="window.print()">🖨️ REIMPRIMIR</button></center></body></html>""", height=500)
+
+                # REPORTE GENERAL
+                if st.button("🖨️ Imprimir Reporte General"):
+                    logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
+                    rows_html = ""
+                    for item in data_rep:
+                        color_row = "#e8f5e9" if item['tipo'] == 'ingreso' else "#ffebee"
+                        rows_html += f"<tr style='background:{color_row};'><td>{item['fecha_legible']}</td><td>{item.get('id_short','-')}</td><td>{item['nombre_persona']}</td><td>{item['descripcion']}</td><td align='right'>${item['monto']:.2f}</td></tr>"
+                    html_reporte = f"""<div style="font-family:Arial; padding:20px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;"><div style="display:flex; align-items:center; gap:15px;">{hi}<div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">REPORTE FINANCIERO</p></div></div><div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')} <b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div></div><br><div style="display:flex; gap:20px; margin-bottom:20px;"><div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div><div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div><div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div></div><table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd"><tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Ref</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>{rows_html}</table><br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div></div>"""
+                    components.html(f"""<html><body>{html_reporte}<br><center><button onclick="window.print()" style="background:#333; color:white; padding:10px 20px; cursor:pointer;">🖨️ IMPRIMIR REPORTE PDF</button></center></body></html>""", height=600, scrolling=True)
 
     # --- 8. CONFIGURACIÓN (USUARIOS) (NUEVO MODULO) ---
     elif opcion_seleccionada == "Configuración (Usuarios)":

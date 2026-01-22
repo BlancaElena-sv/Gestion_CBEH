@@ -7,6 +7,7 @@ import base64
 import time
 import os
 import streamlit.components.v1 as components
+import re
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -56,6 +57,13 @@ if "user_role" not in st.session_state: st.session_state["user_role"] = None
 if "user_name" not in st.session_state: st.session_state["user_name"] = None
 if "user_id" not in st.session_state: st.session_state["user_id"] = None
 
+def limpiar_nombre(nombre):
+    """Elimina caracteres especiales y espacios extra para búsquedas limpias."""
+    if not nombre: return ""
+    # Eliminar asteriscos y guiones bajos, y quitar espacios al inicio/final
+    limpio = nombre.replace("*", "").replace("_", " ").strip()
+    return limpio
+
 def login():
     col_izq, col_centro, col_der = st.columns([1, 2, 1])
     with col_centro:
@@ -92,7 +100,7 @@ def login():
                             if d["pass"] == password:
                                 st.session_state["logged_in"] = True
                                 st.session_state["user_role"] = d["rol"]
-                                st.session_state["user_name"] = d["nombre"]
+                                st.session_state["user_name"] = d.get("nombre", user) # Fallback al user si no hay nombre
                                 st.session_state["user_id"] = user
                                 st.rerun()
                             else: st.error("❌ Contraseña incorrecta")
@@ -177,7 +185,6 @@ def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
         if fecha_db:
             if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
-            
             if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
                 return True
     return False
@@ -201,8 +208,9 @@ with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.warning("Falta logo.png")
     
-    # LIMPIEZA DE NOMBRE EN SIDEBAR (Quita asteriscos y espacios)
-    nombre_mostrar = st.session_state['user_name'].replace("*", "").strip() if st.session_state['user_name'] else "Usuario"
+    # LIMPIEZA DE NOMBRE EN SIDEBAR
+    nombre_raw = st.session_state.get('user_name', 'Usuario')
+    nombre_mostrar = limpiar_nombre(nombre_raw)
     st.write(f"👤 **{nombre_mostrar}**")
     
     if st.session_state["user_role"] == "admin":
@@ -237,18 +245,23 @@ if opcion_seleccionada == "Inicio":
     
     if st.session_state["user_role"] == "docente" and db:
         # 1. LIMPIEZA DEL NOMBRE PARA BUSQUEDA
-        nombre_limpio = st.session_state["user_name"].replace("*", "").strip()
+        nombre_raw = st.session_state["user_name"]
+        nombre_limpio = limpiar_nombre(nombre_raw)
         
         # 2. BUSQUEDA INTELIGENTE DEL PERFIL
-        # Intento 1: Buscar por el nombre tal cual está en el login
-        q_prof = db.collection("maestros_perfil").where("nombre", "==", st.session_state["user_name"]).stream()
         found_prof = None
-        for p in q_prof: found_prof = p.to_dict()
+        # Intento 1: Buscar por el nombre tal cual está en el login
+        try:
+            q_prof = db.collection("maestros_perfil").where("nombre", "==", nombre_raw).stream()
+            for p in q_prof: found_prof = p.to_dict()
+        except: pass
         
         # Intento 2: Si falla, buscar por el nombre limpio
         if not found_prof:
-            q_prof_clean = db.collection("maestros_perfil").where("nombre", "==", nombre_limpio).stream()
-            for p in q_prof_clean: found_prof = p.to_dict()
+            try:
+                q_prof_clean = db.collection("maestros_perfil").where("nombre", "==", nombre_limpio).stream()
+                for p in q_prof_clean: found_prof = p.to_dict()
+            except: pass
 
         col_p1, col_p2 = st.columns([1, 4])
         with col_p1:
@@ -264,7 +277,7 @@ if opcion_seleccionada == "Inicio":
         # VISTA ADMIN
         c1, c2, c3 = st.columns(3)
         c1.metric("Ciclo Lectivo", "2026")
-        c2.metric("Usuario", st.session_state['user_name'].replace("*","").strip())
+        c2.metric("Usuario", limpiar_nombre(st.session_state['user_name']))
         c3.metric("Rol", st.session_state['user_role'].upper())
 
     st.markdown("---")
@@ -276,9 +289,9 @@ if opcion_seleccionada == "Inicio":
         st.write("- Actualización de datos.")
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
-        st.metric("Fecha", "26 de Enero", "2026")
+        st.metric("Fecha", "19 de Enero", "2026")
     
-    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "15 Ene", "Actividad": "Inicio actividades personal docente", "Estado": "Realizado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
+    cronograma = [{"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
     st.table(pd.DataFrame(cronograma))
 
 # ==========================================
@@ -498,33 +511,37 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     else: st.error("Nombre requerido")
         else:
             if lista_profes:
+                # --- BLOQUE TRY/EXCEPT AÑADIDO PARA EVITAR CRASH ---
                 try:
                     pid = next(p['id'] for p in lista_profes if f"{p.get('codigo','S/C')} - {p['nombre']}" == sel_prof)
                     prof_data = next(p for p in lista_profes if p['id'] == pid)
+                    
                     with st.container(border=True):
                         c1, c2, c3 = st.columns([1, 3, 1])
                         with c1: st.image(prof_data.get('foto_url', "https://via.placeholder.com/150"), width=120)
                         with c2:
-                            st.title(prof_data['nombre'])
+                            st.title(prof_data.get('nombre', 'Sin Nombre'))
                             st.caption(f"Código: {prof_data.get('codigo','S/C')}")
                             st.write(f"📞 {prof_data.get('telefono','-')} | 📧 {prof_data.get('email','-')}")
                         with c3:
                             if st.button("✏️ Editar Perfil"): st.session_state.edit_prof_mode = True
+
                     if st.session_state.get("edit_prof_mode"):
                         with st.form("edit_prof_form"):
-                            nc = st.text_input("Nombre", prof_data['nombre'])
+                            nc = st.text_input("Nombre", prof_data.get('nombre', ''))
                             nt = st.text_input("Teléfono", prof_data.get('telefono',''))
                             nf = st.file_uploader("Nueva Foto", ["jpg", "png"])
                             if st.form_submit_button("Guardar Cambios"):
                                 upd = {"nombre": nc, "telefono": nt}
                                 if nf:
-                                    u = subir_archivo(nf, f"profesores/{prof_data.get('codigo')}")
+                                    u = subir_archivo(nf, f"profesores/{prof_data.get('codigo','SN')}")
                                     if u: upd["foto_url"] = u
                                 db.collection("maestros_perfil").document(pid).update(upd)
                                 st.session_state.edit_prof_mode = False
                                 st.success("Actualizado"); time.sleep(1); st.rerun()
                     
                     tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
+
                     with tabs_m[0]:
                         c_asig, c_tabla = st.columns([1, 2])
                         with c_asig:
@@ -535,17 +552,19 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 m_sel = st.multiselect("Materias", mats_disp)
                                 guia = st.checkbox("¿Es Guía?")
                                 if st.form_submit_button("Guardar Carga"):
-                                    db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data['nombre'], "grado": g_sel, "materias": m_sel, "es_guia": guia})
+                                    db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data.get('nombre','Desconocido'), "grado": g_sel, "materias": m_sel, "es_guia": guia})
                                     st.success("Asignado"); time.sleep(0.5); st.rerun()
+
                         with c_tabla:
                             st.markdown("#### Carga Actual")
                             cargas = db.collection("carga_academica").where("id_docente", "==", pid).stream()
                             for c in cargas:
                                 cd = c.to_dict()
-                                with st.expander(f"{cd['grado']} {'(GUIA)' if cd.get('es_guia') else ''}"):
-                                    st.write(", ".join(cd['materias']))
+                                with st.expander(f"{cd.get('grado','?')} {'(GUIA)' if cd.get('es_guia') else ''}"):
+                                    st.write(", ".join(cd.get('materias',[])))
                                     if st.button("Eliminar", key=c.id):
                                         db.collection("carga_academica").document(c.id).delete(); st.rerun()
+
                     with tabs_m[1]:
                         with st.expander("➕ Registrar Movimiento"):
                             with st.form("ffin"):
@@ -558,14 +577,16 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                     if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
                                          st.error("⛔ Transacción duplicada (Salario hoy).")
                                     else:
-                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'], "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
+                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data.get('nombre',''), "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
                                         st.success("Registrado")
                         movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
                         lm = [m.to_dict() for m in movs]
                         lm.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
                         if lm: st.dataframe(pd.DataFrame(lm)[['fecha_legible','descripcion','monto']], use_container_width=True)
                         else: st.info("Sin historial.")
-                except Exception as e: st.error(f"Error cargando docente: {e}")
+
+                except Exception as e:
+                    st.error(f"Error cargando docente (Datos incompletos): {e}")
 
     # --- 5. ASISTENCIA GLOBAL ---
     elif opcion_seleccionada == "Asistencia Global":
@@ -576,24 +597,19 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         f_fin = c3.date_input("Hasta:", date.today())
         
         if st.button("Generar Reporte"):
-            # Lógica de reporte simplificada para evitar errores de fecha en query
             docs = db.collection("asistencia").where("grado", "==", g).stream()
-            
             stats = {}
             alums = db.collection("alumnos").where("grado_actual", "==", g).stream()
             for a in alums: stats[a.to_dict()['nie']] = {"Nombre": a.to_dict()['nombre_completo'], "P": 0, "A": 0, "Obs": []}
-            
             total_dias = 0
             
             for d in docs:
                 data_doc = d.to_dict()
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                # Manejar fecha en Python
                 if isinstance(fecha_doc, datetime): f_obj = fecha_doc.date()
                 else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp()).date()
                 
-                # FILTRO DE RANGO EN PYTHON (SEGURO)
                 if f_ini <= f_obj <= f_fin:
                     total_dias += 1
                     regs = data_doc.get('registros', {})

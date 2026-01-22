@@ -466,7 +466,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
     # --- 4. MAESTROS ---
     elif opcion_seleccionada == "Maestros":
-        st.title("👩‍🏫 Gestión Docente Pro")
+        st.title("👩‍🏫 Gestión Plantel Docente")
         docs_m = db.collection("maestros_perfil").stream()
         lista_profes = []
         for d in docs_m:

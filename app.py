@@ -7,6 +7,7 @@ import base64
 import time
 import os
 import streamlit.components.v1 as components
+import re
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -56,12 +57,15 @@ if "user_role" not in st.session_state: st.session_state["user_role"] = None
 if "user_name" not in st.session_state: st.session_state["user_name"] = None
 if "user_id" not in st.session_state: st.session_state["user_id"] = None
 
+def limpiar_nombre(nombre):
+    if not nombre: return ""
+    return nombre.replace("*", "").replace("_", " ").strip()
+
 def login():
     col_izq, col_centro, col_der = st.columns([1, 2, 1])
     with col_centro:
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         try: 
-            # Columnas anidadas para centrar imagen
             sc1, sc2, sc3 = st.columns([1, 1, 1])
             with sc2:
                 st.image("logo.png", use_container_width=True) 
@@ -93,7 +97,7 @@ def login():
                             if d["pass"] == password:
                                 st.session_state["logged_in"] = True
                                 st.session_state["user_role"] = d["rol"]
-                                st.session_state["user_name"] = d["nombre"]
+                                st.session_state["user_name"] = d.get("nombre", user)
                                 st.session_state["user_id"] = user
                                 st.rerun()
                             else: st.error("❌ Contraseña incorrecta")
@@ -178,7 +182,6 @@ def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
         if fecha_db:
             if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
-            
             if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
                 return True
     return False
@@ -202,7 +205,8 @@ with st.sidebar:
     try: st.image("logo.png", use_container_width=True)
     except: st.warning("Falta logo.png")
     
-    st.write(f"👤 **{st.session_state['user_name']}**")
+    nombre_mostrar = limpiar_nombre(st.session_state.get('user_name', 'Usuario'))
+    st.write(f"👤 **{nombre_mostrar}**")
     
     if st.session_state["user_role"] == "admin":
         opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Asistencia Global", "Notas", "Finanzas", "Configuración (Usuarios)"])
@@ -233,22 +237,34 @@ if not db and opcion_seleccionada != "Configuración (Usuarios)":
 # --- INICIO ---
 if opcion_seleccionada == "Inicio":
     st.title("🍎 Tablero Institucional")
+    
     if st.session_state["user_role"] == "docente" and db:
-        q_prof = db.collection("maestros_perfil").where("nombre", "==", st.session_state["user_name"]).stream()
+        nombre_limpio = limpiar_nombre(st.session_state.get("user_name",""))
         found_prof = None
-        for p in q_prof: found_prof = p.to_dict()
+        try:
+            q_prof = db.collection("maestros_perfil").where("nombre", "==", st.session_state["user_name"]).stream()
+            for p in q_prof: found_prof = p.to_dict()
+        except: pass
+        if not found_prof:
+            try:
+                q_prof_clean = db.collection("maestros_perfil").where("nombre", "==", nombre_limpio).stream()
+                for p in q_prof_clean: found_prof = p.to_dict()
+            except: pass
+
         col_p1, col_p2 = st.columns([1, 4])
         with col_p1:
-            if found_prof and found_prof.get('foto_url'): st.image(found_prof['foto_url'], width=150)
-            else: st.markdown("<h1 style='text-align: center;'>👤</h1>", unsafe_allow_html=True)
+            if found_prof and found_prof.get('foto_url'): 
+                st.image(found_prof['foto_url'], width=150)
+            else: 
+                st.markdown("<h1 style='text-align: center;'>👤</h1>", unsafe_allow_html=True)
         with col_p2:
-            st.subheader(f"Bienvenido, {st.session_state['user_name']}")
+            st.subheader(f"Bienvenido, {nombre_limpio}")
             st.info("Panel Docente - EduManager")
             if found_prof: st.write(f"📞 {found_prof.get('telefono','')} | 📧 {found_prof.get('email','')}")
     else:
         c1, c2, c3 = st.columns(3)
         c1.metric("Ciclo Lectivo", "2026")
-        c2.metric("Usuario", st.session_state['user_name'])
+        c2.metric("Usuario", limpiar_nombre(st.session_state['user_name']))
         c3.metric("Rol", st.session_state['user_role'].upper())
 
     st.markdown("---")
@@ -260,9 +276,9 @@ if opcion_seleccionada == "Inicio":
         st.write("- Actualización de datos.")
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
-        st.metric("Fecha", "26 de Enero", "2026")
+        st.metric("Fecha", "19 de Enero", "2026")
     
-    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "15 Ene", "Actividad": "Inicio de labores plantel docente", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
+    cronograma = [{"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
     st.table(pd.DataFrame(cronograma))
 
 # ==========================================
@@ -458,7 +474,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             dd['id'] = d.id
             if 'nombre' not in dd: dd['nombre'] = "Desconocido"
             lista_profes.append(dd)
-        opciones_prof = ["➕ Registrar Nuevo Maestro"] + [f"{p.get('codigo','S/C')} - {p['nombre']}" for p in lista_profes]
+        
+        # --- AQUÍ ESTÁ LA CORRECCIÓN: ELIMINAR DUPLICADOS EN LA LISTA ---
+        # 1. Crear conjunto de nombres únicos
+        nombres_unicos = sorted(list(set([f"{p.get('codigo','S/C')} - {p['nombre']}" for p in lista_profes])))
+        opciones_prof = ["➕ Registrar Nuevo Maestro"] + nombres_unicos
+        
         col_sel, _ = st.columns([2, 1])
         with col_sel:
             idx = st.session_state.get('sel_prof_idx', 0)
@@ -483,32 +504,36 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         else:
             if lista_profes:
                 try:
+                    # Búsqueda robusta por string coincidente
                     pid = next(p['id'] for p in lista_profes if f"{p.get('codigo','S/C')} - {p['nombre']}" == sel_prof)
                     prof_data = next(p for p in lista_profes if p['id'] == pid)
+                    
                     with st.container(border=True):
                         c1, c2, c3 = st.columns([1, 3, 1])
                         with c1: st.image(prof_data.get('foto_url', "https://via.placeholder.com/150"), width=120)
                         with c2:
-                            st.title(prof_data['nombre'])
+                            st.title(prof_data.get('nombre', 'Sin Nombre'))
                             st.caption(f"Código: {prof_data.get('codigo','S/C')}")
                             st.write(f"📞 {prof_data.get('telefono','-')} | 📧 {prof_data.get('email','-')}")
                         with c3:
                             if st.button("✏️ Editar Perfil"): st.session_state.edit_prof_mode = True
+
                     if st.session_state.get("edit_prof_mode"):
                         with st.form("edit_prof_form"):
-                            nc = st.text_input("Nombre", prof_data['nombre'])
+                            nc = st.text_input("Nombre", prof_data.get('nombre', ''))
                             nt = st.text_input("Teléfono", prof_data.get('telefono',''))
                             nf = st.file_uploader("Nueva Foto", ["jpg", "png"])
                             if st.form_submit_button("Guardar Cambios"):
                                 upd = {"nombre": nc, "telefono": nt}
                                 if nf:
-                                    u = subir_archivo(nf, f"profesores/{prof_data.get('codigo')}")
+                                    u = subir_archivo(nf, f"profesores/{prof_data.get('codigo','SN')}")
                                     if u: upd["foto_url"] = u
                                 db.collection("maestros_perfil").document(pid).update(upd)
                                 st.session_state.edit_prof_mode = False
                                 st.success("Actualizado"); time.sleep(1); st.rerun()
                     
                     tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
+
                     with tabs_m[0]:
                         c_asig, c_tabla = st.columns([1, 2])
                         with c_asig:
@@ -519,17 +544,19 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 m_sel = st.multiselect("Materias", mats_disp)
                                 guia = st.checkbox("¿Es Guía?")
                                 if st.form_submit_button("Guardar Carga"):
-                                    db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data['nombre'], "grado": g_sel, "materias": m_sel, "es_guia": guia})
+                                    db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data.get('nombre','Desconocido'), "grado": g_sel, "materias": m_sel, "es_guia": guia})
                                     st.success("Asignado"); time.sleep(0.5); st.rerun()
+
                         with c_tabla:
                             st.markdown("#### Carga Actual")
                             cargas = db.collection("carga_academica").where("id_docente", "==", pid).stream()
                             for c in cargas:
                                 cd = c.to_dict()
-                                with st.expander(f"{cd['grado']} {'(GUIA)' if cd.get('es_guia') else ''}"):
-                                    st.write(", ".join(cd['materias']))
+                                with st.expander(f"{cd.get('grado','?')} {'(GUIA)' if cd.get('es_guia') else ''}"):
+                                    st.write(", ".join(cd.get('materias',[])))
                                     if st.button("Eliminar", key=c.id):
                                         db.collection("carga_academica").document(c.id).delete(); st.rerun()
+
                     with tabs_m[1]:
                         with st.expander("➕ Registrar Movimiento"):
                             with st.form("ffin"):
@@ -542,14 +569,16 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                     if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
                                          st.error("⛔ Transacción duplicada (Salario hoy).")
                                     else:
-                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data['nombre'], "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
+                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data.get('nombre',''), "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
                                         st.success("Registrado")
                         movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
                         lm = [m.to_dict() for m in movs]
                         lm.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
                         if lm: st.dataframe(pd.DataFrame(lm)[['fecha_legible','descripcion','monto']], use_container_width=True)
                         else: st.info("Sin historial.")
-                except Exception as e: st.error(f"Error cargando docente: {e}")
+
+                except Exception as e:
+                    st.error(f"Error cargando docente (Datos incompletos): {e}")
 
     # --- 5. ASISTENCIA GLOBAL ---
     elif opcion_seleccionada == "Asistencia Global":
@@ -560,24 +589,19 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         f_fin = c3.date_input("Hasta:", date.today())
         
         if st.button("Generar Reporte"):
-            # Lógica de reporte simplificada para evitar errores de fecha en query
             docs = db.collection("asistencia").where("grado", "==", g).stream()
-            
             stats = {}
             alums = db.collection("alumnos").where("grado_actual", "==", g).stream()
             for a in alums: stats[a.to_dict()['nie']] = {"Nombre": a.to_dict()['nombre_completo'], "P": 0, "A": 0, "Obs": []}
-            
             total_dias = 0
             
             for d in docs:
                 data_doc = d.to_dict()
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                # Manejar fecha en Python
                 if isinstance(fecha_doc, datetime): f_obj = fecha_doc.date()
                 else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp()).date()
                 
-                # FILTRO DE RANGO EN PYTHON (SEGURO)
                 if f_ini <= f_obj <= f_fin:
                     total_dias += 1
                     regs = data_doc.get('registros', {})
@@ -619,7 +643,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 else:
                     for c in cols: df[c] = 0.0
                 
-                # CALCULO REAL TIME
                 if m == "Conducta":
                     df["Promedio"] = df[cols[0]]
                 else:
@@ -776,46 +799,106 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 if st.button("Cerrar Comprobante Gasto"): del st.session_state.gasto_temp; st.rerun()
 
         with t4:
-            c1, c2, c3 = st.columns(3)
-            txt = c1.text_input("Buscar")
-            fi = c2.date_input("Desde", date.today().replace(day=1))
-            ff = c3.date_input("Hasta", date.today())
+            st.subheader("📜 Reportes Financieros")
+            c_f1, c_f2, c_f3, c_f4 = st.columns(4)
+            # Filtro Rango Rápido
+            filtro_rango = c_f1.selectbox("Rango de Tiempo", ["Este Mes", "Mes Pasado", "Últimos 3 Meses", "Últimos 6 Meses", "Este Año", "Personalizado"])
+            
+            # Lógica de fechas automática
+            hoy = date.today()
+            if filtro_rango == "Este Mes":
+                f_inicio = hoy.replace(day=1)
+                f_fin = hoy
+            elif filtro_rango == "Mes Pasado":
+                mes_anterior = hoy.replace(day=1) - timedelta(days=1)
+                f_inicio = mes_anterior.replace(day=1)
+                f_fin = mes_anterior
+            elif filtro_rango == "Últimos 3 Meses":
+                f_inicio = hoy - timedelta(days=90)
+                f_fin = hoy
+            elif filtro_rango == "Últimos 6 Meses":
+                f_inicio = hoy - timedelta(days=180)
+                f_fin = hoy
+            elif filtro_rango == "Este Año":
+                f_inicio = hoy.replace(month=1, day=1)
+                f_fin = hoy
+            else: # Personalizado
+                f_inicio = c_f2.date_input("Desde", hoy.replace(day=1))
+                f_fin = c_f3.date_input("Hasta", hoy)
+
+            f_tipo = c_f4.multiselect("Tipo:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
+            
+            # Filtro fecha en Python
+            dt_ini = datetime.combine(f_inicio, datetime.min.time())
+            dt_fin = datetime.combine(f_fin, datetime.max.time())
             
             docs_hist = db.collection("finanzas").stream() 
             data_raw = []
-            dt_ini = datetime.combine(fi, datetime.min.time())
-            dt_fin = datetime.combine(ff, datetime.max.time())
+            
+            tot_ing = 0.0
+            tot_egr = 0.0
             
             for doc in docs_hist:
                 d = doc.to_dict()
                 d_date = d.get("fecha")
                 if not d_date: continue
+                # Manejar tipos de fecha
                 if isinstance(d_date, datetime): actual = d_date.replace(tzinfo=None)
                 else: actual = datetime.fromtimestamp(d_date.timestamp())
                 
                 if dt_ini <= actual <= dt_fin:
-                    if txt.lower() in d.get('descripcion','').lower() or txt.lower() in d.get('nombre_persona','').lower():
+                    c_typ = d['tipo'] in f_tipo
+                    if c_typ:
                         data_raw.append(d)
+                        if d['tipo'] == 'ingreso': tot_ing += d['monto']
+                        elif d['tipo'] == 'egreso': tot_egr += d['monto']
             
+            # Tarjetas Resumen
+            st.divider()
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Total Ingresos", f"${tot_ing:.2f}", border=True)
+            k2.metric("Total Egresos", f"${tot_egr:.2f}", delta_color="inverse", border=True)
+            k3.metric("Balance Periodo", f"${tot_ing - tot_egr:.2f}", border=True)
+            st.divider()
+
             data_raw.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
             if data_raw:
-                st.dataframe(pd.DataFrame(data_raw)[['fecha_legible','tipo','descripcion','monto']], use_container_width=True)
+                df_rep = pd.DataFrame(data_raw)
+                st.dataframe(df_rep[['fecha_legible','tipo','nombre_persona','descripcion','monto']], use_container_width=True)
                 
-                # Reimpresión
-                st.markdown("#### 🔄 Reimpresión")
-                options = {f"{r['fecha_legible']} | {r.get('id_short','-')} | {r['nombre_persona']} | ${r['monto']}": r for r in data_raw}
-                selection = st.selectbox("Seleccione transacción:", ["Seleccionar..."] + list(options.keys()))
-                if selection != "Seleccionar...":
-                    r = options[selection]
-                    if st.button("Ver Original"):
-                        logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
-                        color_b = "#333" if r['tipo'] == 'ingreso' else "#d32f2f"
-                        titulo = "COMPROBANTE DE INGRESO" if r['tipo'] == 'ingreso' else "COMPROBANTE DE EGRESO"
-                        etiqueta1 = "RECIBIMOS DE:" if r['tipo'] == 'ingreso' else "PAGADO A:"
-                        etiqueta2 = "Entregado Por" if r['tipo'] == 'ingreso' else "Autorizado Por"
-                        etiqueta3 = "Recibido (Caja)" if r['tipo'] == 'ingreso' else "Recibido Conforme"
-                        html_reimp = f"""<div style="border: 2px solid {color_b}; padding: 20px; font-family: 'Helvetica', sans-serif; max-width: 700px; margin: auto;"><table width="100%"><tr><td width="20%">{hi}</td><td width="60%" align="center"><h3 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h3><p style="margin:5px; font-size:12px;">San Felipe, San Bartolo, Ilopango</p><p style="margin:0; font-size:12px;"><b>{titulo} (COPIA)</b></p></td><td width="20%" align="right"><h4 style="margin:0; color: {color_b};">NO. {r.get('id_short','000')}</h4><p style="font-size:12px;">{r['fecha_legible']}</p></td></tr></table><hr><div style="padding: 10px;"><p><b>{etiqueta1}</b> {r.get('nombre_persona','-')}</p><p><b>LA CANTIDAD DE:</b> <span style="font-size:18px; font-weight:bold;">${r['monto']:.2f}</span></p><p><b>POR CONCEPTO DE:</b> {r['descripcion']}</p><p><b>OBSERVACIONES:</b> {r.get('observaciones','')}</p></div><br><br><table width="100%"><tr><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta2}</td><td width="20%"></td><td align="center" style="border-top: 1px solid #000; width:40%;">{etiqueta3}</td></tr></table></div>"""
-                        components.html(f"""<html><body>{html_reimp}<br><center><button onclick="window.print()">🖨️ REIMPRIMIR</button></center></body></html>""", height=500)
+                # REPORTE IMPRESO CON FILTROS
+                if st.button("🖨️ Imprimir Reporte Generado"):
+                    logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
+                    rows_html = ""
+                    for item in data_raw:
+                        color_row = "#e8f5e9" if item['tipo'] == 'ingreso' else "#ffebee"
+                        rows_html += f"<tr style='background:{color_row};'><td>{item['fecha_legible']}</td><td>{item.get('id_short','-')}</td><td>{item['nombre_persona']}</td><td>{item['descripcion']}</td><td align='right'>${item['monto']:.2f}</td></tr>"
+                    
+                    html_reporte = f"""
+                    <div style="font-family:Arial; padding:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:15px;">
+                                {hi}
+                                <div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">REPORTE FINANCIERO ({filtro_rango})</p></div>
+                            </div>
+                            <div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')}<br><b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div>
+                        </div>
+                        <br>
+                        <div style="display:flex; gap:20px; margin-bottom:20px;">
+                            <div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div>
+                            <div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div>
+                            <div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd">
+                            <tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Ref</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>
+                            {rows_html}
+                        </table>
+                        <br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div>
+                    </div>
+                    """
+                    components.html(f"""<html><body>{html_reporte}<br><center><button onclick="window.print()" style="background:#333; color:white; padding:10px 20px; cursor:pointer;">🖨️ IMPRIMIR REPORTE PDF</button></center></body></html>""", height=600, scrolling=True)
+
+            else: st.info("No hay registros en este rango.")
 
     # --- 8. CONFIGURACIÓN (USUARIOS) (NUEVO MODULO) ---
     elif opcion_seleccionada == "Configuración (Usuarios)":
@@ -847,31 +930,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
         with t_db:
             if st.session_state["user_id"] == "david":
-                st.warning("Zona de Peligro: Esta acción es irreversible.")
-                st.write("Para reiniciar la base de datos, escriba **BORRAR** abajo y luego presione el botón.")
-                
-                # 1. Primero el input
-                confirm_code = st.text_input("Confirmación de seguridad:", key="del_confirm")
-                
-                # 2. Luego el botón
-                if st.button("🔴 EJECUTAR BORRADO TOTAL", type="primary"):
-                    if confirm_code == "BORRAR":
-                        with st.spinner("Eliminando datos..."):
-                            borrar_coleccion("alumnos")
-                            borrar_coleccion("maestros_perfil")
-                            borrar_coleccion("carga_academica")
-                            borrar_coleccion("finanzas")
-                            borrar_coleccion("notas")
-                            borrar_coleccion("notas_mensuales")
-                            borrar_coleccion("asistencia")
-                        
-                        st.success("✅ Base de datos reiniciada con éxito.")
-                        time.sleep(2)
-                        st.rerun()
-                    else:
-                        st.error("❌ La palabra de confirmación no coincide. Escriba BORRAR.")
+                st.warning("Zona de Peligro")
+                if st.button("🔴 BORRAR TODO") and st.text_input("Confirmar:") == "BORRAR":
+                    borrar_coleccion("alumnos"); borrar_coleccion("maestros_perfil"); borrar_coleccion("carga_academica"); borrar_coleccion("finanzas"); borrar_coleccion("notas")
+                    st.success("Borrado completo.")
             else:
-                st.info("🔒 Función reservada exclusivamente para el desarrollador (David).")
+                st.info("Función reservada para el desarrollador.")
 
 # ==========================================
 # MÓDULOS DE DOCENTE
@@ -965,9 +1029,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 
                 # CALCULO REAL TIME
                 if m == "Conducta": df["Promedio"] = df[cols[0]]
-                else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + 
-                                      df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + 
-                                      df["Examen (30%)"]*0.30).apply(redondear_mined)
+                else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + df["Examen (30%)"]*0.30).apply(redondear_mined)
 
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
                 if st.button("Guardar"):

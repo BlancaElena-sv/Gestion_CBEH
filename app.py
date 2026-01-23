@@ -274,6 +274,7 @@ if opcion_seleccionada == "Inicio":
         st.info("**ESTADO: PERIODO DE INSCRIPCIÓN**")
         st.write("- Recepción de documentos.")
         st.write("- Actualización de datos.")
+        st.write("- Recepción de Materiales por alumno.")
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
         st.metric("Fecha", "26 de Enero", "2026")

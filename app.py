@@ -276,9 +276,9 @@ if opcion_seleccionada == "Inicio":
         st.write("- Actualización de datos.")
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
-        st.metric("Fecha", "19 de Enero", "2026")
+        st.metric("Fecha", "26 de Enero", "2026")
     
-    cronograma = [{"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
+    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "15 Ene", "Actividad": "Inicio de labores Docentes", "Estado": "Realizado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
     st.table(pd.DataFrame(cronograma))
 
 # ==========================================

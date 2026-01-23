@@ -123,7 +123,7 @@ if not st.session_state["logged_in"]:
 
 MAT_KINDER = ["Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", "Cuerpo, Movimiento y Bienestar", "Conducta"]
 MAT_I_CICLO = ["Comunicación", "Números y Formas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
-MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
+MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta","Moral y Civica"]
 MAT_III_CICLO = ["Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", "Ciudadanía y Valores", "Inglés", "Educación Física y Deportes", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
 
 MAPA_CURRICULAR = {

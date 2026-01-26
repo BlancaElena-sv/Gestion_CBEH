@@ -182,6 +182,7 @@ def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
         if fecha_db:
             if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
+            
             if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
                 return True
     return False
@@ -275,9 +276,9 @@ if opcion_seleccionada == "Inicio":
         st.write("- Actualización de datos.")
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
-        st.metric("Fecha", "19 de Enero", "2026")
+        st.metric("Fecha", "26 de Enero", "2026")
     
-    cronograma = [{"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
+    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "15 Ene", "Actividad": "Inicio de labores plantel docente", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
     st.table(pd.DataFrame(cronograma))
 
 # ==========================================
@@ -351,13 +352,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 3, 2])
                 with c1: 
-                    # --- CORRECCIÓN DE LA IMAGEN DE ALUMNO ---
-                    # Recuperar URL de manera segura
+                    # BLINDAJE DE FOTO ALUMNO
                     foto_url_alum = a.get('documentos', {}).get('foto_url')
-                    # Si no hay URL o es None, usar placeholder
-                    if not foto_url_alum: 
-                        foto_url_alum = "https://via.placeholder.com/150"
-                    
+                    if not foto_url_alum: foto_url_alum = "https://via.placeholder.com/150"
                     st.image(foto_url_alum, width=130)
                 
                 with c2:
@@ -476,20 +473,20 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
     elif opcion_seleccionada == "Maestros":
         st.title("👩‍🏫 Gestión Docente Pro")
         docs_m = db.collection("maestros_perfil").stream()
-        lista_profes = []
-        for d in docs_m:
-            dd = d.to_dict()
-            dd['id'] = d.id
-            if 'nombre' not in dd: dd['nombre'] = "Desconocido"
-            lista_profes.append(dd)
         
-        nombres_unicos = sorted(list(set([f"{p.get('codigo','S/C')} - {p['nombre']}" for p in lista_profes])))
-        opciones_prof = ["➕ Registrar Nuevo Maestro"] + nombres_unicos
+        # --- NUEVA LÓGICA: DICCIONARIO PARA ELIMINAR DUPLICADOS Y BÚSQUEDA RÁPIDA ---
+        mapa_profesores = {}
+        for d in docs_m:
+            data = d.to_dict()
+            key_name = f"{data.get('codigo','S/C')} - {data['nombre']}"
+            mapa_profesores[key_name] = {"id": d.id, "data": data}
+        
+        opciones_prof = ["➕ Registrar Nuevo Maestro"] + sorted(list(mapa_profesores.keys()))
         
         col_sel, _ = st.columns([2, 1])
         with col_sel:
-            idx = st.session_state.get('sel_prof_idx', 0)
-            sel_prof = st.selectbox("Seleccionar Docente:", opciones_prof, index=idx)
+            # Usar key para persistencia
+            sel_prof = st.selectbox("Seleccionar Docente:", opciones_prof, key="sel_prof_main")
         st.markdown("---")
 
         if sel_prof == "➕ Registrar Nuevo Maestro":
@@ -508,81 +505,83 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         st.success("Guardado"); time.sleep(1); st.rerun()
                     else: st.error("Nombre requerido")
         else:
-            if lista_profes:
-                try:
-                    pid = next(p['id'] for p in lista_profes if f"{p.get('codigo','S/C')} - {p['nombre']}" == sel_prof)
-                    prof_data = next(p for p in lista_profes if p['id'] == pid)
+            if sel_prof in mapa_profesores:
+                # Recuperar datos directamente del diccionario (Cero error)
+                prof_info = mapa_profesores[sel_prof]
+                pid = prof_info["id"]
+                prof_data = prof_info["data"]
+                
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([1, 3, 1])
+                    with c1: 
+                        if prof_data.get('foto_url'): st.image(prof_data['foto_url'], width=120)
+                        else: st.markdown("<h1>👤</h1>", unsafe_allow_html=True)
+                    with c2:
+                        st.title(prof_data.get('nombre', 'Sin Nombre'))
+                        st.caption(f"Código: {prof_data.get('codigo','S/C')}")
+                        st.write(f"📞 {prof_data.get('telefono','-')} | 📧 {prof_data.get('email','-')}")
+                    with c3:
+                        if st.button("✏️ Editar Perfil", key=f"btn_edit_{pid}"): 
+                            st.session_state.edit_prof_mode = True
+
+                if st.session_state.get("edit_prof_mode"):
+                    with st.form("edit_prof_form"):
+                        nc = st.text_input("Nombre", prof_data.get('nombre', ''))
+                        nt = st.text_input("Teléfono", prof_data.get('telefono',''))
+                        nf = st.file_uploader("Nueva Foto", ["jpg", "png"])
+                        if st.form_submit_button("Guardar Cambios"):
+                            upd = {"nombre": nc, "telefono": nt}
+                            if nf:
+                                u = subir_archivo(nf, f"profesores/{prof_data.get('codigo','SN')}")
+                                if u: upd["foto_url"] = u
+                            db.collection("maestros_perfil").document(pid).update(upd)
+                            st.session_state.edit_prof_mode = False
+                            st.success("Actualizado"); time.sleep(1); st.rerun()
+                
+                tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
+
+                with tabs_m[0]:
+                    c_asig, c_tabla = st.columns([1, 2])
+                    with c_asig:
+                        st.markdown("#### Asignar Nueva Materia")
+                        g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
+                        mats_disp = MAPA_CURRICULAR.get(g_sel, [])
+                        with st.form("add_carga_prof"):
+                            m_sel = st.multiselect("Materias", mats_disp)
+                            guia = st.checkbox("¿Es Guía?")
+                            if st.form_submit_button("Guardar Carga"):
+                                db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data.get('nombre','Desconocido'), "grado": g_sel, "materias": m_sel, "es_guia": guia})
+                                st.success("Asignado"); time.sleep(0.5); st.rerun()
+
+                    with c_tabla:
+                        st.markdown("#### Carga Actual")
+                        cargas = db.collection("carga_academica").where("id_docente", "==", pid).stream()
+                        for c in cargas:
+                            cd = c.to_dict()
+                            with st.expander(f"{cd.get('grado','?')} {'(GUIA)' if cd.get('es_guia') else ''}"):
+                                st.write(", ".join(cd.get('materias',[])))
+                                if st.button("Eliminar", key=f"del_carga_{c.id}"):
+                                    db.collection("carga_academica").document(c.id).delete(); st.rerun()
+
+                with tabs_m[1]:
+                    with st.expander("➕ Registrar Movimiento"):
+                        with st.form("ffin"):
+                            tipo = st.selectbox("Tipo", ["Pago Salario (Egreso)", "Préstamo (Deuda)", "Abono Deuda (Ingreso)"])
+                            monto = st.number_input("Monto", min_value=0.01)
+                            desc = st.text_input("Detalle")
+                            if st.form_submit_button("Registrar"):
+                                desc_full = f"{tipo} - {desc}"
+                                if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
+                                        st.error("⛔ Transacción duplicada (Salario hoy).")
+                                else:
+                                    db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data.get('nombre',''), "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
+                                    st.success("Registrado"); time.sleep(1); st.rerun()
                     
-                    with st.container(border=True):
-                        c1, c2, c3 = st.columns([1, 3, 1])
-                        with c1: st.image(prof_data.get('foto_url', "https://via.placeholder.com/150"), width=120)
-                        with c2:
-                            st.title(prof_data.get('nombre', 'Sin Nombre'))
-                            st.caption(f"Código: {prof_data.get('codigo','S/C')}")
-                            st.write(f"📞 {prof_data.get('telefono','-')} | 📧 {prof_data.get('email','-')}")
-                        with c3:
-                            if st.button("✏️ Editar Perfil"): st.session_state.edit_prof_mode = True
-
-                    if st.session_state.get("edit_prof_mode"):
-                        with st.form("edit_prof_form"):
-                            nc = st.text_input("Nombre", prof_data.get('nombre', ''))
-                            nt = st.text_input("Teléfono", prof_data.get('telefono',''))
-                            nf = st.file_uploader("Nueva Foto", ["jpg", "png"])
-                            if st.form_submit_button("Guardar Cambios"):
-                                upd = {"nombre": nc, "telefono": nt}
-                                if nf:
-                                    u = subir_archivo(nf, f"profesores/{prof_data.get('codigo','SN')}")
-                                    if u: upd["foto_url"] = u
-                                db.collection("maestros_perfil").document(pid).update(upd)
-                                st.session_state.edit_prof_mode = False
-                                st.success("Actualizado"); time.sleep(1); st.rerun()
-                    
-                    tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
-
-                    with tabs_m[0]:
-                        c_asig, c_tabla = st.columns([1, 2])
-                        with c_asig:
-                            st.markdown("#### Asignar Nueva Materia")
-                            g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
-                            mats_disp = MAPA_CURRICULAR.get(g_sel, [])
-                            with st.form("add_carga_prof"):
-                                m_sel = st.multiselect("Materias", mats_disp)
-                                guia = st.checkbox("¿Es Guía?")
-                                if st.form_submit_button("Guardar Carga"):
-                                    db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data.get('nombre','Desconocido'), "grado": g_sel, "materias": m_sel, "es_guia": guia})
-                                    st.success("Asignado"); time.sleep(0.5); st.rerun()
-
-                        with c_tabla:
-                            st.markdown("#### Carga Actual")
-                            cargas = db.collection("carga_academica").where("id_docente", "==", pid).stream()
-                            for c in cargas:
-                                cd = c.to_dict()
-                                with st.expander(f"{cd.get('grado','?')} {'(GUIA)' if cd.get('es_guia') else ''}"):
-                                    st.write(", ".join(cd.get('materias',[])))
-                                    if st.button("Eliminar", key=c.id):
-                                        db.collection("carga_academica").document(c.id).delete(); st.rerun()
-
-                    with tabs_m[1]:
-                        with st.expander("➕ Registrar Movimiento"):
-                            with st.form("ffin"):
-                                tipo = st.selectbox("Tipo", ["Pago Salario (Egreso)", "Préstamo (Deuda)", "Abono Deuda (Ingreso)"])
-                                monto = st.number_input("Monto", min_value=0.01)
-                                desc = st.text_input("Detalle")
-                                if st.form_submit_button("Registrar"):
-                                    desc_full = f"{tipo} - {desc}"
-                                    if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
-                                         st.error("⛔ Transacción duplicada (Salario hoy).")
-                                    else:
-                                        db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data.get('nombre',''), "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
-                                        st.success("Registrado")
-                        movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
-                        lm = [m.to_dict() for m in movs]
-                        lm.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
-                        if lm: st.dataframe(pd.DataFrame(lm)[['fecha_legible','descripcion','monto']], use_container_width=True)
-                        else: st.info("Sin historial.")
-
-                except Exception as e:
-                    st.error(f"Error cargando docente (Datos incompletos): {e}")
+                    movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
+                    lm = [m.to_dict() for m in movs]
+                    lm.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
+                    if lm: st.dataframe(pd.DataFrame(lm)[['fecha_legible','descripcion','monto']], use_container_width=True)
+                    else: st.info("Sin historial.")
 
     # --- 5. ASISTENCIA GLOBAL ---
     elif opcion_seleccionada == "Asistencia Global":
@@ -946,3 +945,151 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     st.success("Borrado completo.")
             else:
                 st.info("Función reservada para el desarrollador.")
+
+# ==========================================
+# MÓDULOS DE DOCENTE
+# ==========================================
+elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inicio":
+    
+    if opcion_seleccionada == "Mis Listados":
+        st.title("🖨️ Imprimir Listas")
+        g = st.selectbox("Grado:", LISTA_GRADOS_TODO)
+        mes_lista = st.selectbox("Mes:", LISTA_MESES)
+        
+        if st.button("Generar Hoja de Control"):
+            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            lista = sorted([d.to_dict()['nombre_completo'] for d in docs])
+            if not lista: st.warning("Sin alumnos")
+            else:
+                logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
+                rows = ""
+                for i, n in enumerate(lista):
+                    rows += f"<tr><td>{i+1}</td><td style='text-align:left;padding-left:5px;'>{n}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>"
+                html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>COLEGIO PROFA. BLANCA ELENA</h3><h4>CONTROL DE EVALUACIÓN - {mes_lista.upper()} - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='40%'>NOMBRE</td><td width='8%'>ACT1</td><td width='8%'>ACT2</td><td width='8%'>ALT1</td><td width='8%'>ALT2</td><td width='8%'>EXAM</td><td width='10%'>PROM</td></tr>{rows}</table></div>"""
+                components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR LISTADO</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+
+    elif opcion_seleccionada == "Tomar Asistencia":
+        st.title("📅 Control de Asistencia")
+        c1, c2 = st.columns(2)
+        fecha_asist = c1.date_input("Fecha:", date.today())
+        grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
+        if grado_asist:
+            id_asistencia = f"{fecha_asist}_{grado_asist}"
+            doc_ref = db.collection("asistencia").document(id_asistencia)
+            doc_snap = doc_ref.get()
+            alumnos_ref = db.collection("alumnos").where("grado_actual", "==", grado_asist).stream()
+            lista_alumnos = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in alumnos_ref]
+            lista_alumnos.sort(key=lambda x: x["Nombre"])
+            if lista_alumnos:
+                datos = doc_snap.to_dict().get("registros", {}) if doc_snap.exists else {}
+                observaciones = doc_snap.to_dict().get("observaciones", {}) if doc_snap.exists else {}
+                
+                data_editor = []
+                for alum in lista_alumnos:
+                    data_editor.append({
+                        "NIE": alum["NIE"], 
+                        "Nombre": alum["Nombre"], 
+                        "Estado": datos.get(alum["NIE"], "Presente"),
+                        "Observación": observaciones.get(alum["NIE"], "")
+                    })
+                
+                df_asist = pd.DataFrame(data_editor)
+                ed = st.data_editor(df_asist, column_config={
+                    "NIE": st.column_config.TextColumn(disabled=True),
+                    "Nombre": st.column_config.TextColumn(disabled=True),
+                    "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True),
+                    "Observación": st.column_config.TextColumn(width="medium")
+                }, hide_index=True, use_container_width=True, key=id_asistencia)
+                
+                if st.button("💾 Guardar Asistencia"):
+                    regs = {r["NIE"]: r["Estado"] for r in ed.to_dict(orient="records")}
+                    obs_regs = {r["NIE"]: r["Observación"] for r in ed.to_dict(orient="records")}
+                    doc_ref.set({
+                        "fecha": datetime.combine(fecha_asist, datetime.min.time()), 
+                        "grado": grado_asist, 
+                        "registros": regs,
+                        "observaciones": obs_regs
+                    })
+                    st.success("Guardado.")
+            else: st.warning("Sin alumnos.")
+
+    elif opcion_seleccionada == "Cargar Notas":
+        st.title("📝 Registro de Notas")
+        c1, c2, c3 = st.columns(3)
+        g = c1.selectbox("Grado", ["Select..."]+LISTA_GRADOS_NOTAS)
+        mp = MAPA_CURRICULAR.get(g,[]) if g!="Select..." else []
+        m = c2.selectbox("Materia", ["Select..."]+mp)
+        mes = c3.selectbox("Mes", LISTA_MESES)
+        
+        if g!="Select..." and m!="Select...":
+            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
+            if not lista: st.warning("Sin alumnos")
+            else:
+                df = pd.DataFrame(lista).sort_values("Nombre")
+                id_doc = f"{g}_{m}_{mes}".replace(" ","_")
+                cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
+                doc_ref = db.collection("notas_mensuales").document(id_doc).get()
+                if doc_ref.exists:
+                    dd = doc_ref.to_dict().get('detalles', {})
+                    for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
+                else:
+                    for c in cols: df[c] = 0.0
+                df["Promedio"] = 0.0
+                cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
+                for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
+                
+                # CALCULO REAL TIME
+                if m == "Conducta": df["Promedio"] = df[cols[0]]
+                else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + df["Examen (30%)"]*0.30).apply(redondear_mined)
+
+                ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
+                if st.button("Guardar"):
+                    batch = db.batch()
+                    detalles = {}
+                    for _, r in ed.iterrows():
+                        if m == "Conducta": prom = r[cols[0]]
+                        else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
+                        prom_r = redondear_mined(prom)
+                        detalles[r["NIE"]] = {c: r[c] for c in cols}
+                        detalles[r["NIE"]]["Promedio"] = prom_r
+                        ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
+                        batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": prom_r})
+                    db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
+                    batch.commit()
+                    st.success("Guardado")
+                    time.sleep(1); st.rerun()
+                
+                st.divider()
+                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
+                rows_acumulados = []
+                for mes_iter in LISTA_MESES:
+                    id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
+                    doc_h = db.collection("notas_mensuales").document(id_history).get()
+                    if doc_h.exists:
+                        data_h = doc_h.to_dict().get("detalles", {})
+                        for nie_iter, notas_iter in data_h.items():
+                            nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
+                            if m == "Conducta":
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
+                            else:
+                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
+                if rows_acumulados:
+                    df_ac = pd.DataFrame(rows_acumulados)
+                    df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
+                    df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
+                    st.dataframe(df_ac, use_container_width=True, hide_index=True)
+
+    elif opcion_seleccionada == "Ver Mis Cargas":
+        st.title("📋 Mi Carga Académica")
+        cargas = db.collection("carga_academica").where("nombre_docente", "==", st.session_state["user_name"]).stream()
+        found = False
+        for c in cargas:
+            found = True
+            d = c.to_dict()
+            with st.container(border=True):
+                st.subheader(d['grado'])
+                st.write("**Materias:** " + ", ".join(d['materias']))
+                if d.get('es_guia'): st.success("🌟 MAESTRO GUÍA")
+        if not found:
+            st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.")

@@ -123,8 +123,8 @@ if not st.session_state["logged_in"]:
 
 MAT_KINDER = ["Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", "Cuerpo, Movimiento y Bienestar", "Conducta"]
 MAT_I_CICLO = ["Comunicación", "Números y Formas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
-MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores","Ingles", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta","Moral y Civica"]
-MAT_III_CICLO = ["Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", "Ciudadanía y Valores", "Inglés",  "Artes", "Educación Física y Deportes", "Ortografía", "Caligrafía", "Conducta","Moral y Civica"]
+MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
+MAT_III_CICLO = ["Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", "Ciudadanía y Valores", "Inglés", "Educación Física y Deportes", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
 
 MAPA_CURRICULAR = {
     "Kinder 4": MAT_KINDER, "Kinder 5": MAT_KINDER, "Preparatoria": MAT_KINDER,
@@ -237,7 +237,6 @@ if not db and opcion_seleccionada != "Configuración (Usuarios)":
 # --- INICIO ---
 if opcion_seleccionada == "Inicio":
     st.title("🍎 Tablero Institucional")
-    
     if st.session_state["user_role"] == "docente" and db:
         nombre_limpio = limpiar_nombre(st.session_state.get("user_name",""))
         found_prof = None
@@ -274,12 +273,11 @@ if opcion_seleccionada == "Inicio":
         st.info("**ESTADO: PERIODO DE INSCRIPCIÓN**")
         st.write("- Recepción de documentos.")
         st.write("- Actualización de datos.")
-        st.write("- Recepción de Materiales por alumno.")
     with col_der:
         st.success("**PRÓXIMO: INICIO DE CLASES**")
-        st.metric("Fecha", "26 de Enero", "2026")
+        st.metric("Fecha", "19 de Enero", "2026")
     
-    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "15 Ene", "Actividad": "Inicio de labores Docentes", "Estado": "Realizado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
+    cronograma = [{"Fecha": "02 Ene - 18 Ene", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "19 Ene", "Actividad": "Inauguración Año Escolar", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
     st.table(pd.DataFrame(cronograma))
 
 # ==========================================
@@ -352,7 +350,16 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             st.markdown("---")
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 3, 2])
-                with c1: st.image(a.get('documentos',{}).get('foto_url', "https://via.placeholder.com/150"), width=130)
+                with c1: 
+                    # --- CORRECCIÓN DE LA IMAGEN DE ALUMNO ---
+                    # Recuperar URL de manera segura
+                    foto_url_alum = a.get('documentos', {}).get('foto_url')
+                    # Si no hay URL o es None, usar placeholder
+                    if not foto_url_alum: 
+                        foto_url_alum = "https://via.placeholder.com/150"
+                    
+                    st.image(foto_url_alum, width=130)
+                
                 with c2:
                     st.title(a['nombre_completo'])
                     st.markdown(f"#### **NIE:** {a['nie']}")
@@ -467,7 +474,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
     # --- 4. MAESTROS ---
     elif opcion_seleccionada == "Maestros":
-        st.title("👩‍🏫 Gestión Plantel Docente")
+        st.title("👩‍🏫 Gestión Docente Pro")
         docs_m = db.collection("maestros_perfil").stream()
         lista_profes = []
         for d in docs_m:
@@ -476,8 +483,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             if 'nombre' not in dd: dd['nombre'] = "Desconocido"
             lista_profes.append(dd)
         
-        # --- AQUÍ ESTÁ LA CORRECCIÓN: ELIMINAR DUPLICADOS EN LA LISTA ---
-        # 1. Crear conjunto de nombres únicos
         nombres_unicos = sorted(list(set([f"{p.get('codigo','S/C')} - {p['nombre']}" for p in lista_profes])))
         opciones_prof = ["➕ Registrar Nuevo Maestro"] + nombres_unicos
         
@@ -505,7 +510,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         else:
             if lista_profes:
                 try:
-                    # Búsqueda robusta por string coincidente
                     pid = next(p['id'] for p in lista_profes if f"{p.get('codigo','S/C')} - {p['nombre']}" == sel_prof)
                     prof_data = next(p for p in lista_profes if p['id'] == pid)
                     
@@ -565,7 +569,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 monto = st.number_input("Monto", min_value=0.01)
                                 desc = st.text_input("Detalle")
                                 if st.form_submit_button("Registrar"):
-                                    # CHECK DUPLICADOS MAESTRO
                                     desc_full = f"{tipo} - {desc}"
                                     if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
                                          st.error("⛔ Transacción duplicada (Salario hoy).")
@@ -619,7 +622,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 st.dataframe(pd.DataFrame(data), use_container_width=True)
             else: st.info("No hay tomas de asistencia registradas para este periodo.")
 
-    # --- 6. NOTAS (CALCULO AUTOMATICO) ---
+    # --- 6. NOTAS ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Admin Notas")
         c1, c2, c3 = st.columns(3)
@@ -934,151 +937,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 st.warning("Zona de Peligro")
                 if st.button("🔴 BORRAR TODO") and st.text_input("Confirmar:") == "BORRAR":
                     borrar_coleccion("alumnos"); borrar_coleccion("maestros_perfil"); borrar_coleccion("carga_academica"); borrar_coleccion("finanzas"); borrar_coleccion("notas")
+                    # NUEVO: BORRAR USUARIOS (EXCEPTO DAVID)
+                    borrar_coleccion("usuarios")
+                    # RESTAURAR SUPER ADMIN INMEDIATAMENTE
+                    db.collection("usuarios").document("david").set({
+                        "usuario": "david", "pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"
+                    })
                     st.success("Borrado completo.")
             else:
                 st.info("Función reservada para el desarrollador.")
-
-# ==========================================
-# MÓDULOS DE DOCENTE
-# ==========================================
-elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inicio":
-    
-    if opcion_seleccionada == "Mis Listados":
-        st.title("🖨️ Imprimir Listas")
-        g = st.selectbox("Grado:", LISTA_GRADOS_TODO)
-        mes_lista = st.selectbox("Mes:", LISTA_MESES)
-        
-        if st.button("Generar Hoja de Control"):
-            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
-            lista = sorted([d.to_dict()['nombre_completo'] for d in docs])
-            if not lista: st.warning("Sin alumnos")
-            else:
-                logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
-                rows = ""
-                for i, n in enumerate(lista):
-                    rows += f"<tr><td>{i+1}</td><td style='text-align:left;padding-left:5px;'>{n}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>"
-                html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>COLEGIO PROFA. BLANCA ELENA</h3><h4>CONTROL DE EVALUACIÓN - {mes_lista.upper()} - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='40%'>NOMBRE</td><td width='8%'>ACT1</td><td width='8%'>ACT2</td><td width='8%'>ALT1</td><td width='8%'>ALT2</td><td width='8%'>EXAM</td><td width='10%'>PROM</td></tr>{rows}</table></div>"""
-                components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR LISTADO</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
-
-    elif opcion_seleccionada == "Tomar Asistencia":
-        st.title("📅 Control de Asistencia")
-        c1, c2 = st.columns(2)
-        fecha_asist = c1.date_input("Fecha:", date.today())
-        grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
-        if grado_asist:
-            id_asistencia = f"{fecha_asist}_{grado_asist}"
-            doc_ref = db.collection("asistencia").document(id_asistencia)
-            doc_snap = doc_ref.get()
-            alumnos_ref = db.collection("alumnos").where("grado_actual", "==", grado_asist).stream()
-            lista_alumnos = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in alumnos_ref]
-            lista_alumnos.sort(key=lambda x: x["Nombre"])
-            if lista_alumnos:
-                datos = doc_snap.to_dict().get("registros", {}) if doc_snap.exists else {}
-                observaciones = doc_snap.to_dict().get("observaciones", {}) if doc_snap.exists else {}
-                
-                data_editor = []
-                for alum in lista_alumnos:
-                    data_editor.append({
-                        "NIE": alum["NIE"], 
-                        "Nombre": alum["Nombre"], 
-                        "Estado": datos.get(alum["NIE"], "Presente"),
-                        "Observación": observaciones.get(alum["NIE"], "")
-                    })
-                
-                df_asist = pd.DataFrame(data_editor)
-                ed = st.data_editor(df_asist, column_config={
-                    "NIE": st.column_config.TextColumn(disabled=True),
-                    "Nombre": st.column_config.TextColumn(disabled=True),
-                    "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True),
-                    "Observación": st.column_config.TextColumn(width="medium")
-                }, hide_index=True, use_container_width=True, key=id_asistencia)
-                
-                if st.button("💾 Guardar Asistencia"):
-                    regs = {r["NIE"]: r["Estado"] for r in ed.to_dict(orient="records")}
-                    obs_regs = {r["NIE"]: r["Observación"] for r in ed.to_dict(orient="records")}
-                    doc_ref.set({
-                        "fecha": datetime.combine(fecha_asist, datetime.min.time()), 
-                        "grado": grado_asist, 
-                        "registros": regs,
-                        "observaciones": obs_regs
-                    })
-                    st.success("Guardado.")
-            else: st.warning("Sin alumnos.")
-
-    elif opcion_seleccionada == "Cargar Notas":
-        st.title("📝 Registro de Notas")
-        c1, c2, c3 = st.columns(3)
-        g = c1.selectbox("Grado", ["Select..."]+LISTA_GRADOS_NOTAS)
-        mp = MAPA_CURRICULAR.get(g,[]) if g!="Select..." else []
-        m = c2.selectbox("Materia", ["Select..."]+mp)
-        mes = c3.selectbox("Mes", LISTA_MESES)
-        
-        if g!="Select..." and m!="Select...":
-            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
-            lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
-            if not lista: st.warning("Sin alumnos")
-            else:
-                df = pd.DataFrame(lista).sort_values("Nombre")
-                id_doc = f"{g}_{m}_{mes}".replace(" ","_")
-                cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
-                doc_ref = db.collection("notas_mensuales").document(id_doc).get()
-                if doc_ref.exists:
-                    dd = doc_ref.to_dict().get('detalles', {})
-                    for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
-                else:
-                    for c in cols: df[c] = 0.0
-                
-                # CALCULO REAL TIME
-                if m == "Conducta": df["Promedio"] = df[cols[0]]
-                else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + df["Examen (30%)"]*0.30).apply(redondear_mined)
-
-                ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
-                if st.button("Guardar"):
-                    batch = db.batch()
-                    detalles = {}
-                    for _, r in ed.iterrows():
-                        if m == "Conducta": prom = r[cols[0]]
-                        else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
-                        prom_r = redondear_mined(prom)
-                        detalles[r["NIE"]] = {c: r[c] for c in cols}
-                        detalles[r["NIE"]]["Promedio"] = prom_r
-                        ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
-                        batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": prom_r})
-                    db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
-                    batch.commit()
-                    st.success("Guardado")
-                    time.sleep(1); st.rerun()
-                
-                st.divider()
-                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
-                rows_acumulados = []
-                for mes_iter in LISTA_MESES:
-                    id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
-                    doc_h = db.collection("notas_mensuales").document(id_history).get()
-                    if doc_h.exists:
-                        data_h = doc_h.to_dict().get("detalles", {})
-                        for nie_iter, notas_iter in data_h.items():
-                            nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
-                            if m == "Conducta":
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                            else:
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                if rows_acumulados:
-                    df_ac = pd.DataFrame(rows_acumulados)
-                    df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
-                    df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
-                    st.dataframe(df_ac, use_container_width=True, hide_index=True)
-
-    elif opcion_seleccionada == "Ver Mis Cargas":
-        st.title("📋 Mi Carga Académica")
-        cargas = db.collection("carga_academica").where("nombre_docente", "==", st.session_state["user_name"]).stream()
-        found = False
-        for c in cargas:
-            found = True
-            d = c.to_dict()
-            with st.container(border=True):
-                st.subheader(d['grado'])
-                st.write("**Materias:** " + ", ".join(d['materias']))
-                if d.get('es_guia'): st.success("🌟 MAESTRO GUÍA")
-        if not found:
-            st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.")

@@ -182,7 +182,6 @@ def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
         if fecha_db:
             if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
-            
             if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
                 return True
     return False
@@ -286,7 +285,7 @@ if opcion_seleccionada == "Inicio":
 # ==========================================
 if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
-    # --- INSCRIPCIÓN ---
+    # --- INSCRIPCIÓN (AHORA CON VALIDACIÓN DE NIE ÚNICO) ---
     if opcion_seleccionada == "Inscripción":
         st.title("📝 Inscripción 2026")
         with st.form("fi"):
@@ -305,16 +304,21 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             if st.form_submit_button("Guardar"):
                 try:
                     if nie and nom:
-                        r = f"expedientes/{nie}"
-                        urls = [subir_archivo(f, r) for f in (doc or [])]
-                        db.collection("alumnos").document(nie).set({
-                            "nie": nie, "nombre_completo": f"{nom} {ape}", "nombres": nom, "apellidos": ape,
-                            "grado_actual": gra, "turno": tur, "estado": "Activo",
-                            "encargado": {"nombre": enc, "telefono": tel, "direccion": dir},
-                            "documentos": {"foto_url": subir_archivo(fot, r), "doc_urls": [u for u in urls if u]},
-                            "fecha_registro": firestore.SERVER_TIMESTAMP
-                        })
-                        st.success("Guardado")
+                        # --- VALIDACIÓN DE NIE ---
+                        doc_ref = db.collection("alumnos").document(nie)
+                        if doc_ref.get().exists:
+                            st.error(f"⛔ Error Crítico: El NIE {nie} ya está registrado en el sistema. Verifique si es correcto o si el alumno ya fue inscrito.")
+                        else:
+                            r = f"expedientes/{nie}"
+                            urls = [subir_archivo(f, r) for f in (doc or [])]
+                            doc_ref.set({
+                                "nie": nie, "nombre_completo": f"{nom} {ape}", "nombres": nom, "apellidos": ape,
+                                "grado_actual": gra, "turno": tur, "estado": "Activo",
+                                "encargado": {"nombre": enc, "telefono": tel, "direccion": dir},
+                                "documentos": {"foto_url": subir_archivo(fot, r), "doc_urls": [u for u in urls if u]},
+                                "fecha_registro": firestore.SERVER_TIMESTAMP
+                            })
+                            st.success(f"✅ Alumno {nom} {ape} inscrito correctamente.")
                     else: st.error("Faltan datos obligatorios.")
                 except Exception as e: st.error(f"Error: {e}")
 
@@ -801,30 +805,22 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         with t4:
             st.subheader("📜 Reportes Financieros")
             
-            # --- SECCIÓN NUEVA: MAPEO DE GRADOS PARA REPORTE ---
-            # Antes de mostrar nada, creamos un mapa NIE -> Grado
+            # --- MAPEO DE GRADOS PARA REPORTE ---
             mapa_grados = {}
             try:
-                # Recuperamos solo campos necesarios para optimizar
-                # (aunque stream() trae todo el doc, es lo estándar en firebase-admin)
                 alums_ref = db.collection("alumnos").stream()
                 for al in alums_ref:
                     ad = al.to_dict()
-                    # Mapeamos NIE : Grado
                     mapa_grados[ad.get('nie', 'ns')] = ad.get('grado_actual', 'Sin Grado')
             except: pass
-            # ---------------------------------------------------
 
             c_f1, c_f2, c_f3 = st.columns(3)
-            # Fila 1 de Filtros
             filtro_rango = c_f1.selectbox("Rango de Tiempo", ["Este Mes", "Mes Pasado", "Últimos 3 Meses", "Últimos 6 Meses", "Este Año", "Personalizado"])
             f_tipo = c_f2.multiselect("Tipo Transacción:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
             
-            # Nuevo Filtro de Grado
             lista_grados_filtro = ["Todos"] + LISTA_GRADOS_TODO
             filtro_grado = c_f3.selectbox("Filtrar Grado (Alumnos):", lista_grados_filtro)
 
-            # Lógica de fechas automática
             hoy = date.today()
             f_inicio = hoy
             f_fin = hoy
@@ -850,7 +846,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 f_inicio = hoy.replace(month=1, day=1)
                 f_fin = hoy
             
-            # Filtro fecha en Python
             dt_ini = datetime.combine(f_inicio, datetime.min.time())
             dt_fin = datetime.combine(f_fin, datetime.max.time())
             
@@ -864,35 +859,27 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 d = doc.to_dict()
                 d_date = d.get("fecha")
                 if not d_date: continue
-                # Manejar tipos de fecha
                 if isinstance(d_date, datetime): actual = d_date.replace(tzinfo=None)
                 else: actual = datetime.fromtimestamp(d_date.timestamp())
                 
                 if dt_ini <= actual <= dt_fin:
-                    # 1. Filtro Tipo
                     if d['tipo'] not in f_tipo: continue
 
-                    # 2. Enriquecer con Grado
                     grado_alumno = "-"
                     nie_transaccion = d.get('alumno_nie')
                     if nie_transaccion and nie_transaccion in mapa_grados:
                         grado_alumno = mapa_grados[nie_transaccion]
                     
-                    d['grado_reporte'] = grado_alumno # Guardamos para el dataframe
+                    d['grado_reporte'] = grado_alumno 
 
-                    # 3. Filtro Grado
-                    # Si el usuario elige un grado específico, solo mostramos registros que coincidan.
-                    # Los gastos (que tienen grado "-") se ocultarán a menos que se elija "Todos".
                     if filtro_grado != "Todos":
                         if grado_alumno != filtro_grado:
                             continue
 
-                    # Si pasa todos los filtros, agregamos
                     data_raw.append(d)
                     if d['tipo'] == 'ingreso': tot_ing += d['monto']
                     elif d['tipo'] == 'egreso': tot_egr += d['monto']
             
-            # Tarjetas Resumen
             st.divider()
             k1, k2, k3 = st.columns(3)
             k1.metric("Total Ingresos", f"${tot_ing:.2f}", border=True)
@@ -903,16 +890,13 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             data_raw.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
             if data_raw:
                 df_rep = pd.DataFrame(data_raw)
-                # Mostramos la nueva columna 'grado_reporte'
                 st.dataframe(df_rep[['fecha_legible','tipo', 'grado_reporte', 'nombre_persona','descripcion','monto']], use_container_width=True)
                 
-                # REPORTE IMPRESO CON FILTROS
                 if st.button("🖨️ Imprimir Reporte Generado"):
                     logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
                     rows_html = ""
                     for item in data_raw:
                         color_row = "#e8f5e9" if item['tipo'] == 'ingreso' else "#ffebee"
-                        # Agregamos columna Grado al HTML
                         rows_html += f"<tr style='background:{color_row};'><td>{item['fecha_legible']}</td><td>{item.get('grado_reporte','-')}</td><td>{item['nombre_persona']}</td><td>{item['descripcion']}</td><td align='right'>${item['monto']:.2f}</td></tr>"
                     
                     titulo_reporte = f"REPORTE FINANCIERO ({filtro_rango})"

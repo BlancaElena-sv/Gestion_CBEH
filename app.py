@@ -275,10 +275,10 @@ if opcion_seleccionada == "Inicio":
         st.write("- Recepción de documentos.")
         st.write("- Actualización de datos.")
     with col_der:
-        st.success("**PRÓXIMO: Reunion General de Padres de Familia**")
-        st.metric("Fecha", "30 de Enero", "2026")
+        st.success("**PRÓXIMO: Celebración día del Amor y la Amistad**")
+        st.metric("Fecha", "13 de Febrero", "2026")
     
-    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "15 Ene", "Actividad": "Inicio de labores plantel docente", "Estado": "Realizado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Realizado"}, {"Fecha": "30 Ene", "Actividad": "Reunión General de Padres de Familia", "Estado": "Pendiente"}]
+    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "2 Feb", "Actividad": "Inicio período normal de Clases", "Estado": "En Curso"}, {"Fecha": "19 Feb", "Actividad": "Entrega de Examenes", "Estado": "Pendiente"}, {"Fecha": "24 Feb", "Actividad": "Inicio de examenes mensuales", "Estado": "Pendiente"}]
     st.table(pd.DataFrame(cronograma))
 
 # ==========================================

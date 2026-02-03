@@ -211,7 +211,8 @@ with st.sidebar:
     if st.session_state["user_role"] == "admin":
         opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Asistencia Global", "Notas", "Finanzas", "Configuración (Usuarios)"])
     else:
-        opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Tomar Asistencia", "Cargar Notas", "Ver Mis Cargas"])
+        # SE AGREGA "Expediente Alumnos"
+        opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Tomar Asistencia", "Cargar Notas", "Ver Mis Cargas", "Expediente Alumnos"])
     
     if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada
     if st.session_state.last_page != opcion_seleccionada:
@@ -234,7 +235,7 @@ if not db and opcion_seleccionada != "Configuración (Usuarios)":
 # 5. CONTENIDO PRINCIPAL
 # ==========================================
 
-# --- INICIO (COMÚN PARA TODOS) ---
+# --- INICIO ---
 if opcion_seleccionada == "Inicio":
     st.title("🍎 Tablero Institucional")
     if st.session_state["user_role"] == "docente" and db:
@@ -304,7 +305,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             if st.form_submit_button("Guardar"):
                 try:
                     if nie and nom:
-                        # --- VALIDACIÓN DE NIE ---
                         doc_ref = db.collection("alumnos").document(nie)
                         if doc_ref.get().exists:
                             st.error(f"⛔ Error Crítico: El NIE {nie} ya está registrado en el sistema.")
@@ -356,10 +356,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 3, 2])
                 with c1: 
-                    # BLINDAJE IMAGEN
-                    url_f = a.get('documentos', {}).get('foto_url')
-                    if not url_f: url_f = "https://via.placeholder.com/150"
-                    st.image(url_f, width=130)
+                    foto_url_alum = a.get('documentos', {}).get('foto_url')
+                    if not foto_url_alum: foto_url_alum = "https://via.placeholder.com/150"
+                    st.image(foto_url_alum, width=130)
                 
                 with c2:
                     st.title(a['nombre_completo'])
@@ -515,12 +514,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 with st.container(border=True):
                     c1, c2, c3 = st.columns([1, 3, 1])
                     with c1: 
-                        # BLINDAJE IMAGEN MAESTRO
                         url_m = prof_data.get('foto_url')
-                        if not url_m: 
-                            st.markdown("<h1>👤</h1>", unsafe_allow_html=True)
-                        else:
-                            st.image(url_m, width=120)
+                        if not url_m: st.markdown("<h1>👤</h1>", unsafe_allow_html=True)
+                        else: st.image(url_m, width=120)
 
                     with c2:
                         st.title(prof_data.get('nombre', 'Sin Nombre'))
@@ -1091,26 +1087,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     batch.commit()
                     st.success("Guardado")
                     time.sleep(1); st.rerun()
-                
-                st.divider()
-                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
-                rows_acumulados = []
-                for mes_iter in LISTA_MESES:
-                    id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
-                    doc_h = db.collection("notas_mensuales").document(id_history).get()
-                    if doc_h.exists:
-                        data_h = doc_h.to_dict().get("detalles", {})
-                        for nie_iter, notas_iter in data_h.items():
-                            nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
-                            if m == "Conducta":
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                            else:
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                if rows_acumulados:
-                    df_ac = pd.DataFrame(rows_acumulados)
-                    df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
-                    df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
-                    st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")
@@ -1125,3 +1101,79 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 if d.get('es_guia'): st.success("🌟 MAESTRO GUÍA")
         if not found:
             st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.")
+
+    # --- NUEVA SECCIÓN DE BITÁCORA ---
+    elif opcion_seleccionada == "Expediente Alumnos":
+        st.title("📂 Bitácora del Alumno")
+        
+        c1, c2 = st.columns(2)
+        grado_sel = c1.selectbox("Seleccionar Grado", LISTA_GRADOS_TODO)
+        
+        # Buscar alumnos de ese grado
+        alumnos_grado = db.collection("alumnos").where("grado_actual", "==", grado_sel).stream()
+        dict_alumnos = {a.to_dict()['nombre_completo']: a.to_dict() for a in alumnos_grado}
+        
+        nombre_alum = c2.selectbox("Seleccionar Alumno", ["Seleccionar..."] + sorted(list(dict_alumnos.keys())))
+        
+        if nombre_alum != "Seleccionar...":
+            alum_data = dict_alumnos[nombre_alum]
+            nie_actual = alum_data['nie']
+            
+            st.markdown("---")
+            # PERFIL RÁPIDO
+            cp1, cp2 = st.columns([1, 4])
+            with cp1:
+                # Blindaje imagen alumno
+                foto_url = alum_data.get('documentos', {}).get('foto_url')
+                if not foto_url: foto_url = "https://via.placeholder.com/150"
+                st.image(foto_url, width=120)
+            with cp2:
+                st.subheader(alum_data['nombre_completo'])
+                st.write(f"**NIE:** {alum_data['nie']} | **Responsable:** {alum_data.get('encargado',{}).get('nombre','-')}")
+                st.write(f"**Tel:** {alum_data.get('encargado',{}).get('telefono','-')}")
+            
+            st.divider()
+            
+            # --- SECCIÓN BITÁCORA ---
+            st.markdown("### 📝 Historial de Observaciones")
+            
+            # 1. Formulario de nueva entrada
+            with st.expander("➕ Agregar Nueva Nota / Observación", expanded=True):
+                with st.form("form_bitacora"):
+                    nota_texto = st.text_area("Escriba la observación (comportamiento, tareas, citatorios, etc.):")
+                    if st.form_submit_button("Guardar en Bitácora"):
+                        if nota_texto:
+                            nueva_entrada = {
+                                "nie": nie_actual,
+                                "alumno": nombre_alum,
+                                "grado": grado_sel,
+                                "fecha": firestore.SERVER_TIMESTAMP,
+                                "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                                "autor": st.session_state["user_name"], # El maestro logueado
+                                "contenido": nota_texto
+                            }
+                            db.collection("bitacora").add(nueva_entrada)
+                            st.success("Nota agregada.")
+                            time.sleep(1); st.rerun()
+                        else:
+                            st.warning("La nota no puede estar vacía.")
+
+            # 2. Visualización de historial
+            logs = db.collection("bitacora").where("nie", "==", nie_actual).stream()
+            lista_logs = [l.to_dict() for l in logs]
+            
+            # Ordenar por fecha (descendente - más nuevo primero)
+            # Nota: Firestore devuelve timestamp, aquí ordenamos en python por fecha_legible o idealmente por timestamp si lo trajimos
+            lista_logs.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
+            
+            if lista_logs:
+                for log in lista_logs:
+                    with st.container(border=True):
+                        c_meta, c_body = st.columns([1, 3])
+                        with c_meta:
+                            st.caption(f"📅 {log.get('fecha_legible')}")
+                            st.caption(f"✍️ **{log.get('autor')}**")
+                        with c_body:
+                            st.write(log.get('contenido'))
+            else:
+                st.info("No hay registros en la bitácora de este alumno.")

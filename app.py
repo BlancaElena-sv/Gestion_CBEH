@@ -8,6 +8,7 @@ import time
 import os
 import streamlit.components.v1 as components
 import re
+import pytz  # Librería para manejo de zonas horarias
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -16,6 +17,20 @@ st.set_page_config(
     page_icon="🎓",
     initial_sidebar_state="expanded"
 )
+
+# ==========================================
+# 0. CONFIGURACIÓN DE ZONA HORARIA
+# ==========================================
+# Definimos la zona horaria de El Salvador para todo el sistema
+TZ_SV = pytz.timezone("America/El_Salvador")
+
+def obtener_fecha_hoy():
+    """Retorna la fecha actual en El Salvador"""
+    return datetime.now(TZ_SV).date()
+
+def obtener_hora_actual():
+    """Retorna fecha y hora legible en El Salvador"""
+    return datetime.now(TZ_SV).strftime("%d/%m/%Y %H:%M")
 
 # ==========================================
 # 1. SISTEMA DE SEGURIDAD Y CONEXIÓN
@@ -175,26 +190,28 @@ def borrar_coleccion(coll_name, batch_size=10):
 
 def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
     docs = db.collection("finanzas").where("docente_id", "==", docente_id).where("tipo", "==", "egreso").stream()
-    hoy = date.today()
+    hoy = obtener_fecha_hoy() # USO DE FECHA SV
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
         if fecha_db:
-            if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
-            else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
+            # Convertir fecha DB a zona horaria SV si es posible, o comparar fechas naive si coinciden
+            if isinstance(fecha_db, datetime): f_obj = fecha_db.astimezone(TZ_SV).date()
+            else: f_obj = datetime.fromtimestamp(fecha_db.timestamp(), TZ_SV).date()
+            
             if f_obj == hoy and "Salario" in data.get("descripcion", "") and "Salario" in tipo_gasto:
                 return True
     return False
 
 def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
     docs = db.collection(coleccion).where(campo_id, "==", id_valor).where("descripcion", "==", descripcion).stream()
-    hoy = date.today()
+    hoy = obtener_fecha_hoy() # USO DE FECHA SV
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
         if fecha_db:
-            if isinstance(fecha_db, datetime): f_obj = fecha_db.date()
-            else: f_obj = datetime.fromtimestamp(fecha_db.timestamp()).date()
+            if isinstance(fecha_db, datetime): f_obj = fecha_db.astimezone(TZ_SV).date()
+            else: f_obj = datetime.fromtimestamp(fecha_db.timestamp(), TZ_SV).date()
             if f_obj == hoy: return True
     return False
 
@@ -369,8 +386,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     color = "green" if est == "Activo" else "red"
                     st.markdown(f"<h3 style='color:{color};text-align:center;border:2px solid {color};padding:5px;border-radius:10px;'>{est.upper()}</h3>", unsafe_allow_html=True)
 
-            # --- AÑADIDA PESTAÑA BITÁCORA ---
-            tabs = st.tabs(["📋 Datos", "💰 Solvencia", "📊 Boleta", "⚙️ Edición", "📒 Bitácora"])
+            tabs = st.tabs(["📋 Datos y Documentos", "💰 Historial y Solvencia", "📊 Boleta de Notas", "⚙️ Edición Expediente", "📒 Bitácora"])
             
             with tabs[0]:
                 col_d1, col_d2 = st.columns(2)
@@ -415,7 +431,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     st.markdown("### 🎫 Solvencia")
                     periodo = st.selectbox("Examen:", ["I Trimestre", "II Trimestre", "III Trimestre", "Final"])
                     if st.button("Generar Taco"):
-                        fecha = datetime.now().strftime("%d/%m/%Y")
+                        fecha = obtener_fecha_hoy().strftime("%d/%m/%Y") # FECHA SV
                         logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="40">' if logo else ""
                         html = f"""<div style="font-family:monospace;width:300px;margin:auto;padding:10px;border:1px dashed black;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;">{hi}<b>COLEGIO BLANCA ELENA</b></div><h4 style="background:black;color:white;margin:5px 0;">SOLVENCIA EXAMEN</h4><div style="text-align:left;font-size:11px;"><b>ALUMNO:</b> {a['nombre_completo']}<br><b>NIE:</b> {a['nie']}<br><b>PERIODO:</b> {periodo}<br><b>ESTADO:</b> SOLVENTE ✅</div><br><table border="1" style="width:100%;font-size:10px;border-collapse:collapse;text-align:center;"><tr><td>LUN</td><td>MAR</td><td>MIE</td><td>JUE</td><td>VIE</td></tr><tr><td height="30"></td><td></td><td></td><td></td><td></td></tr></table><br><span style="font-size:9px;">Fecha: {fecha}</span></div>"""
                         components.html(f"""<html><body>{html}<br><center><button onclick="window.print()">🖨️ IMPRIMIR</button></center></body></html>""", height=350)
@@ -472,7 +488,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         db.collection("alumnos").document(a['nie']).update(update_data)
                         st.success("Expediente actualizado."); time.sleep(1); st.rerun()
 
-            # --- VISUALIZADOR DE BITÁCORA PARA ADMIN ---
             with tabs[4]:
                 st.markdown("### 📒 Bitácora del Alumno")
                 logs = db.collection("bitacora").where("nie", "==", a['nie']).stream()
@@ -522,7 +537,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 if st.form_submit_button("Guardar"):
                     if nom:
                         url = subir_archivo(foto, f"profesores/{cod}")
-                        db.collection("maestros_perfil").add({"codigo": cod, "nombre": nom, "telefono": tel, "email": email, "direccion": dir, "foto_url": url, "fecha_ingreso": datetime.now().strftime("%d/%m/%Y"), "activo": True})
+                        db.collection("maestros_perfil").add({"codigo": cod, "nombre": nom, "telefono": tel, "email": email, "direccion": dir, "foto_url": url, "fecha_ingreso": obtener_fecha_hoy().strftime("%d/%m/%Y"), "activo": True})
                         st.success("Guardado"); time.sleep(1); st.rerun()
                     else: st.error("Nombre requerido")
         else:
@@ -596,7 +611,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                                 if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
                                         st.error("⛔ Transacción duplicada (Salario hoy).")
                                 else:
-                                    db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data.get('nombre',''), "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y")})
+                                    db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data.get('nombre',''), "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": obtener_hora_actual()})
                                     st.success("Registrado"); time.sleep(1); st.rerun()
                     
                     movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
@@ -605,13 +620,13 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     if lm: st.dataframe(pd.DataFrame(lm)[['fecha_legible','descripcion','monto']], use_container_width=True)
                     else: st.info("Sin historial.")
 
-    # --- 5. ASISTENCIA GLOBAL (CON RANGO FECHAS) ---
+    # --- 5. ASISTENCIA GLOBAL ---
     elif opcion_seleccionada == "Asistencia Global":
         st.title("📅 Reporte de Asistencia Global")
         c1, c2, c3 = st.columns(3)
         g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
-        f_ini = c2.date_input("Desde:", date.today())
-        f_fin = c3.date_input("Hasta:", date.today())
+        f_ini = c2.date_input("Desde:", obtener_fecha_hoy())
+        f_fin = c3.date_input("Hasta:", obtener_fecha_hoy())
         
         if st.button("Generar Reporte"):
             docs = db.collection("asistencia").where("grado", "==", g).stream()
@@ -624,8 +639,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 data_doc = d.to_dict()
                 fecha_doc = data_doc.get("fecha")
                 if not fecha_doc: continue
-                if isinstance(fecha_doc, datetime): f_obj = fecha_doc.date()
-                else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp()).date()
+                # Manejo de Timestamp para TZ
+                if isinstance(fecha_doc, datetime): f_obj = fecha_doc.astimezone(TZ_SV).date()
+                else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp(), TZ_SV).date()
                 
                 if f_ini <= f_obj <= f_fin:
                     total_dias += 1
@@ -714,14 +730,14 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
                     st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
-    # --- 7. FINANZAS (CON BÚSQUEDA FLEXIBLE) ---
+    # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")
         t1, t2, t3, t4 = st.tabs(["📊 Corte de Caja", "➕ Cobros (Alumnos)", "➖ Gastos Operativos", "📜 Reportes & Reimpresión"])
         
         with t1:
             c_date, _ = st.columns([1, 2])
-            fecha_corte = c_date.date_input("Fecha de Corte", date.today())
+            fecha_corte = c_date.date_input("Fecha de Corte", obtener_fecha_hoy())
             fecha_str = fecha_corte.strftime("%d/%m/%Y")
             all_fin = db.collection("finanzas").stream()
             data_hoy = []
@@ -748,24 +764,19 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     components.html(f"""<html><body>{html_corte}<br><center><button onclick="window.print()">IMPRIMIR</button></center></body></html>""", height=400)
             else: st.info("No hay movimientos hoy.")
 
-        # --- SECCIÓN DE COBROS FLEXIBLES (NIE/NOMBRE/GRADO) ---
         with t2:
             st.subheader("Búsqueda de Alumno para Cobro")
             modo_busqueda = st.radio("Buscar por:", ["NIE", "Nombre", "Grado"], horizontal=True)
-            
             nie_encontrado = None
             
             if modo_busqueda == "NIE":
                 n_input = st.text_input("Ingrese NIE:")
                 if st.button("Buscar por NIE") and n_input:
                     d = db.collection("alumnos").document(n_input).get()
-                    if d.exists: 
-                        st.session_state.pago_alum = d.to_dict()
-                        nie_encontrado = n_input
+                    if d.exists: st.session_state.pago_alum = d.to_dict()
                     else: st.error("No encontrado")
             
             elif modo_busqueda == "Nombre":
-                # Descargar nombres para el selectbox (puede ser pesado con miles, ok para cientos)
                 alums_ref = db.collection("alumnos").stream()
                 mapa_nombres = {a.to_dict()['nombre_completo']: a.id for a in alums_ref}
                 sel_nom = st.selectbox("Seleccione Alumno:", [""] + sorted(list(mapa_nombres.keys())))
@@ -797,27 +808,15 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     obs = st.text_input("Observaciones")
                     if st.form_submit_button("✅ Registrar Ingreso"):
                         desc_full = f"{tipo_c} - {det_c}"
-                        # Check duplicados
                         if existe_duplicado("finanzas", "alumno_nie", pa['nie'], desc_full):
                             st.error("⛔ Transacción duplicada (Mismo alumno, mismo concepto hoy).")
                         else:
-                            recibo_data = {
-                                "tipo": "ingreso", 
-                                "descripcion": desc_full, 
-                                "monto": monto, 
-                                "alumno_nie": pa['nie'], 
-                                "nombre_persona": pa['nombre_completo'], 
-                                "observaciones": obs, 
-                                "fecha": firestore.SERVER_TIMESTAMP, 
-                                "fecha_legible": datetime.now().strftime("%d/%m/%Y"), 
-                                "id_short": str(int(time.time()))[-6:]
-                            }
+                            recibo_data = {"tipo": "ingreso", "descripcion": desc_full, "monto": monto, "alumno_nie": pa['nie'], "nombre_persona": pa['nombre_completo'], "observaciones": obs, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": obtener_hora_actual(), "id_short": str(int(time.time()))[-6:]}
                             db.collection("finanzas").add(recibo_data)
                             st.session_state.recibo_temp = recibo_data
                             st.success("Cobro registrado")
                             del st.session_state.pago_alum
                             st.rerun()
-            
             if "recibo_temp" in st.session_state:
                 r = st.session_state.recibo_temp
                 logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
@@ -850,7 +849,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     if duplicado:
                         st.error("⛔ Pago duplicado detectado (Salario ya registrado hoy para este docente).")
                     else:
-                        gasto_data = {"tipo": "egreso", "descripcion": desc_full, "monto": mt, "nombre_persona": per, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": datetime.now().strftime("%d/%m/%Y"), "id_short": str(int(time.time()))[-6:]}
+                        gasto_data = {"tipo": "egreso", "descripcion": desc_full, "monto": mt, "nombre_persona": per, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": obtener_hora_actual(), "id_short": str(int(time.time()))[-6:]}
                         if maestro_seleccionado: gasto_data["docente_id"] = maestro_seleccionado
                         db.collection("finanzas").add(gasto_data)
                         st.session_state.gasto_temp = gasto_data
@@ -865,7 +864,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
         with t4:
             st.subheader("📜 Reportes Financieros")
-            
             mapa_grados = {}
             try:
                 alums_ref = db.collection("alumnos").stream()
@@ -877,11 +875,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             c_f1, c_f2, c_f3 = st.columns(3)
             filtro_rango = c_f1.selectbox("Rango de Tiempo", ["Este Mes", "Mes Pasado", "Últimos 3 Meses", "Últimos 6 Meses", "Este Año", "Personalizado"])
             f_tipo = c_f2.multiselect("Tipo Transacción:", ["ingreso", "egreso"], default=["ingreso", "egreso"])
-            
             lista_grados_filtro = ["Todos"] + LISTA_GRADOS_TODO
             filtro_grado = c_f3.selectbox("Filtrar Grado (Alumnos):", lista_grados_filtro)
 
-            hoy = date.today()
+            hoy = obtener_fecha_hoy()
             f_inicio = hoy
             f_fin = hoy
 
@@ -911,7 +908,6 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             
             docs_hist = db.collection("finanzas").stream() 
             data_raw = []
-            
             tot_ing = 0.0
             tot_egr = 0.0
             
@@ -919,23 +915,19 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 d = doc.to_dict()
                 d_date = d.get("fecha")
                 if not d_date: continue
-                if isinstance(d_date, datetime): actual = d_date.replace(tzinfo=None)
-                else: actual = datetime.fromtimestamp(d_date.timestamp())
+                # Manejo Timestamp con TZ
+                if isinstance(d_date, datetime): actual = d_date.astimezone(TZ_SV).replace(tzinfo=None)
+                else: actual = datetime.fromtimestamp(d_date.timestamp(), TZ_SV).replace(tzinfo=None)
                 
                 if dt_ini <= actual <= dt_fin:
                     if d['tipo'] not in f_tipo: continue
-
                     grado_alumno = "-"
                     nie_transaccion = d.get('alumno_nie')
                     if nie_transaccion and nie_transaccion in mapa_grados:
                         grado_alumno = mapa_grados[nie_transaccion]
-                    
                     d['grado_reporte'] = grado_alumno 
-
                     if filtro_grado != "Todos":
-                        if grado_alumno != filtro_grado:
-                            continue
-
+                        if grado_alumno != filtro_grado: continue
                     data_raw.append(d)
                     if d['tipo'] == 'ingreso': tot_ing += d['monto']
                     elif d['tipo'] == 'egreso': tot_egr += d['monto']
@@ -960,36 +952,13 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         rows_html += f"<tr style='background:{color_row};'><td>{item['fecha_legible']}</td><td>{item.get('grado_reporte','-')}</td><td>{item['nombre_persona']}</td><td>{item['descripcion']}</td><td align='right'>${item['monto']:.2f}</td></tr>"
                     
                     titulo_reporte = f"REPORTE FINANCIERO ({filtro_rango})"
-                    if filtro_grado != "Todos":
-                        titulo_reporte += f" - {filtro_grado.upper()}"
+                    if filtro_grado != "Todos": titulo_reporte += f" - {filtro_grado.upper()}"
 
-                    html_reporte = f"""
-                    <div style="font-family:Arial; padding:20px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;">
-                            <div style="display:flex; align-items:center; gap:15px;">
-                                {hi}
-                                <div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">{titulo_reporte}</p></div>
-                            </div>
-                            <div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')}<br><b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div>
-                        </div>
-                        <br>
-                        <div style="display:flex; gap:20px; margin-bottom:20px;">
-                            <div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div>
-                            <div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div>
-                            <div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div>
-                        </div>
-                        <table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd">
-                            <tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Grado</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>
-                            {rows_html}
-                        </table>
-                        <br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div>
-                    </div>
-                    """
+                    html_reporte = f"""<div style="font-family:Arial; padding:20px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;"><div style="display:flex; align-items:center; gap:15px;">{hi}<div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">{titulo_reporte}</p></div></div><div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')}<br><b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div></div><br><div style="display:flex; gap:20px; margin-bottom:20px;"><div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div><div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div><div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div></div><table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd"><tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Grado</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>{rows_html}</table><br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div></div>"""
                     components.html(f"""<html><body>{html_reporte}<br><center><button onclick="window.print()" style="background:#333; color:white; padding:10px 20px; cursor:pointer;">🖨️ IMPRIMIR REPORTE PDF</button></center></body></html>""", height=600, scrolling=True)
-
             else: st.info("No hay registros en este rango.")
 
-    # --- 8. CONFIGURACIÓN (USUARIOS) (NUEVO MODULO) ---
+    # --- 8. CONFIGURACIÓN (USUARIOS) ---
     elif opcion_seleccionada == "Configuración (Usuarios)":
         st.header("⚙️ Configuración")
         t_usr, t_db = st.tabs(["👥 Usuarios", "⚠️ Base de Datos"])
@@ -998,12 +967,9 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             st.subheader("Crear / Editar Credenciales")
             ur = db.collection("usuarios").stream()
             lu = [u.to_dict() for u in ur]
-            # PROTECCIÓN DE SUPER ADMIN (Solo david ve a david)
             if st.session_state["user_id"] != "david":
                 lu = [x for x in lu if x["usuario"] != "david"]
-            
             st.dataframe(pd.DataFrame(lu), use_container_width=True)
-            
             with st.form("add_user"):
                 c1, c2 = st.columns(2)
                 u_user = c1.text_input("Usuario (ID)")
@@ -1022,12 +988,8 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 st.warning("Zona de Peligro")
                 if st.button("🔴 BORRAR TODO") and st.text_input("Confirmar:") == "BORRAR":
                     borrar_coleccion("alumnos"); borrar_coleccion("maestros_perfil"); borrar_coleccion("carga_academica"); borrar_coleccion("finanzas"); borrar_coleccion("notas")
-                    # NUEVO: BORRAR USUARIOS (EXCEPTO DAVID)
                     borrar_coleccion("usuarios")
-                    # RESTAURAR SUPER ADMIN INMEDIATAMENTE
-                    db.collection("usuarios").document("david").set({
-                        "usuario": "david", "pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"
-                    })
+                    db.collection("usuarios").document("david").set({"usuario": "david", "pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"})
                     st.success("Borrado completo.")
             else:
                 st.info("Función reservada para el desarrollador.")
@@ -1041,7 +1003,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
         st.title("🖨️ Imprimir Listas")
         g = st.selectbox("Grado:", LISTA_GRADOS_TODO)
         mes_lista = st.selectbox("Mes:", LISTA_MESES)
-        
         if st.button("Generar Hoja de Control"):
             docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
             lista = sorted([d.to_dict()['nombre_completo'] for d in docs])
@@ -1057,7 +1018,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
     elif opcion_seleccionada == "Tomar Asistencia":
         st.title("📅 Control de Asistencia")
         c1, c2 = st.columns(2)
-        fecha_asist = c1.date_input("Fecha:", date.today())
+        fecha_asist = c1.date_input("Fecha:", obtener_fecha_hoy())
         grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
         if grado_asist:
             id_asistencia = f"{fecha_asist}_{grado_asist}"
@@ -1069,33 +1030,15 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
             if lista_alumnos:
                 datos = doc_snap.to_dict().get("registros", {}) if doc_snap.exists else {}
                 observaciones = doc_snap.to_dict().get("observaciones", {}) if doc_snap.exists else {}
-                
                 data_editor = []
                 for alum in lista_alumnos:
-                    data_editor.append({
-                        "NIE": alum["NIE"], 
-                        "Nombre": alum["Nombre"], 
-                        "Estado": datos.get(alum["NIE"], "Presente"),
-                        "Observación": observaciones.get(alum["NIE"], "")
-                    })
-                
+                    data_editor.append({"NIE": alum["NIE"], "Nombre": alum["Nombre"], "Estado": datos.get(alum["NIE"], "Presente"), "Observación": observaciones.get(alum["NIE"], "")})
                 df_asist = pd.DataFrame(data_editor)
-                ed = st.data_editor(df_asist, column_config={
-                    "NIE": st.column_config.TextColumn(disabled=True),
-                    "Nombre": st.column_config.TextColumn(disabled=True),
-                    "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True),
-                    "Observación": st.column_config.TextColumn(width="medium")
-                }, hide_index=True, use_container_width=True, key=id_asistencia)
-                
+                ed = st.data_editor(df_asist, column_config={"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True), "Estado": st.column_config.SelectboxColumn("Estado", options=["Presente", "Ausente", "Tardanza", "Permiso"], required=True), "Observación": st.column_config.TextColumn(width="medium")}, hide_index=True, use_container_width=True, key=id_asistencia)
                 if st.button("💾 Guardar Asistencia"):
                     regs = {r["NIE"]: r["Estado"] for r in ed.to_dict(orient="records")}
                     obs_regs = {r["NIE"]: r["Observación"] for r in ed.to_dict(orient="records")}
-                    doc_ref.set({
-                        "fecha": datetime.combine(fecha_asist, datetime.min.time()), 
-                        "grado": grado_asist, 
-                        "registros": regs,
-                        "observaciones": obs_regs
-                    })
+                    doc_ref.set({"fecha": datetime.combine(fecha_asist, datetime.min.time()), "grado": grado_asist, "registros": regs, "observaciones": obs_regs})
                     st.success("Guardado.")
             else: st.warning("Sin alumnos.")
 
@@ -1106,7 +1049,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
         mp = MAPA_CURRICULAR.get(g,[]) if g!="Select..." else []
         m = c2.selectbox("Materia", ["Select..."]+mp)
         mes = c3.selectbox("Mes", LISTA_MESES)
-        
         if g!="Select..." and m!="Select...":
             docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
             lista = [{"NIE": d.to_dict()['nie'], "Nombre": d.to_dict()['nombre_completo']} for d in docs]
@@ -1124,11 +1066,8 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 df["Promedio"] = 0.0
                 cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                 for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
-                
-                # CALCULO REAL TIME
                 if m == "Conducta": df["Promedio"] = df[cols[0]]
                 else: df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + df["Examen (30%)"]*0.30).apply(redondear_mined)
-
                 ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
                 if st.button("Guardar"):
                     batch = db.batch()
@@ -1143,8 +1082,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                         batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": prom_r})
                     db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
-                    st.success("Guardado")
-                    time.sleep(1); st.rerun()
+                    st.success("Guardado"); time.sleep(1); st.rerun()
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")
@@ -1157,31 +1095,22 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 st.subheader(d['grado'])
                 st.write("**Materias:** " + ", ".join(d['materias']))
                 if d.get('es_guia'): st.success("🌟 MAESTRO GUÍA")
-        if not found:
-            st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.")
+        if not found: st.info("No se encontraron cargas asignadas a su nombre exacto. Contacte a Dirección.")
 
     elif opcion_seleccionada == "Expediente Alumnos":
         st.title("📂 Bitácora del Alumno")
-        
         c1, c2 = st.columns(2)
         grado_sel = c1.selectbox("Seleccionar Grado", LISTA_GRADOS_TODO)
-        
-        # Buscar alumnos de ese grado
         alumnos_grado = db.collection("alumnos").where("grado_actual", "==", grado_sel).stream()
         dict_alumnos = {a.to_dict()['nombre_completo']: a.to_dict() for a in alumnos_grado}
-        
         if dict_alumnos:
             nombre_alum = c2.selectbox("Seleccionar Alumno", ["Seleccionar..."] + sorted(list(dict_alumnos.keys())))
-            
             if nombre_alum != "Seleccionar...":
                 alum_data = dict_alumnos[nombre_alum]
                 nie_actual = alum_data['nie']
-                
                 st.markdown("---")
-                # PERFIL RÁPIDO
                 cp1, cp2 = st.columns([1, 4])
                 with cp1:
-                    # Blindaje imagen alumno
                     foto_url = alum_data.get('documentos', {}).get('foto_url')
                     if not foto_url: foto_url = "https://via.placeholder.com/150"
                     st.image(foto_url, width=120)
@@ -1189,40 +1118,20 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     st.subheader(alum_data['nombre_completo'])
                     st.write(f"**NIE:** {alum_data['nie']} | **Responsable:** {alum_data.get('encargado',{}).get('nombre','-')}")
                     st.write(f"**Tel:** {alum_data.get('encargado',{}).get('telefono','-')}")
-                
                 st.divider()
-                
-                # --- SECCIÓN BITÁCORA ---
                 st.markdown("### 📝 Historial de Observaciones")
-                
-                # 1. Formulario de nueva entrada
                 with st.expander("➕ Agregar Nueva Nota / Observación", expanded=True):
                     with st.form("form_bitacora"):
-                        nota_texto = st.text_area("Escriba la observación (comportamiento, tareas, citatorios, etc.):")
+                        nota_texto = st.text_area("Escriba la observación:")
                         if st.form_submit_button("Guardar en Bitácora"):
                             if nota_texto:
-                                nueva_entrada = {
-                                    "nie": nie_actual,
-                                    "alumno": nombre_alum,
-                                    "grado": grado_sel,
-                                    "fecha": firestore.SERVER_TIMESTAMP,
-                                    "fecha_legible": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                                    "autor": st.session_state["user_name"], # El maestro logueado
-                                    "contenido": nota_texto
-                                }
+                                nueva_entrada = {"nie": nie_actual, "alumno": nombre_alum, "grado": grado_sel, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": obtener_hora_actual(), "autor": st.session_state["user_name"], "contenido": nota_texto}
                                 db.collection("bitacora").add(nueva_entrada)
-                                st.success("Nota agregada.")
-                                time.sleep(1); st.rerun()
-                            else:
-                                st.warning("La nota no puede estar vacía.")
-
-                # 2. Visualización de historial
+                                st.success("Nota agregada."); time.sleep(1); st.rerun()
+                            else: st.warning("La nota no puede estar vacía.")
                 logs = db.collection("bitacora").where("nie", "==", nie_actual).stream()
                 lista_logs = [l.to_dict() for l in logs]
-                
-                # Ordenar por fecha (descendente - más nuevo primero)
                 lista_logs.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
-                
                 if lista_logs:
                     for log in lista_logs:
                         with st.container(border=True):
@@ -1230,9 +1139,6 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                             with c_meta:
                                 st.caption(f"📅 {log.get('fecha_legible')}")
                                 st.caption(f"✍️ **{log.get('autor')}**")
-                            with c_body:
-                                st.write(log.get('contenido'))
-                else:
-                    st.info("No hay registros en la bitácora de este alumno.")
-        else:
-            c2.warning("No hay alumnos inscritos en este grado.")
+                            with c_body: st.write(log.get('contenido'))
+                else: st.info("No hay registros en la bitácora de este alumno.")
+        else: c2.warning("No hay alumnos inscritos en este grado.")

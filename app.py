@@ -287,14 +287,14 @@ if opcion_seleccionada == "Inicio":
     st.subheader("📅 Agenda de Actividades")
     col_izq, col_der = st.columns(2)
     with col_izq:
-        st.info("**ESTADO: PERIODO DE INSCRIPCIÓN**")
+        st.info("**ESTADO: PERIODO DE INSCRIPCIÓN FINALIZADO**")
         st.write("- Recepción de documentos.")
         st.write("- Actualización de datos.")
     with col_der:
-        st.success("**PRÓXIMO: INICIO DE CLASES**")
-        st.metric("Fecha", "26 de Enero", "2026")
+        st.success("**PRÓXIMO: INICIO DE EXAMENES MENSUALES**")
+        st.metric("Fecha", "23 de Febrero", "2026")
     
-    cronograma = [{"Fecha": "02 Ene - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "15 Ene", "Actividad": "Inicio de labores plantel docente", "Estado": "Programado"}, {"Fecha": "26 Ene", "Actividad": "Inicio de Clases (Oficial)", "Estado": "Programado"}, {"Fecha": "30 Ene", "Actividad": "Entrega Planificaciones", "Estado": "Pendiente"}]
+    cronograma = [{"Fecha": "16 Feb - 18 Feb", "Actividad": "Matrícula Extraordinaria", "Estado": "En Curso"}, {"Fecha": "20 Feb", "Actividad": "Ultima fecha de Pagos", "Estado": "En Curso"}, {"Fecha": "19 Feb", "Actividad": "Entrega de Exámenes a Direccion", "Estado": "Programado"}, {"Fecha": "23 Feb", "Actividad": "Inicio de examenes mensuales", "Estado": "Pendiente"}]
     st.table(pd.DataFrame(cronograma))
 
 # ==========================================

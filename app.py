@@ -161,9 +161,17 @@ def subir_archivo(archivo, ruta):
         b = storage.bucket()
         blob = b.blob(f"{ruta}/{archivo.name.replace(' ', '_')}")
         blob.upload_from_file(archivo)
-        blob.make_public()
-        return blob.public_url
-    except: return None
+        
+        # En lugar de make_public(), generamos una URL firmada válida por 100 años
+        url_firmada = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(days=365 * 100),
+            method="GET"
+        )
+        return url_firmada
+    except Exception as e: 
+        st.error(f"Error al subir imagen: {e}") # Añadí esto temporalmente para que veas si hay otro error
+        return None
 
 def get_base64(path):
     try:

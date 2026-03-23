@@ -9,6 +9,8 @@ import os
 import streamlit.components.v1 as components
 import re
 import pytz  # Librería para manejo de zonas horarias
+import uuid  # Para generar IDs únicos si es necesario
+import urllib.parse # Para manejar URLs de manera segura
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -159,18 +161,21 @@ def subir_archivo(archivo, ruta):
     if not archivo or not db: return None
     try:
         b = storage.bucket()
-        blob = b.blob(f"{ruta}/{archivo.name.replace(' ', '_')}")
+        blob_name = f"{ruta}/{archivo.name.replace(' ', '_')}"
+        blob = b.blob(blob_name)
+        
+        # Generar un token de acceso único (método nativo de Firebase)
+        token = uuid.uuid4()
+        metadata = {"firebaseStorageDownloadTokens": str(token)}
+        blob.metadata = metadata
+        
         blob.upload_from_file(archivo)
         
-        # En lugar de make_public(), generamos una URL firmada válida por 100 años
-        url_firmada = blob.generate_signed_url(
-            version="v4",
-            expiration=timedelta(days=365 * 100),
-            method="GET"
-        )
-        return url_firmada
-    except Exception as e: 
-        st.error(f"Error al subir imagen: {e}") # Añadí esto temporalmente para que veas si hay otro error
+        # Construir la URL de descarga con el token incluido
+        url = f"https://firebasestorage.googleapis.com/v0/b/{b.name}/o/{urllib.parse.quote(blob_name, safe='')}?alt=media&token={token}"
+        return url
+    except Exception as e:
+        st.error(f"Error al subir imagen: {e}")
         return None
 
 def get_base64(path):

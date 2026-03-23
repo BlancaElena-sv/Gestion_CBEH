@@ -50,7 +50,6 @@ def conectar_firebase():
             elif "firebase_key" in st.secrets: cred = credentials.Certificate(dict(st.secrets["firebase_key"]))
             else: return None, "No se encontró el archivo de credenciales."
             
-            # RECUERDA: Si te da error 403, verifica que este bucket sea exactamente el que sale en tu consola de Firebase
             firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
         except Exception as e: return None, str(e)
     
@@ -139,10 +138,10 @@ if not st.session_state["logged_in"]:
 # 2. CONFIGURACIÓN ACADÉMICA
 # ==========================================
 
-# AÑADIDO: "Artes" en MAT_KINDER y MAT_III_CICLO
-MAT_KINDER = ["Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", "Cuerpo, Movimiento y Bienestar", "Artes", "Conducta"]
-MAT_I_CICLO = ["Comunicación", "Números y Formas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
-MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
+# AÑADIDO: "Inglés" en todas las mallas curriculares
+MAT_KINDER = ["Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", "Cuerpo, Movimiento y Bienestar", "Artes", "Inglés", "Conducta"]
+MAT_I_CICLO = ["Comunicación", "Números y Formas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Inglés", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
+MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Inglés", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
 MAT_III_CICLO = ["Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", "Ciudadanía y Valores", "Inglés", "Educación Física y Deportes", "Artes", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
 
 MAPA_CURRICULAR = {
@@ -166,13 +165,17 @@ def subir_archivo(archivo, ruta):
         blob_name = f"{ruta}/{archivo.name.replace(' ', '_')}"
         blob = b.blob(blob_name)
         
-        # Generar un token de acceso único para evitar el error de privacidad
-        token = uuid.uuid4()
-        metadata = {"firebaseStorageDownloadTokens": str(token)}
-        blob.metadata = metadata
-        
+        # 1. Subir el archivo primero
         blob.upload_from_file(archivo)
         
+        # 2. Generar el token y asignarlo a los metadatos
+        token = str(uuid.uuid4())
+        blob.metadata = {"firebaseStorageDownloadTokens": token}
+        
+        # 3. Hacer "patch" para guardar el token en Firebase
+        blob.patch()
+        
+        # 4. Retornar la URL con el token incluido
         url = f"https://firebasestorage.googleapis.com/v0/b/{b.name}/o/{urllib.parse.quote(blob_name, safe='')}?alt=media&token={token}"
         return url
     except Exception as e:
@@ -241,7 +244,6 @@ with st.sidebar:
     if st.session_state["user_role"] == "admin":
         opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Asistencia Global", "Notas", "Finanzas", "Configuración (Usuarios)"], key="menu_admin_v43")
     else:
-        # AÑADIDO: "Boletas de Notas" al menú docente
         opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Tomar Asistencia", "Cargar Notas", "Ver Mis Cargas", "Expediente Alumnos", "Boletas de Notas"], key="menu_docente_v43")
     
     if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada

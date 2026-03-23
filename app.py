@@ -9,8 +9,8 @@ import os
 import streamlit.components.v1 as components
 import re
 import pytz  # Librería para manejo de zonas horarias
-import uuid  # Para generar IDs únicos si es necesario
-import urllib.parse # Para manejar URLs de manera segura
+import uuid
+import urllib.parse
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -50,6 +50,7 @@ def conectar_firebase():
             elif "firebase_key" in st.secrets: cred = credentials.Certificate(dict(st.secrets["firebase_key"]))
             else: return None, "No se encontró el archivo de credenciales."
             
+            # RECUERDA: Si te da error 403, verifica que este bucket sea exactamente el que sale en tu consola de Firebase
             firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
         except Exception as e: return None, str(e)
     
@@ -138,10 +139,11 @@ if not st.session_state["logged_in"]:
 # 2. CONFIGURACIÓN ACADÉMICA
 # ==========================================
 
-MAT_KINDER = ["Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", "Cuerpo, Movimiento y Bienestar", "Conducta"]
+# AÑADIDO: "Artes" en MAT_KINDER y MAT_III_CICLO
+MAT_KINDER = ["Relaciones Sociales y Afectivas", "Exploración y Experimentación con el Mundo", "Lenguaje y Comunicación", "Matemática", "Ciencia y Tecnología", "Cuerpo, Movimiento y Bienestar", "Artes", "Conducta"]
 MAT_I_CICLO = ["Comunicación", "Números y Formas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
 MAT_II_CICLO = ["Comunicación y Literatura", "Aritmética y Finanzas", "Ciencia y Tecnología", "Ciudadanía y Valores", "Artes", "Desarrollo Corporal", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
-MAT_III_CICLO = ["Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", "Ciudadanía y Valores", "Inglés", "Educación Física y Deportes", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
+MAT_III_CICLO = ["Lenguaje y Literatura", "Matemáticas y Datos", "Ciencia y Tecnología", "Ciudadanía y Valores", "Inglés", "Educación Física y Deportes", "Artes", "Ortografía", "Caligrafía", "Lectura", "Conducta"]
 
 MAPA_CURRICULAR = {
     "Kinder 4": MAT_KINDER, "Kinder 5": MAT_KINDER, "Preparatoria": MAT_KINDER,
@@ -164,18 +166,17 @@ def subir_archivo(archivo, ruta):
         blob_name = f"{ruta}/{archivo.name.replace(' ', '_')}"
         blob = b.blob(blob_name)
         
-        # Generar un token de acceso único (método nativo de Firebase)
+        # Generar un token de acceso único para evitar el error de privacidad
         token = uuid.uuid4()
         metadata = {"firebaseStorageDownloadTokens": str(token)}
         blob.metadata = metadata
         
         blob.upload_from_file(archivo)
         
-        # Construir la URL de descarga con el token incluido
         url = f"https://firebasestorage.googleapis.com/v0/b/{b.name}/o/{urllib.parse.quote(blob_name, safe='')}?alt=media&token={token}"
         return url
     except Exception as e:
-        st.error(f"Error al subir imagen: {e}")
+        st.error(f"Error al subir archivo: {e}")
         return None
 
 def get_base64(path):
@@ -203,12 +204,11 @@ def borrar_coleccion(coll_name, batch_size=10):
 
 def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
     docs = db.collection("finanzas").where("docente_id", "==", docente_id).where("tipo", "==", "egreso").stream()
-    hoy = obtener_fecha_hoy() # USO DE FECHA SV
+    hoy = obtener_fecha_hoy() 
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
         if fecha_db:
-            # Convertir fecha DB a zona horaria SV si es posible, o comparar fechas naive si coinciden
             if isinstance(fecha_db, datetime): f_obj = fecha_db.astimezone(TZ_SV).date()
             else: f_obj = datetime.fromtimestamp(fecha_db.timestamp(), TZ_SV).date()
             
@@ -218,7 +218,7 @@ def verificar_pago_duplicado_hoy(docente_id, tipo_gasto):
 
 def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
     docs = db.collection(coleccion).where(campo_id, "==", id_valor).where("descripcion", "==", descripcion).stream()
-    hoy = obtener_fecha_hoy() # USO DE FECHA SV
+    hoy = obtener_fecha_hoy() 
     for d in docs:
         data = d.to_dict()
         fecha_db = data.get("fecha")
@@ -241,7 +241,8 @@ with st.sidebar:
     if st.session_state["user_role"] == "admin":
         opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Asistencia Global", "Notas", "Finanzas", "Configuración (Usuarios)"], key="menu_admin_v43")
     else:
-        opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Tomar Asistencia", "Cargar Notas", "Ver Mis Cargas", "Expediente Alumnos"], key="menu_docente_v43")
+        # AÑADIDO: "Boletas de Notas" al menú docente
+        opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Tomar Asistencia", "Cargar Notas", "Ver Mis Cargas", "Expediente Alumnos", "Boletas de Notas"], key="menu_docente_v43")
     
     if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada
     if st.session_state.last_page != opcion_seleccionada:
@@ -1155,3 +1156,56 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                             with c_body: st.write(log.get('contenido'))
                 else: st.info("No hay registros en la bitácora de este alumno.")
         else: c2.warning("No hay alumnos inscritos en este grado.")
+
+    # AÑADIDO: MÓDULO DE BOLETAS PARA DOCENTES
+    elif opcion_seleccionada == "Boletas de Notas":
+        st.title("🖨️ Impresión de Boletas de Notas")
+        c1, c2 = st.columns(2)
+        grado_sel = c1.selectbox("Seleccionar Grado", LISTA_GRADOS_TODO)
+        alumnos_grado = db.collection("alumnos").where("grado_actual", "==", grado_sel).stream()
+        dict_alumnos = {f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}": a.to_dict() for a in alumnos_grado}
+        
+        if dict_alumnos:
+            nombre_alum = c2.selectbox("Seleccionar Alumno", ["Seleccionar..."] + sorted(list(dict_alumnos.keys())))
+            if nombre_alum != "Seleccionar...":
+                alum_data = dict_alumnos[nombre_alum]
+                malla_completa = MAPA_CURRICULAR.get(grado_sel, [])
+                
+                st.markdown("---")
+                st.subheader("Configuración de Boleta")
+                st.info("Puede eliminar de la lista las materias que aún no desea que aparezcan en el reporte impreso.")
+                materias_seleccionadas = st.multiselect("Seleccione las materias a incluir en la boleta:", malla_completa, default=malla_completa)
+                
+                if st.button("Generar Boleta") and materias_seleccionadas:
+                    # Obtener al guía del grado
+                    q_guia = db.collection("carga_academica").where("grado", "==", grado_sel).where("es_guia", "==", True).stream()
+                    maestro_guia = "No Asignado"
+                    for d in q_guia: maestro_guia = d.to_dict()['nombre_docente']
+
+                    # Obtener notas del alumno
+                    notas = db.collection("notas").where("nie", "==", alum_data['nie']).stream()
+                    nm = {}
+                    for doc in notas:
+                        dd = doc.to_dict()
+                        if dd['materia'] not in nm: nm[dd['materia']] = {}
+                        nm[dd['materia']][dd['mes']] = dd['promedio_final']
+                    
+                    filas = []
+                    for mat in materias_seleccionadas:
+                        if mat in nm:
+                            n = nm[mat]
+                            t1 = redondear_mined((n.get("Febrero",0)+n.get("Marzo",0)+n.get("Abril",0))/3)
+                            t2 = redondear_mined((n.get("Mayo",0)+n.get("Junio",0)+n.get("Julio",0))/3)
+                            t3 = redondear_mined((n.get("Agosto",0)+n.get("Septiembre",0)+n.get("Octubre",0))/3)
+                            fin = redondear_mined((t1+t2+t3)/3)
+                            filas.append(f"<tr><td style='text-align:left'>{mat}</td><td>{n.get('Febrero','-')}</td><td>{n.get('Marzo','-')}</td><td>{n.get('Abril','-')}</td><td style='background:#eee'><b>{t1}</b></td><td>{n.get('Mayo','-')}</td><td>{n.get('Junio','-')}</td><td>{n.get('Julio','-')}</td><td style='background:#eee'><b>{t2}</b></td><td>{n.get('Agosto','-')}</td><td>{n.get('Septiembre','-')}</td><td>{n.get('Octubre','-')}</td><td style='background:#eee'><b>{t3}</b></td><td style='background:#333;color:white'><b>{fin}</b></td></tr>")
+                        else:
+                            # Si no hay notas registradas para esa materia todavía
+                            filas.append(f"<tr><td style='text-align:left'>{mat}</td><td>-</td><td>-</td><td>-</td><td style='background:#eee'><b>0.0</b></td><td>-</td><td>-</td><td>-</td><td style='background:#eee'><b>0.0</b></td><td>-</td><td>-</td><td>-</td><td style='background:#eee'><b>0.0</b></td><td style='background:#333;color:white'><b>0.0</b></td></tr>")
+
+                    logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="60">' if logo else ""
+                    sello = get_base64("sello.png"); hs = f'<img src="{sello}" height="80">' if sello else ""
+                    html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:20px'><h2>COLEGIO PROFA. BLANCA ELENA</h2><h4>INFORME DE NOTAS</h4></div></div><p><b>Alumno:</b> {nombre_alum} | <b>Grado:</b> {grado_sel} | <b>Guía:</b> {maestro_guia}</p><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>{"".join(filas)}</table><br><br><br><div style='display:flex;justify-content:space-between;align-items:end;padding:0 50px;'><div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Orientador</div></div><div style='text-align:center;'>{hs}</div><div style='text-align:center;width:30%'><div style='border-top:1px solid black;width:100%'>Dirección</div></div></div></div>"""
+                    components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
+        else:
+            c2.warning("No hay alumnos inscritos en este grado.")

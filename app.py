@@ -1211,3 +1211,5 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                     components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR BOLETA</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
         else:
             c2.warning("No hay alumnos inscritos en este grado.")
+    
+        

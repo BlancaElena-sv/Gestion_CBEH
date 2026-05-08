@@ -813,6 +813,112 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         </div>
                         """
                         components.html(f"<html><body>{html_reporte}<br><center><button onclick='window.print()'>🖨️ DESCARGAR REPORTE ANUAL</button></center></body></html>", height=800, scrolling=True)
+# --- AÑADIR DENTRO DEL tab_reporte_grado DEL ADMINISTRADOR ---
+        st.divider()
+        st.subheader("🖨️ Impresión Masiva de Boletas")
+        c_lote, _ = st.columns([2, 2])
+        g_lote = c_lote.selectbox("Grado para impresión en lote:", ["Select..."] + LISTA_GRADOS_NOTAS, key="g_lote")
+
+        if g_lote != "Select..." and st.button("Generar Lote Completo (2 por página)"):
+            with st.spinner("Preparando documentos..."):
+                # 1. Obtener datos base
+                alumnos_docs = db.collection("alumnos").where("grado_actual", "==", g_lote).stream()
+                alumnos_list = [d.to_dict() for d in alumnos_docs]
+                alumnos_list.sort(key=lambda x: x.get('apellidos', ''))
+
+                # 2. Obtener guía y notas (caché de notas para velocidad)
+                q_guia = db.collection("carga_academica").where("grado", "==", g_lote).where("es_guia", "==", True).stream()
+                maestro_guia = next((d.to_dict()['nombre_docente'] for d in q_guia), "No Asignado")
+                
+                notas_ref = db.collection("notas").where("grado", "==", g_lote).stream()
+                mapa_notas_global = {} # {nie: {materia: {mes: nota}}}
+                for n in notas_ref:
+                    nd = n.to_dict()
+                    nie, mat, mes, nota = nd['nie'], nd['materia'], nd['mes'], nd['promedio_final']
+                    if nie not in mapa_notas_global: mapa_notas_global[nie] = {}
+                    if mat not in mapa_notas_global[nie]: mapa_notas_global[nie][mat] = {}
+                    mapa_notas_global[nie][mat][mes] = nota
+
+                # 3. Generar el HTML Masivo
+                logo_b64 = get_base64("logo.png")
+                sello_b64 = get_base64("sello.png")
+                hi = f'<img src="{logo_b64}" height="50">' if logo_b64 else ""
+                hs = f'<img src="{sello_b64}" height="60">' if sello_b64 else ""
+                
+                html_masivo = ""
+                malla = MAPA_CURRICULAR.get(g_lote, [])
+
+                for i, a in enumerate(alumnos_list):
+                    # Generar filas de notas para este alumno
+                    nm = mapa_notas_global.get(a['nie'], {})
+                    filas_notas = ""
+                    for mat in malla:
+                        n = nm.get(mat, {})
+                        t1 = redondear_mined((n.get("Febrero",0)+n.get("Marzo",0)+n.get("Abril",0))/3)
+                        t2 = redondear_mined((n.get("Mayo",0)+n.get("Junio",0)+n.get("Julio",0))/3)
+                        t3 = redondear_mined((n.get("Agosto",0)+n.get("Septiembre",0)+n.get("Octubre",0))/3)
+                        fin = redondear_mined((t1+t2+t3)/3)
+                        filas_notas += f"<tr><td style='text-align:left'>{mat}</td><td>{n.get('Febrero','-')}</td><td>{n.get('Marzo','-')}</td><td>{n.get('Abril','-')}</td><td style='background:#eee'><b>{t1}</b></td><td>{n.get('Mayo','-')}</td><td>{n.get('Junio','-')}</td><td>{n.get('Julio','-')}</td><td style='background:#eee'><b>{t2}</b></td><td>{n.get('Agosto','-')}</td><td>{n.get('Septiembre','-')}</td><td>{n.get('Octubre','-')}</td><td style='background:#eee'><b>{t3}</b></td><td style='background:#333;color:white'><b>{fin}</b></td></tr>"
+
+                    # Estructura de la boleta individual
+                    boleta_html = f"""
+                    <div class="boleta-container">
+                        <div style='display:flex;align-items:center;border-bottom:1px solid black;margin-bottom:5px;'>
+                            {hi}
+                            <div style='margin-left:15px'>
+                                <h3 style='margin:0;'>COLEGIO PROFA. BLANCA ELENA</h3>
+                                <h5 style='margin:0;'>INFORME DE NOTAS - 2026</h5>
+                            </div>
+                        </div>
+                        <p style='font-size:10px; margin:5px 0;'><b>Alumno:</b> {a.get('apellidos')} {a.get('nombres')} | <b>Grado:</b> {g_lote} | <b>Guía:</b> {maestro_guia}</p>
+                        <table border='1' style='width:100%;border-collapse:collapse;text-align:center;font-size:9px;'>
+                            <tr style='background:#ddd;font-weight:bold;'><td>ASIGNATURA</td><td>F</td><td>M</td><td>A</td><td>T1</td><td>M</td><td>J</td><td>J</td><td>T2</td><td>A</td><td>S</td><td>O</td><td>T3</td><td>FIN</td></tr>
+                            {filas_notas}
+                        </table>
+                        <div style='display:flex;justify-content:space-between;align-items:end;margin-top:20px; padding: 0 30px;'>
+                            <div style='text-align:center;width:35%;border-top:1px solid black;font-size:9px;'>Orientador</div>
+                            <div style='text-align:center;'>{hs}</div>
+                            <div style='text-align:center;width:35%;border-top:1px solid black;font-size:9px;'>Dirección</div>
+                        </div>
+                    </div>
+                    """
+                    
+                    # Agregar separador cada 2 boletas
+                    html_masivo += boleta_html
+                    if (i + 1) % 2 == 0:
+                        html_masivo += '<div class="page-break"></div>'
+                    else:
+                        html_masivo += '<div class="spacer"></div>'
+
+                # Estilos CSS para el layout
+                full_html = f"""
+                <html>
+                <head>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; }}
+                        .boleta-container {{ 
+                            height: 48%; 
+                            padding: 10px; 
+                            box-sizing: border-box; 
+                            border: 1px dashed #ccc;
+                        }}
+                        .spacer {{ height: 4%; }}
+                        .page-break {{ page-break-after: always; }}
+                        @media print {{
+                            button {{ display: none; }}
+                            body {{ margin: 0; }}
+                            .boleta-container {{ border: none; }}
+                        }}
+                    </style>
+                </head>
+                <body>
+                    {html_masivo}
+                    <script>function printReport(){{ window.print(); }}</script>
+                    <br><center><button onclick="printReport()" style="padding:15px; background:#1E3A8A; color:white; border-radius:10px; cursor:pointer;">🖨️ IMPRIMIR TODO EL GRADO</button></center>
+                </body>
+                </html>
+                """
+                components.html(full_html, height=800, scrolling=True)
     # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")

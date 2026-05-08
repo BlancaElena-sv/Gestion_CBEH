@@ -675,77 +675,141 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 st.dataframe(pd.DataFrame(data), use_container_width=True)
             else: st.info("No hay tomas de asistencia registradas para este periodo.")
 
-    # --- 6. NOTAS ---
+    # --- 6. NOTAS (ACTUALIZADO CON REPORTES) ---
     elif opcion_seleccionada == "Notas":
-        st.title("📊 Admin Notas")
-        c1, c2, c3 = st.columns(3)
-        g = c1.selectbox("Grado", ["Select..."]+LISTA_GRADOS_NOTAS)
-        mp = MAPA_CURRICULAR.get(g,[]) if g!="Select..." else []
-        m = c2.selectbox("Materia", ["Select..."]+mp)
-        mes = c3.selectbox("Mes", LISTA_MESES)
+        st.title("📊 Gestión y Reportes de Notas")
         
-        if g!="Select..." and m!="Select...":
-            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
-            lista = [{"NIE": d.to_dict()['nie'], "Nombre": f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}"} for d in docs]
-            if not lista: st.warning("Sin alumnos")
-            else:
-                df = pd.DataFrame(lista).sort_values("Nombre")
-                id_doc = f"{g}_{m}_{mes}".replace(" ","_")
-                cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
-                doc_ref = db.collection("notas_mensuales").document(id_doc).get()
-                
-                if doc_ref.exists:
-                    dd = doc_ref.to_dict().get('detalles', {})
-                    for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
-                else:
-                    for c in cols: df[c] = 0.0
-                
-                if m == "Conducta":
-                    df["Promedio"] = df[cols[0]]
-                else:
-                    df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + 
-                                      df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + 
-                                      df["Examen (30%)"]*0.30).apply(redondear_mined)
+        tab_registro, tab_reporte_grado = st.tabs(["📝 Registro Mensual", "📜 Reporte por Grado (Cuadros)"])
 
-                cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
-                for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
-                ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=id_doc)
-                if st.button("Guardar"):
-                    batch = db.batch()
-                    detalles = {}
-                    for _, r in ed.iterrows():
-                        if m == "Conducta": prom = r[cols[0]]
-                        else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
-                        prom_r = redondear_mined(prom)
-                        detalles[r["NIE"]] = {c: r[c] for c in cols}
-                        detalles[r["NIE"]]["Promedio"] = prom_r
-                        ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
-                        batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": prom_r})
-                    db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
-                    batch.commit()
-                    st.success("Guardado")
-                    time.sleep(1); st.rerun()
-                
-                st.divider()
-                st.subheader(f"📋 Registro Acumulado Detallado - {m}")
-                rows_acumulados = []
-                for mes_iter in LISTA_MESES:
-                    id_history = f"{g}_{m}_{mes_iter}".replace(" ","_")
-                    doc_h = db.collection("notas_mensuales").document(id_history).get()
-                    if doc_h.exists:
-                        data_h = doc_h.to_dict().get("detalles", {})
-                        for nie_iter, notas_iter in data_h.items():
-                            nom_alum = next((x['Nombre'] for x in lista if x['NIE'] == nie_iter), nie_iter)
-                            if m == "Conducta":
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Nota Conducta": notas_iter.get("Nota Conducta", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                            else:
-                                rows_acumulados.append({"Mes": mes_iter, "NIE": nie_iter, "Nombre": nom_alum, "Act1": notas_iter.get("Act1 (25%)", 0), "Act2": notas_iter.get("Act2 (25%)", 0), "Alt1": notas_iter.get("Alt1 (10%)", 0), "Alt2": notas_iter.get("Alt2 (10%)", 0), "Examen": notas_iter.get("Examen (30%)", 0), "Promedio": notas_iter.get("Promedio", 0)})
-                if rows_acumulados:
-                    df_ac = pd.DataFrame(rows_acumulados)
-                    df_ac['Mes_Indice'] = df_ac['Mes'].apply(lambda x: LISTA_MESES.index(x))
-                    df_ac = df_ac.sort_values(by=['Mes_Indice', 'Nombre']).drop(columns=['Mes_Indice'])
-                    st.dataframe(df_ac, use_container_width=True, hide_index=True)
+        with tab_registro:
+            c1, c2, c3 = st.columns(3)
+            g = c1.selectbox("Grado", ["Select..."] + LISTA_GRADOS_NOTAS, key="g_reg")
+            mp = MAPA_CURRICULAR.get(g, []) if g != "Select..." else []
+            m = c2.selectbox("Materia", ["Select..."] + mp, key="m_reg")
+            mes = c3.selectbox("Mes", LISTA_MESES, key="mes_reg")
+            
+            if g != "Select..." and m != "Select...":
+                docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+                lista = [{"NIE": d.to_dict()['nie'], "Nombre": f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}"} for d in docs]
+                if not lista: st.warning("Sin alumnos")
+                else:
+                    df = pd.DataFrame(lista).sort_values("Nombre")
+                    id_doc = f"{g}_{m}_{mes}".replace(" ", "_")
+                    cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
+                    doc_ref = db.collection("notas_mensuales").document(id_doc).get()
+                    
+                    if doc_ref.exists:
+                        dd = doc_ref.to_dict().get('detalles', {})
+                        for c in cols: df[c] = df["NIE"].map(lambda x: dd.get(x, {}).get(c, 0.0))
+                    else:
+                        for c in cols: df[c] = 0.0
+                    
+                    if m == "Conducta":
+                        df["Promedio"] = df[cols[0]]
+                    else:
+                        df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + 
+                                          df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + 
+                                          df["Examen (30%)"]*0.30).apply(redondear_mined)
 
+                    cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
+                    for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
+                    ed = st.data_editor(df, column_config=cfg, hide_index=True, use_container_width=True, key=f"editor_{id_doc}")
+                    
+                    if st.button("Guardar Notas"):
+                        batch = db.batch()
+                        detalles = {}
+                        for _, r in ed.iterrows():
+                            if m == "Conducta": prom = r[cols[0]]
+                            else: prom = (r[cols[0]]*0.25 + r[cols[1]]*0.25 + r[cols[2]]*0.1 + r[cols[3]]*0.1 + r[cols[4]]*0.3)
+                            prom_r = redondear_mined(prom)
+                            detalles[r["NIE"]] = {c: r[c] for c in cols}
+                            detalles[r["NIE"]]["Promedio"] = prom_r
+                            ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
+                            batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": prom_r})
+                        db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
+                        batch.commit()
+                        st.success("Guardado"); time.sleep(1); st.rerun()
+
+        with tab_reporte_grado:
+            st.subheader("📋 Cuadro General de Notas por Grado")
+            c1, c2 = st.columns(2)
+            g_rep = c1.selectbox("Seleccione Grado:", ["Select..."] + LISTA_GRADOS_NOTAS, key="g_rep")
+            mes_rep = c2.selectbox("Mes del Reporte:", LISTA_MESES, key="mes_rep")
+
+            if g_rep != "Select...":
+                if st.button("Generar Cuadro de Notas"):
+                    # 1. Obtener Alumnos
+                    alumnos_docs = db.collection("alumnos").where("grado_actual", "==", g_rep).stream()
+                    alumnos_list = []
+                    for d in alumnos_docs:
+                        data = d.to_dict()
+                        alumnos_list.append({"nie": d.id, "nombre": f"{data.get('apellidos', '')} {data.get('nombres', '')}"})
+                    alumnos_list.sort(key=lambda x: x["nombre"])
+
+                    # 2. Obtener Materias del Grado
+                    materias = MAPA_CURRICULAR.get(g_rep, [])
+                    
+                    # 3. Consultar notas de todos los alumnos para ese mes/grado
+                    # Usamos la colección 'notas' que ya tiene el promedio final calculado
+                    notas_ref = db.collection("notas").where("grado", "==", g_rep).where("mes", "==", mes_rep).stream()
+                    mapa_notas = {} # {nie: {materia: nota}}
+                    for n in notas_ref:
+                        nd = n.to_dict()
+                        nie = nd['nie']
+                        if nie not in mapa_notas: mapa_notas[nie] = {}
+                        mapa_notas[nie][nd['materia']] = nd['promedio_final']
+
+                    # 4. Construir HTML del Cuadro (Estilo imagen adjunta)
+                    logo = get_base64("logo.png")
+                    hi = f'<img src="{logo}" height="50">' if logo else ""
+                    
+                    # Encabezados de materias (Vertical para ahorrar espacio)
+                    th_materias = "".join([f"<th style='writing-mode: vertical-lr; transform: rotate(180deg); padding: 10px 2px; font-size:10px;'>{m}</th>" for m in materias])
+                    
+                    rows_html = ""
+                    for i, alum in enumerate(alumnos_list):
+                        notas_alum = mapa_notas.get(alum['nie'], {})
+                        td_notas = ""
+                        suma_prom = 0
+                        cont_prom = 0
+                        for m in materias:
+                            val = notas_alum.get(m, "-")
+                            td_notas += f"<td>{val}</td>"
+                            if isinstance(val, (int, float)):
+                                suma_prom += val
+                                cont_prom += 1
+                        
+                        prom_gral = redondear_mined(suma_prom/cont_prom) if cont_prom > 0 else "-"
+                        rows_html += f"<tr><td>{i+1}</td><td style='text-align:left; font-size:11px;'>{alum['nie']}</td><td style='text-align:left; font-size:11px;'>{alum['nombre']}</td>{td_notas}<td style='background:#f0f0f0;'><b>{prom_gral}</b></td></tr>"
+
+                    html_cuadro = f"""
+                    <div style="font-family:Arial; padding:10px;">
+                        <div style="display:flex; align-items:center; border-bottom:2px solid #000; margin-bottom:10px;">
+                            {hi}
+                            <div style="margin-left:20px;">
+                                <h2 style="margin:0;">COLEGIO PROFA. BLANCA ELENA</h2>
+                                <h4 style="margin:0;">CUADRO DE CALIFICACIONES - {mes_rep.upper()} 2026</h4>
+                                <p style="margin:0; font-size:12px;"><b>GRADO:</b> {g_rep.upper()}</p>
+                            </div>
+                        </div>
+                        <table border="1" style="width:100%; border-collapse:collapse; text-align:center; font-size:12px;">
+                            <tr style="background:#eee;">
+                                <th width="3%">No.</th>
+                                <th width="10%">NIE</th>
+                                <th width="25%">NOMBRE DEL ESTUDIANTE</th>
+                                {th_materias}
+                                <th width="5%">PROM</th>
+                            </tr>
+                            {rows_html}
+                        </table>
+                        <br><br>
+                        <div style="display:flex; justify-content:space-around; margin-top:30px;">
+                            <div style="text-align:center; width:30%; border-top:1px solid #000;">Maestro(a) de Grado</div>
+                            <div style="text-align:center; width:30%; border-top:1px solid #000;">Dirección</div>
+                        </div>
+                    </div>
+                    """
+                    components.html(f"<html><body>{html_cuadro}<br><center><button onclick='window.print()'>🖨️ IMPRIMIR CUADRO</button></center><style>@media print{{button{{display:none;}}}}</style></body></html>", height=800, scrolling=True)
     # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")

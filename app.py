@@ -729,87 +729,90 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                         db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
                         batch.commit()
                         st.success("Guardado"); time.sleep(1); st.rerun()
-
         with tab_reporte_grado:
-            st.subheader("📋 Cuadro General de Notas por Grado")
-            c1, c2 = st.columns(2)
-            g_rep = c1.selectbox("Seleccione Grado:", ["Select..."] + LISTA_GRADOS_NOTAS, key="g_rep")
-            mes_rep = c2.selectbox("Mes del Reporte:", LISTA_MESES, key="mes_rep")
+            st.subheader("📜 Cuadro de Registro Anual y Promedios")
+            c1, _ = st.columns([2, 2])
+            g_rep = c1.selectbox("Seleccione Grado para el Cuadro Anual:", ["Select..."] + LISTA_GRADOS_NOTAS, key="g_rep_anual")
 
             if g_rep != "Select...":
-                if st.button("Generar Cuadro de Notas"):
-                    # 1. Obtener Alumnos
-                    alumnos_docs = db.collection("alumnos").where("grado_actual", "==", g_rep).stream()
-                    alumnos_list = []
-                    for d in alumnos_docs:
-                        data = d.to_dict()
-                        alumnos_list.append({"nie": d.id, "nombre": f"{data.get('apellidos', '')} {data.get('nombres', '')}"})
-                    alumnos_list.sort(key=lambda x: x["nombre"])
+                if st.button("Generar Reporte de Rendimiento Anual"):
+                    with st.spinner("Calculando promedios anuales..."):
+                        # 1. Obtener Alumnos y Materias
+                        alumnos_docs = db.collection("alumnos").where("grado_actual", "==", g_rep).stream()
+                        alumnos_list = [{"nie": d.id, "nombre": f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}"} for d in alumnos_docs]
+                        alumnos_list.sort(key=lambda x: x["nombre"])
+                        materias = MAPA_CURRICULAR.get(g_rep, [])
 
-                    # 2. Obtener Materias del Grado
-                    materias = MAPA_CURRICULAR.get(g_rep, [])
-                    
-                    # 3. Consultar notas de todos los alumnos para ese mes/grado
-                    # Usamos la colección 'notas' que ya tiene el promedio final calculado
-                    notas_ref = db.collection("notas").where("grado", "==", g_rep).where("mes", "==", mes_rep).stream()
-                    mapa_notas = {} # {nie: {materia: nota}}
-                    for n in notas_ref:
-                        nd = n.to_dict()
-                        nie = nd['nie']
-                        if nie not in mapa_notas: mapa_notas[nie] = {}
-                        mapa_notas[nie][nd['materia']] = nd['promedio_final']
-
-                    # 4. Construir HTML del Cuadro (Estilo imagen adjunta)
-                    logo = get_base64("logo.png")
-                    hi = f'<img src="{logo}" height="50">' if logo else ""
-                    
-                    # Encabezados de materias (Vertical para ahorrar espacio)
-                    th_materias = "".join([f"<th style='writing-mode: vertical-lr; transform: rotate(180deg); padding: 10px 2px; font-size:10px;'>{m}</th>" for m in materias])
-                    
-                    rows_html = ""
-                    for i, alum in enumerate(alumnos_list):
-                        notas_alum = mapa_notas.get(alum['nie'], {})
-                        td_notas = ""
-                        suma_prom = 0
-                        cont_prom = 0
-                        for m in materias:
-                            val = notas_alum.get(m, "-")
-                            td_notas += f"<td>{val}</td>"
-                            if isinstance(val, (int, float)):
-                                suma_prom += val
-                                cont_prom += 1
+                        # 2. Consultar TODAS las notas del grado en una sola pasada
+                        notas_ref = db.collection("notas").where("grado", "==", g_rep).stream()
                         
-                        prom_gral = redondear_mined(suma_prom/cont_prom) if cont_prom > 0 else "-"
-                        rows_html += f"<tr><td>{i+1}</td><td style='text-align:left; font-size:11px;'>{alum['nie']}</td><td style='text-align:left; font-size:11px;'>{alum['nombre']}</td>{td_notas}<td style='background:#f0f0f0;'><b>{prom_gral}</b></td></tr>"
+                        # Estructura: data[nie][materia][mes] = nota
+                        data_anual = {}
+                        for n in notas_ref:
+                            nd = n.to_dict()
+                            nie, mat, mes, nota = nd['nie'], nd['materia'], nd['mes'], nd['promedio_final']
+                            if nie not in data_anual: data_anual[nie] = {}
+                            if mat not in data_anual[nie]: data_anual[nie][mat] = {}
+                            data_anual[nie][mat][mes] = nota
 
-                    html_cuadro = f"""
-                    <div style="font-family:Arial; padding:10px;">
-                        <div style="display:flex; align-items:center; border-bottom:2px solid #000; margin-bottom:10px;">
-                            {hi}
-                            <div style="margin-left:20px;">
-                                <h2 style="margin:0;">COLEGIO PROFA. BLANCA ELENA</h2>
-                                <h4 style="margin:0;">CUADRO DE CALIFICACIONES - {mes_rep.upper()} 2026</h4>
-                                <p style="margin:0; font-size:12px;"><b>GRADO:</b> {g_rep.upper()}</p>
+                        # 3. Construcción de filas
+                        rows_html = ""
+                        for i, alum in enumerate(alumnos_list):
+                            notas_alum = data_anual.get(alum['nie'], {})
+                            
+                            for idx_mat, mat in enumerate(materias):
+                                m_n = notas_alum.get(mat, {})
+                                
+                                # Cálculos de Trimestres
+                                t1 = (m_n.get("Febrero", 0) + m_n.get("Marzo", 0) + m_n.get("Abril", 0)) / 3
+                                t2 = (m_n.get("Mayo", 0) + m_n.get("Junio", 0) + m_n.get("Julio", 0)) / 3
+                                t3 = (m_n.get("Agosto", 0) + m_n.get("Septiembre", 0) + m_n.get("Octubre", 0)) / 3
+                                
+                                rt1, rt2, rt3 = redondear_mined(t1), redondear_mined(t2), redondear_mined(t3)
+                                pf = redondear_mined((rt1 + rt2 + rt3) / 3)
+
+                                # Formato: La primera materia lleva el nombre del alumno, las siguientes celdas vacías para agrupar
+                                if idx_mat == 0:
+                                    row_start = f"<tr><td rowspan='{len(materias)}'>{i+1}</td><td rowspan='{len(materias)}' style='text-align:left;'>{alum['nombre']}</td>"
+                                else:
+                                    row_start = "<tr>"
+                                
+                                rows_html += f"""
+                                    {row_start}
+                                    <td style='text-align:left; font-size:10px;'>{mat}</td>
+                                    <td>{m_n.get('Febrero','-')}</td><td>{m_n.get('Marzo','-')}</td><td>{m_n.get('Abril','-')}</td>
+                                    <td style='background:#e3f2fd;'><b>{rt1}</b></td>
+                                    <td>{m_n.get('Mayo','-')}</td><td>{m_n.get('Junio','-')}</td><td>{m_n.get('Julio','-')}</td>
+                                    <td style='background:#e3f2fd;'><b>{rt2}</b></td>
+                                    <td>{m_n.get('Agosto','-')}</td><td>{m_n.get('Septiembre','-')}</td><td>{m_n.get('Octubre','-')}</td>
+                                    <td style='background:#e3f2fd;'><b>{rt3}</b></td>
+                                    <td style='background:#1e3a8a; color:white;'><b>{pf}</b></td>
+                                </tr>"""
+
+                        # 4. Renderizado HTML
+                        logo = get_base64("logo.png")
+                        hi = f'<img src="{logo}" height="50">' if logo else ""
+                        html_reporte = f"""
+                        <div style="font-family:Arial; padding:10px;">
+                            <div style="text-align:center; border-bottom:2px solid #333;">
+                                {hi}
+                                <h2>COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
+                                <h3>CUADRO DE REGISTRO DE CALIFICACIONES ANUAL - CICLO 2026</h3>
+                                <p><b>GRADO:</b> {g_rep.upper()}</p>
                             </div>
+                            <table border="1" style="width:100%; border-collapse:collapse; text-align:center; font-size:11px; margin-top:10px;">
+                                <tr style="background:#f2f2f2;">
+                                    <th>No.</th><th>ESTUDIANTE</th><th>ASIGNATURA</th>
+                                    <th>FEB</th><th>MAR</th><th>ABR</th><th style="background:#bbdefb;">PT1</th>
+                                    <th>MAY</th><th>JUN</th><th>JUL</th><th style="background:#bbdefb;">PT2</th>
+                                    <th>AGO</th><th>SEP</th><th>OCT</th><th style="background:#bbdefb;">PT3</th>
+                                    <th style="background:#0d47a1; color:white;">PF</th>
+                                </tr>
+                                {rows_html}
+                            </table>
                         </div>
-                        <table border="1" style="width:100%; border-collapse:collapse; text-align:center; font-size:12px;">
-                            <tr style="background:#eee;">
-                                <th width="3%">No.</th>
-                                <th width="10%">NIE</th>
-                                <th width="25%">NOMBRE DEL ESTUDIANTE</th>
-                                {th_materias}
-                                <th width="5%">PROM</th>
-                            </tr>
-                            {rows_html}
-                        </table>
-                        <br><br>
-                        <div style="display:flex; justify-content:space-around; margin-top:30px;">
-                            <div style="text-align:center; width:30%; border-top:1px solid #000;">Maestro(a) de Grado</div>
-                            <div style="text-align:center; width:30%; border-top:1px solid #000;">Dirección</div>
-                        </div>
-                    </div>
-                    """
-                    components.html(f"<html><body>{html_cuadro}<br><center><button onclick='window.print()'>🖨️ IMPRIMIR CUADRO</button></center><style>@media print{{button{{display:none;}}}}</style></body></html>", height=800, scrolling=True)
+                        """
+                        components.html(f"<html><body>{html_reporte}<br><center><button onclick='window.print()'>🖨️ DESCARGAR REPORTE ANUAL</button></center></body></html>", height=800, scrolling=True)
     # --- 7. FINANZAS ---
     elif opcion_seleccionada == "Finanzas":
         st.title("💰 Administración Financiera")

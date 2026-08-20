@@ -8,24 +8,18 @@ import time
 import os
 import streamlit.components.v1 as components
 import re
-import pytz  # Librería para manejo de zonas horarias
 import uuid
 import urllib.parse
 
+from config import APP_NAME, COLEGIO_NOMBRE, CICLO_LECTIVO, TZ_SV
+
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
-    page_title="EduManager", 
+    page_title=APP_NAME, 
     layout="wide", 
     page_icon="🎓",
     initial_sidebar_state="expanded"
 )
-
-# ==========================================
-# 0. CONFIGURACIÓN DE ZONA HORARIA
-# ==========================================
-# Definimos la zona horaria de El Salvador para todo el sistema
-TZ_SV = pytz.timezone("America/El_Salvador")
-
 def obtener_fecha_hoy():
     """Retorna la fecha actual en El Salvador"""
     return datetime.now(TZ_SV).date()

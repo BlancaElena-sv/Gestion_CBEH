@@ -1,4 +1,28 @@
+# Credenciales y secretos
 credenciales.json
-venv/
+credenciales
+.streamlit/secrets.toml
+
+# Respaldos locales
+*respaldo*.py
+*backup*.py
+
+# Python
 __pycache__/
-.DS_Store
+*.pyc
+*.pyo
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Logs
+*.log
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# VS Code
+.vscode/

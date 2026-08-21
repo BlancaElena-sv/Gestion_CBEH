@@ -213,39 +213,13 @@ def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
 # ==========================================
 # 4. BARRA LATERAL
 # ==========================================
-menu = mostrar_sidebar(
+opcion_seleccionada = mostrar_sidebar(
     st.session_state["user_name"],
     st.session_state["user_role"]
 )
 
-menu = (
-    menu
-    .replace("🏠 ", "")
-    .replace("🎓 ", "")
-    .replace("🔎 ", "")
-    .replace("👩‍🏫 ", "")
-    .replace("📅 ", "")
-    .replace("📊 ", "")
-    .replace("💰 ", "")
-    .replace("⚙️ ", "")
-    .replace("📋 ", "")
-    .replace("📝 ", "")
-)
-
-opcion_seleccionada = menu
-
-if st.sidebar.button(
-    "🚪 Cerrar sesión",
-    use_container_width=True
-):
+if opcion_seleccionada == "__logout__":
     logout()
-
-    st.markdown("---")
-    st.caption("© 2026 David Fuentes | EduManager")
-
-if not db and opcion_seleccionada != "Configuración (Usuarios)":
-    st.error("⚠️ Base de Datos desconectada.")
-    st.stop()
 
 # ==========================================
 # 5. CONTENIDO PRINCIPAL

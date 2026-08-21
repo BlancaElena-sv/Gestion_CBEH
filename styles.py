@@ -192,6 +192,139 @@ def aplicar_estilos():
         font-size: 15px;
     }
 
+    /* ========================================
+   SIDEBAR PROFESIONAL
+======================================== */
+
+.menu-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 1px;
+    margin-top: 18px;
+    margin-bottom: 6px;
+}
+
+/* ========================================
+   SIDEBAR - MENÚ COMPACTO Y ALINEADO
+======================================== */
+
+/* Títulos de categoría */
+.menu-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 1.2px;
+
+    margin-top: 22px;
+    margin-bottom: 9px;
+
+    padding-left: 2px;
+}
+
+/* Contenedor de botones */
+section[data-testid="stSidebar"] .stButton {
+    margin-bottom: 2px;
+}
+
+/* Botones inactivos */
+section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+    background: transparent !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+
+    border: none !important;
+    border-radius: 7px !important;
+
+    min-height: 34px !important;
+    padding: 6px 10px !important;
+
+    justify-content: flex-start !important;
+    text-align: left !important;
+
+    font-size: 14px !important;
+    font-weight: 500 !important;
+
+    width: 100% !important;
+}
+
+/* Texto interno del botón */
+section[data-testid="stSidebar"] .stButton > button p {
+    width: 100% !important;
+    text-align: left !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Hover */
+section[data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Botón activo */
+section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+
+    border: none !important;
+    border-left: 3px solid #ff5252 !important;
+    border-radius: 7px !important;
+
+    min-height: 34px !important;
+    padding: 6px 10px !important;
+
+    justify-content: flex-start !important;
+    text-align: left !important;
+
+    font-size: 14px !important;
+    font-weight: 600 !important;
+
+    width: 100% !important;
+}
+
+/* Hover del activo */
+section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+    background: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Separación entre grupos */
+section[data-testid="stSidebar"] .menu-section-title + div {
+    margin-top: 2px;
+}
+
+/* ========================================
+   FORZAR ALINEACIÓN IZQUIERDA REAL
+======================================== */
+
+/* Contenido interno de todos los botones del sidebar */
+section[data-testid="stSidebar"] .stButton > button {
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+/* Contenedor que Streamlit crea dentro del botón */
+section[data-testid="stSidebar"] .stButton > button > div {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+/* Contenedor Markdown interno */
+section[data-testid="stSidebar"]
+.stButton > button
+div[data-testid="stMarkdownContainer"] {
+    width: 100% !important;
+    text-align: left !important;
+}
+
+/* Párrafo del texto */
+section[data-testid="stSidebar"]
+.stButton > button
+div[data-testid="stMarkdownContainer"] p {
+    width: 100% !important;
+    text-align: left !important;
+    margin: 0 !important;
+}
+
         </style>
         """,
         unsafe_allow_html=True

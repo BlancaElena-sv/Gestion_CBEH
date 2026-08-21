@@ -3,6 +3,7 @@ import time
 import pandas as pd
 import streamlit as st
 from firebase_admin import firestore
+from config import CICLO_LECTIVO
 
 
 def mostrar_maestros(
@@ -394,6 +395,7 @@ def mostrar_maestros(
                                 "grado": grado_sel,
                                 "materias": materias_sel,
                                 "es_guia": es_guia,
+                                "ciclo_lectivo": CICLO_LECTIVO,
                             }
                         )
 

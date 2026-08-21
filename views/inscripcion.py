@@ -1,5 +1,6 @@
 import streamlit as st
 from firebase_admin import firestore
+from config import CICLO_LECTIVO
 
 
 def mostrar_inscripcion(
@@ -163,6 +164,8 @@ def mostrar_inscripcion(
                     "grado_actual": grado,
                     "turno": turno,
                     "estado": "Activo",
+                    "activo": True,
+                    "ciclo_lectivo": CICLO_LECTIVO,
 
                     "encargado": {
                         "nombre": responsable,

@@ -1085,7 +1085,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
         fecha_asist = c1.date_input("Fecha:", obtener_fecha_hoy())
         grado_asist = c2.selectbox("Grado:", LISTA_GRADOS_TODO)
         if grado_asist:
-            id_asistencia = f"{fecha_asist}_{grado_asist}"
+            id_asistencia = ( f"{CICLO_LECTIVO}_{fecha_asist}_{grado_asist}")
             doc_ref = db.collection("asistencia").document(id_asistencia)
             doc_snap = doc_ref.get()
             alumnos_ref = (
@@ -1107,7 +1107,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 if st.button("💾 Guardar Asistencia"):
                     regs = {r["NIE"]: r["Estado"] for r in ed.to_dict(orient="records")}
                     obs_regs = {r["NIE"]: r["Observación"] for r in ed.to_dict(orient="records")}
-                    doc_ref.set({"fecha": datetime.combine(fecha_asist, datetime.min.time()), "grado": grado_asist, "registros": regs, "observaciones": obs_regs})
+                    doc_ref.set({"fecha": datetime.combine(fecha_asist, datetime.min.time()), "ciclo_lectivo": CICLO_LECTIVO, "grado": grado_asist, "registros": regs, "observaciones": obs_regs})
                     st.success("Guardado.")
             else: st.warning("Sin alumnos.")
 
@@ -1129,7 +1129,7 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
             if not lista: st.warning("Sin alumnos")
             else:
                 df = pd.DataFrame(lista).sort_values("Nombre")
-                id_doc = f"{g}_{m}_{mes}".replace(" ","_")
+                id_doc = (f"{CICLO_LECTIVO}_{g}_{m}_{mes}".replace(" ","_"))
                 cols = ["Nota Conducta"] if m == "Conducta" else ["Act1 (25%)", "Act2 (25%)", "Alt1 (10%)", "Alt2 (10%)", "Examen (30%)"]
                 doc_ref = db.collection("notas_mensuales").document(id_doc).get()
                 if doc_ref.exists:
@@ -1153,8 +1153,8 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                         detalles[r["NIE"]] = {c: r[c] for c in cols}
                         detalles[r["NIE"]]["Promedio"] = prom_r
                         ref = db.collection("notas").document(f"{r['NIE']}_{id_doc}")
-                        batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": prom_r})
-                    db.collection("notas_mensuales").document(id_doc).set({"grado": g, "materia": m, "mes": mes, "detalles": detalles})
+                        batch.set(ref, {"nie": r["NIE"], "grado": g, "materia": m, "mes": mes, "promedio_final": prom_r,"ciclo_lectivo": CICLO_LECTIVO })
+                    db.collection("notas_mensuales").document(id_doc).set({"ciclo_lectivo": CICLO_LECTIVO, "grado": g, "materia": m, "mes": mes, "detalles": detalles})
                     batch.commit()
                     st.success("Guardado"); time.sleep(1); st.rerun()
 

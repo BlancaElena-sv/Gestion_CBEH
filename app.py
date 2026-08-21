@@ -14,6 +14,7 @@ import re
 
 from config import APP_NAME, COLEGIO_NOMBRE, CICLO_LECTIVO, TZ_SV
 from utils import get_base64, redondear_mined
+from auth import generar_hash, verificar_password
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -69,50 +70,127 @@ def limpiar_nombre(nombre):
 
 def login():
     col_izq, col_centro, col_der = st.columns([1, 2, 1])
+
     with col_centro:
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        try: 
+
+        try:
             sc1, sc2, sc3 = st.columns([1, 1, 1])
+
             with sc2:
-                st.image("logo.png", use_container_width=True) 
-        except: 
+                st.image("logo.png", use_container_width=True)
+
+        except Exception:
             st.warning("⚠️")
-            
-        st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>EduManager</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center; color: #555;'>Colegio Profa. Blanca Elena de Hernández</h4>", unsafe_allow_html=True)
+
+        st.markdown(
+            "<h1 style='text-align: center; color: #1E3A8A;'>EduManager</h1>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            "<h4 style='text-align: center; color: #555;'>"
+            "Colegio Profa. Blanca Elena de Hernández"
+            "</h4>",
+            unsafe_allow_html=True
+        )
+
         st.markdown("</div>", unsafe_allow_html=True)
-        st.write("") 
+        st.write("")
 
         with st.form("login_form"):
             user = st.text_input("Usuario")
             password = st.text_input("Contraseña", type="password")
-            submitted = st.form_submit_button("INICIAR SESIÓN", type="primary", use_container_width=True)
-            
+
+            submitted = st.form_submit_button(
+                "INICIAR SESIÓN",
+                type="primary",
+                use_container_width=True
+            )
+
             if submitted:
+
+                # Acceso temporal del administrador principal
                 if user == "admin" and password == "master2026":
                     st.session_state["logged_in"] = True
                     st.session_state["user_role"] = "admin"
                     st.session_state["user_name"] = "Super Admin"
                     st.session_state["user_id"] = "admin"
                     st.rerun()
+
                 elif db:
                     try:
                         doc = db.collection("usuarios").document(user).get()
+
                         if doc.exists:
                             d = doc.to_dict()
-                            if d["pass"] == password:
+
+                            password_valida = False
+
+                            # ==========================================
+                            # NUEVO SISTEMA: BCRYPT
+                            # ==========================================
+                            if d.get("password_hash"):
+
+                                password_valida = verificar_password(
+                                    password,
+                                    d["password_hash"]
+                                )
+
+                            # ==========================================
+                            # SISTEMA ANTIGUO
+                            # ==========================================
+                            elif d.get("pass") == password:
+
+                                password_valida = True
+
+                                # Migración automática hacia bcrypt
+                                nuevo_hash = generar_hash(password)
+
+                                db.collection("usuarios").document(user).update({
+                                    "password_hash": nuevo_hash
+                                })
+
+                            # ==========================================
+                            # RESULTADO DEL LOGIN
+                            # ==========================================
+                            if password_valida:
+
                                 st.session_state["logged_in"] = True
                                 st.session_state["user_role"] = d["rol"]
-                                st.session_state["user_name"] = d.get("nombre", user)
+                                st.session_state["user_name"] = d.get(
+                                    "nombre",
+                                    user
+                                )
                                 st.session_state["user_id"] = user
-                                st.rerun()
-                            else: st.error("❌ Contraseña incorrecta")
-                        else: st.error("❌ Usuario no encontrado")
-                    except Exception as e: st.error(f"Error: {e}")
-                else: st.error("⚠️ Sin conexión.")
 
-        st.info("¿Olvidó su credencial? Solicite restablecimiento con la Administración.")
-        st.markdown("<div style='text-align: center; color: grey; font-size: 11px; margin-top: 40px;'><p>© 2026 David Fuentes Development | Todos los derechos reservados.</p></div>", unsafe_allow_html=True)
+                                st.rerun()
+
+                            else:
+                                st.error("❌ Contraseña incorrecta")
+
+                        else:
+                            st.error("❌ Usuario no encontrado")
+
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+                else:
+                    st.error("⚠️ Sin conexión.")
+
+        st.info(
+            "¿Olvidó su credencial? Solicite restablecimiento "
+            "con la Administración."
+        )
+
+        st.markdown(
+            "<div style='text-align: center; color: grey; "
+            "font-size: 11px; margin-top: 40px;'>"
+            "<p>© 2026 David Fuentes Development | "
+            "Todos los derechos reservados.</p>"
+            "</div>",
+            unsafe_allow_html=True
+        )
 
 def logout():
     for key in list(st.session_state.keys()): del st.session_state[key]

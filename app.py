@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from firebase_admin import firestore, storage
+from firebase_admin import firestore
 from firebase_service import (
     conectar_firebase,
     subir_archivo,

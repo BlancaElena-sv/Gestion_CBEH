@@ -16,6 +16,7 @@ from config import APP_NAME, COLEGIO_NOMBRE, CICLO_LECTIVO, TZ_SV
 from utils import get_base64, redondear_mined
 from auth import generar_hash, verificar_password
 from styles import aplicar_estilos
+from components.sidebar import mostrar_sidebar
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -212,28 +213,33 @@ def existe_duplicado(coleccion, campo_id, id_valor, descripcion):
 # ==========================================
 # 4. BARRA LATERAL
 # ==========================================
-with st.sidebar:
-    try: st.image("logo.png", use_container_width=True)
-    except: st.warning("Falta logo.png")
-    
-    nombre_mostrar = limpiar_nombre(st.session_state.get('user_name', 'Usuario'))
-    st.write(f"👤 **{nombre_mostrar}**")
-    
-    if st.session_state["user_role"] == "admin":
-        opcion_seleccionada = st.radio("Menú Admin:", ["Inicio", "Inscripción", "Consulta Alumnos", "Maestros", "Asistencia Global", "Notas", "Finanzas", "Configuración (Usuarios)"], key="menu_admin_v43")
-    else:
-        opcion_seleccionada = st.radio("Menú Docente:", ["Inicio", "Mis Listados", "Tomar Asistencia", "Cargar Notas", "Ver Mis Cargas", "Expediente Alumnos", "Boletas de Notas"], key="menu_docente_v43")
-    
-    if "last_page" not in st.session_state: st.session_state.last_page = opcion_seleccionada
-    if st.session_state.last_page != opcion_seleccionada:
-        keys_to_clear = ["alum_view", "recibo", "pa", "recibo_temp", "pago_alum", "prof_view", "sel_prof_idx", "edit_prof_mode", "gasto_temp"]
-        for key in keys_to_clear:
-            if key in st.session_state: del st.session_state[key]
-        st.session_state.last_page = opcion_seleccionada
-        st.rerun()
+menu = mostrar_sidebar(
+    st.session_state["user_name"],
+    st.session_state["user_role"]
+)
 
-    st.markdown("---")
-    if st.button("Cerrar Sesión"): logout()
+menu = (
+    menu
+    .replace("🏠 ", "")
+    .replace("🎓 ", "")
+    .replace("🔎 ", "")
+    .replace("👩‍🏫 ", "")
+    .replace("📅 ", "")
+    .replace("📊 ", "")
+    .replace("💰 ", "")
+    .replace("⚙️ ", "")
+    .replace("📋 ", "")
+    .replace("📝 ", "")
+)
+
+opcion_seleccionada = menu
+
+if st.sidebar.button(
+    "🚪 Cerrar sesión",
+    use_container_width=True
+):
+    logout()
+
     st.markdown("---")
     st.caption("© 2026 David Fuentes | EduManager")
 

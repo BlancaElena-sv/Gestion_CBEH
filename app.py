@@ -130,7 +130,7 @@ def login():
                                     password,
                                     d["password_hash"]
                                 )
-                           
+
                             # ==========================================
                             # RESULTADO DEL LOGIN
                             # ==========================================
@@ -418,43 +418,48 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             verificar_pago_duplicado_hoy=verificar_pago_duplicado_hoy,
         )
         # --- 5. ASISTENCIA GLOBAL ---
-elif opcion_seleccionada == "Asistencia Global":
-    st.title("📅 Reporte de Asistencia Global")
-    c1, c2, c3 = st.columns(3)
-    g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
-    f_ini = c2.date_input("Desde:", obtener_fecha_hoy())
-    f_fin = c3.date_input("Hasta:", obtener_fecha_hoy())
-        
-    if st.button("Generar Reporte"):
-            docs = db.collection("asistencia").where("grado", "==", g).stream()
-            stats = {}
-            alums = db.collection("alumnos").where("grado_actual", "==", g).stream()
-            for a in alums: stats[a.to_dict()['nie']] = {"Nombre": f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}", "P": 0, "A": 0, "Obs": []}
-            total_dias = 0
+    elif opcion_seleccionada == "Asistencia Global":
+        st.title("📅 Reporte de Asistencia Global")
+        c1, c2, c3 = st.columns(3)
+        g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
+        f_ini = c2.date_input("Desde:", obtener_fecha_hoy())
+        f_fin = c3.date_input("Hasta:", obtener_fecha_hoy())
             
-            for d in docs:
-                data_doc = d.to_dict()
-                fecha_doc = data_doc.get("fecha")
-                if not fecha_doc: continue
-                # Manejo de Timestamp para TZ
-                if isinstance(fecha_doc, datetime): f_obj = fecha_doc.astimezone(TZ_SV).date()
-                else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp(), TZ_SV).date()
+        if st.button("Generar Reporte"):
+                docs = db.collection("asistencia").where("grado", "==", g).stream()
+                stats = {}
+                alums = (
+                    db.collection("alumnos")
+                    .where("grado_actual", "==", g)
+                    .where("estado", "==", "Activo")
+                    .stream()
+                )
+                for a in alums: stats[a.to_dict()['nie']] = {"Nombre": f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}", "P": 0, "A": 0, "Obs": []}
+                total_dias = 0
                 
-                if f_ini <= f_obj <= f_fin:
-                    total_dias += 1
-                    regs = data_doc.get('registros', {})
-                    obs_regs = data_doc.get('observaciones', {})
-                    for nie, est in regs.items():
-                        if nie in stats: 
-                            if est == "Presente": stats[nie]["P"] += 1
-                            elif est == "Ausente": 
-                                stats[nie]["A"] += 1
-                                if obs_regs.get(nie): stats[nie]["Obs"].append(f"{f_obj.strftime('%d/%m')}: {obs_regs[nie]}")
-            
-            if total_dias > 0:
-                data = [{"Alumno": v["Nombre"], "Asistencias": v["P"], "Faltas": v["A"], "% Asist": f"{(v['P']/total_dias)*100:.0f}%", "Observaciones": ", ".join(v["Obs"])} for v in stats.values()]
-                st.dataframe(pd.DataFrame(data), use_container_width=True)
-            else: st.info("No hay tomas de asistencia registradas para este periodo.")
+                for d in docs:
+                    data_doc = d.to_dict()
+                    fecha_doc = data_doc.get("fecha")
+                    if not fecha_doc: continue
+                    # Manejo de Timestamp para TZ
+                    if isinstance(fecha_doc, datetime): f_obj = fecha_doc.astimezone(TZ_SV).date()
+                    else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp(), TZ_SV).date()
+                    
+                    if f_ini <= f_obj <= f_fin:
+                        total_dias += 1
+                        regs = data_doc.get('registros', {})
+                        obs_regs = data_doc.get('observaciones', {})
+                        for nie, est in regs.items():
+                            if nie in stats: 
+                                if est == "Presente": stats[nie]["P"] += 1
+                                elif est == "Ausente": 
+                                    stats[nie]["A"] += 1
+                                    if obs_regs.get(nie): stats[nie]["Obs"].append(f"{f_obj.strftime('%d/%m')}: {obs_regs[nie]}")
+                
+                if total_dias > 0:
+                    data = [{"Alumno": v["Nombre"], "Asistencias": v["P"], "Faltas": v["A"], "% Asist": f"{(v['P']/total_dias)*100:.0f}%", "Observaciones": ", ".join(v["Obs"])} for v in stats.values()]
+                    st.dataframe(pd.DataFrame(data), use_container_width=True)
+                else: st.info("No hay tomas de asistencia registradas para este periodo.")
 
     # --- 6. NOTAS (ACTUALIZADO CON REPORTES) ---
     elif opcion_seleccionada == "Notas":
@@ -470,7 +475,12 @@ elif opcion_seleccionada == "Asistencia Global":
             mes = c3.selectbox("Mes", LISTA_MESES, key="mes_reg")
             
             if g != "Select..." and m != "Select...":
-                docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+                docs = (
+                    db.collection("alumnos")
+                    .where("grado_actual", "==", g)
+                    .where("estado", "==", "Activo")
+                    .stream()
+                )
                 lista = [{"NIE": d.to_dict()['nie'], "Nombre": f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}"} for d in docs]
                 if not lista: st.warning("Sin alumnos")
                 else:
@@ -489,8 +499,8 @@ elif opcion_seleccionada == "Asistencia Global":
                         df["Promedio"] = df[cols[0]]
                     else:
                         df["Promedio"] = (df["Act1 (25%)"]*0.25 + df["Act2 (25%)"]*0.25 + 
-                                          df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + 
-                                          df["Examen (30%)"]*0.30).apply(redondear_mined)
+                                        df["Alt1 (10%)"]*0.10 + df["Alt2 (10%)"]*0.10 + 
+                                        df["Examen (30%)"]*0.30).apply(redondear_mined)
 
                     cfg = {"NIE": st.column_config.TextColumn(disabled=True), "Nombre": st.column_config.TextColumn(disabled=True, width="medium"), "Promedio": st.column_config.NumberColumn(disabled=True)}
                     for c in cols: cfg[c] = st.column_config.NumberColumn(min_value=0.0, max_value=10.0, step=0.01)
@@ -615,7 +625,12 @@ elif opcion_seleccionada == "Asistencia Global":
             else:
                 with st.spinner("Preparando documentos..."):
                     # 1. Datos de alumnos y notas
-                    alumnos_docs = db.collection("alumnos").where("grado_actual", "==", g_lote).stream()
+                    alumnos_docs = (
+                        db.collection("alumnos")
+                        .where("grado_actual", "==", g_lote)
+                        .where("estado", "==", "Activo")
+                        .stream()
+                    )
                     alumnos_list = [d.to_dict() for d in alumnos_docs]
                     alumnos_list.sort(key=lambda x: x.get('apellidos', ''))
 
@@ -780,13 +795,39 @@ elif opcion_seleccionada == "Asistencia Global":
             
             if modo_busqueda == "NIE":
                 n_input = st.text_input("Ingrese NIE:")
+
                 if st.button("Buscar por NIE") and n_input:
                     d = db.collection("alumnos").document(n_input).get()
-                    if d.exists: st.session_state.pago_alum = d.to_dict()
-                    else: st.error("No encontrado")
+
+                    if d.exists:
+                        alumno_data = d.to_dict()
+
+                        if alumno_data.get("estado", "Activo") != "Activo":
+                            st.warning(
+                                "⚠️ Este alumno está dado de baja y no puede recibir nuevos cobros."
+                            )
+
+                            if "pago_alum" in st.session_state:
+                                del st.session_state["pago_alum"]
+                            if pa.get("estado", "Activo") != "Activo":
+                                st.warning(
+                                    "⚠️ El alumno seleccionado está dado de baja. "
+                                    "No se permiten nuevos cobros."
+                            )
+
+                            del st.session_state["pago_alum"]
+                            st.rerun()
+                    else:
+                        st.session_state.pago_alum = alumno_data
+                else:
+                    st.error("No encontrado")
             
             elif modo_busqueda == "Nombre":
-                alums_ref = db.collection("alumnos").stream()
+                alums_ref = (
+                    db.collection("alumnos")
+                    .where("estado", "==", "Activo")
+                    .stream()
+                )
                 mapa_nombres = {f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}": a.id for a in alums_ref}
                 sel_nom = st.selectbox("Seleccione Alumno:", [""] + sorted(list(mapa_nombres.keys())))
                 if sel_nom:
@@ -796,7 +837,12 @@ elif opcion_seleccionada == "Asistencia Global":
 
             elif modo_busqueda == "Grado":
                 sel_grado = st.selectbox("Seleccione Grado:", LISTA_GRADOS_TODO)
-                alums_g = db.collection("alumnos").where("grado_actual", "==", sel_grado).stream()
+                alums_g = (
+                    db.collection("alumnos")
+                    .where("grado_actual", "==", sel_grado)
+                    .where("estado", "==", "Activo")
+                    .stream()
+                )
                 mapa_grado = {f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}": a.id for a in alums_g}
                 sel_nom_g = st.selectbox("Alumno del Grado:", [""] + sorted(list(mapa_grado.keys())))
                 if sel_nom_g:
@@ -839,7 +885,11 @@ elif opcion_seleccionada == "Asistencia Global":
                 maestro_seleccionado = None
                 per = ""
                 if tp == "Salario":
-                    ms = db.collection("maestros_perfil").stream()
+                    ms = (
+                        db.collection("maestros_perfil")
+                        .where("activo", "==", True)
+                        .stream()
+                    )
                     l_ms = {m.to_dict()['nombre']: m.id for m in ms}
                     nom_sel = st.selectbox("Seleccionar Maestro:", list(l_ms.keys()))
                     if nom_sel: maestro_seleccionado = l_ms[nom_sel]; per = nom_sel
@@ -1013,7 +1063,12 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
         g = st.selectbox("Grado:", LISTA_GRADOS_TODO)
         mes_lista = st.selectbox("Mes:", LISTA_MESES)
         if st.button("Generar Hoja de Control"):
-            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            docs = (
+                db.collection("alumnos")
+                .where("grado_actual", "==", g)
+                .where("estado", "==", "Activo")
+                .stream()
+            )
             lista = sorted([f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}" for d in docs])
             if not lista: st.warning("Sin alumnos")
             else:
@@ -1033,7 +1088,12 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
             id_asistencia = f"{fecha_asist}_{grado_asist}"
             doc_ref = db.collection("asistencia").document(id_asistencia)
             doc_snap = doc_ref.get()
-            alumnos_ref = db.collection("alumnos").where("grado_actual", "==", grado_asist).stream()
+            alumnos_ref = (
+                db.collection("alumnos")
+                .where("grado_actual", "==", grado_asist)
+                .where("estado", "==", "Activo")
+                .stream()
+            )    
             lista_alumnos = [{"NIE": d.to_dict()['nie'], "Nombre": f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}"} for d in alumnos_ref]
             lista_alumnos.sort(key=lambda x: x["Nombre"])
             if lista_alumnos:
@@ -1059,7 +1119,12 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
         m = c2.selectbox("Materia", ["Select..."]+mp)
         mes = c3.selectbox("Mes", LISTA_MESES)
         if g!="Select..." and m!="Select...":
-            docs = db.collection("alumnos").where("grado_actual", "==", g).stream()
+            docs = (
+                db.collection("alumnos")
+                .where("grado_actual", "==", g)
+                .where("estado", "==", "Activo")
+                .stream()
+            )
             lista = [{"NIE": d.to_dict()['nie'], "Nombre": f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}"} for d in docs]
             if not lista: st.warning("Sin alumnos")
             else:
@@ -1110,7 +1175,12 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
         st.title("📂 Bitácora del Alumno")
         c1, c2 = st.columns(2)
         grado_sel = c1.selectbox("Seleccionar Grado", LISTA_GRADOS_TODO)
-        alumnos_grado = db.collection("alumnos").where("grado_actual", "==", grado_sel).stream()
+        alumnos_grado = (
+            db.collection("alumnos")
+            .where("grado_actual", "==", grado_sel)
+            .where("estado", "==", "Activo")
+            .stream()
+        )
         dict_alumnos = {f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}": a.to_dict() for a in alumnos_grado}
         if dict_alumnos:
             nombre_alum = c2.selectbox("Seleccionar Alumno", ["Seleccionar..."] + sorted(list(dict_alumnos.keys())))
@@ -1120,9 +1190,55 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
                 st.markdown("---")
                 cp1, cp2 = st.columns([1, 4])
                 with cp1:
-                    foto_url = alum_data.get('documentos', {}).get('foto_url')
-                    if not foto_url: foto_url = "https://via.placeholder.com/150"
-                    st.image(foto_url, width=120)
+                    foto_url_alum = (
+                        alum_data.get("documentos", {})
+                        .get("foto_url")
+                    )
+
+                    if foto_url_alum:
+                        try:
+                            st.image(
+                                foto_url_alum,
+                                width=130
+                            )
+                        except Exception:
+                            st.markdown(
+                                """
+                                <div style="
+                                    width:130px;
+                                    height:130px;
+                                    border-radius:50%;
+                                    background:#e9edf5;
+                                    display:flex;
+                                    align-items:center;
+                                    justify-content:center;
+                                    font-size:55px;
+                                    margin:auto;
+                                ">
+                                    👤
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                    else:
+                        st.markdown(
+                            """
+                            <div style="
+                                width:130px;
+                                height:130px;
+                                border-radius:50%;
+                                background:#e9edf5;
+                                display:flex;
+                                align-items:center;
+                                justify-content:center;
+                                font-size:55px;
+                                margin:auto;
+                            ">
+                                👤
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
                 with cp2:
                     st.subheader(f"{alum_data.get('apellidos', '')} {alum_data.get('nombres', '')}")
                     st.write(f"**NIE:** {alum_data['nie']} | **Responsable:** {alum_data.get('encargado',{}).get('nombre','-')}")
@@ -1157,7 +1273,12 @@ elif st.session_state["user_role"] == "docente" and opcion_seleccionada != "Inic
         st.title("🖨️ Impresión de Boletas de Notas")
         c1, c2 = st.columns(2)
         grado_sel = c1.selectbox("Seleccionar Grado", LISTA_GRADOS_TODO)
-        alumnos_grado = db.collection("alumnos").where("grado_actual", "==", grado_sel).stream()
+        alumnos_grado = (
+            db.collection("alumnos")
+            .where("grado_actual", "==", grado_sel)
+            .where("estado", "==", "Activo")
+            .stream()
+        )
         dict_alumnos = {f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}": a.to_dict() for a in alumnos_grado}
         
         if dict_alumnos:

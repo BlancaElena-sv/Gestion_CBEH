@@ -19,6 +19,7 @@ from styles import aplicar_estilos
 from components.sidebar import mostrar_sidebar
 from views.alumnos import mostrar_consulta_alumnos
 from views.inscripcion import mostrar_inscripcion
+from views.docentes import mostrar_maestros
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -407,126 +408,24 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         )
         # ---  MAESTROS ---
     elif opcion_seleccionada == "Maestros":
-        st.title("👩‍🏫 Gestión Docente Pro")
-        docs_m = db.collection("maestros_perfil").stream()
+        mostrar_maestros(
+            db=db,
+            lista_grados=LISTA_GRADOS_TODO,
+            mapa_curricular=MAPA_CURRICULAR,
+            subir_archivo=subir_archivo,
+            obtener_fecha_hoy=obtener_fecha_hoy,
+            obtener_hora_actual=obtener_hora_actual,
+            verificar_pago_duplicado_hoy=verificar_pago_duplicado_hoy,
+        )
+        # --- 5. ASISTENCIA GLOBAL ---
+elif opcion_seleccionada == "Asistencia Global":
+    st.title("📅 Reporte de Asistencia Global")
+    c1, c2, c3 = st.columns(3)
+    g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
+    f_ini = c2.date_input("Desde:", obtener_fecha_hoy())
+    f_fin = c3.date_input("Hasta:", obtener_fecha_hoy())
         
-        mapa_profesores = {}
-        for d in docs_m:
-            data = d.to_dict()
-            key_name = f"{data.get('codigo','S/C')} - {data['nombre']}"
-            mapa_profesores[key_name] = {"id": d.id, "data": data}
-        
-        opciones_prof = ["➕ Registrar Nuevo Maestro"] + sorted(list(mapa_profesores.keys()))
-        
-        col_sel, _ = st.columns([2, 1])
-        with col_sel:
-            sel_prof = st.selectbox("Seleccionar Docente:", opciones_prof, key="sel_prof_main")
-        st.markdown("---")
-
-        if sel_prof == "➕ Registrar Nuevo Maestro":
-            with st.form("new_prof"):
-                c1, c2 = st.columns(2)
-                cod = c1.text_input("Código")
-                nom = c2.text_input("Nombre")
-                tel = c1.text_input("Teléfono")
-                email = c2.text_input("Email")
-                dir = st.text_area("Dirección")
-                foto = st.file_uploader("Foto")
-                if st.form_submit_button("Guardar"):
-                    if nom:
-                        url = subir_archivo(foto, f"profesores/{cod}")
-                        db.collection("maestros_perfil").add({"codigo": cod, "nombre": nom, "telefono": tel, "email": email, "direccion": dir, "foto_url": url, "fecha_ingreso": obtener_fecha_hoy().strftime("%d/%m/%Y"), "activo": True})
-                        st.success("Guardado"); time.sleep(1); st.rerun()
-                    else: st.error("Nombre requerido")
-        else:
-            if sel_prof in mapa_profesores:
-                prof_info = mapa_profesores[sel_prof]
-                pid = prof_info["id"]
-                prof_data = prof_info["data"]
-                
-                with st.container(border=True):
-                    c1, c2, c3 = st.columns([1, 3, 1])
-                    with c1: 
-                        url_m = prof_data.get('foto_url')
-                        if not url_m: st.markdown("<h1>👤</h1>", unsafe_allow_html=True)
-                        else: st.image(url_m, width=120)
-
-                    with c2:
-                        st.title(prof_data.get('nombre', 'Sin Nombre'))
-                        st.caption(f"Código: {prof_data.get('codigo','S/C')}")
-                        st.write(f"📞 {prof_data.get('telefono','-')} | 📧 {prof_data.get('email','-')}")
-                    with c3:
-                        if st.button("✏️ Editar Perfil", key=f"btn_edit_{pid}"): 
-                            st.session_state.edit_prof_mode = True
-
-                if st.session_state.get("edit_prof_mode"):
-                    with st.form("edit_prof_form"):
-                        nc = st.text_input("Nombre", prof_data.get('nombre', ''))
-                        nt = st.text_input("Teléfono", prof_data.get('telefono',''))
-                        nf = st.file_uploader("Nueva Foto", ["jpg", "png"])
-                        if st.form_submit_button("Guardar Cambios"):
-                            upd = {"nombre": nc, "telefono": nt}
-                            if nf:
-                                u = subir_archivo(nf, f"profesores/{prof_data.get('codigo','SN')}")
-                                if u: upd["foto_url"] = u
-                            db.collection("maestros_perfil").document(pid).update(upd)
-                            st.session_state.edit_prof_mode = False
-                            st.success("Actualizado"); time.sleep(1); st.rerun()
-                
-                tabs_m = st.tabs(["📚 Carga Académica", "💰 Historial Financiero"])
-
-                with tabs_m[0]:
-                    c_asig, c_tabla = st.columns([1, 2])
-                    with c_asig:
-                        st.markdown("#### Asignar Nueva Materia")
-                        g_sel = st.selectbox("Grado", LISTA_GRADOS_TODO, key="g_prof")
-                        mats_disp = MAPA_CURRICULAR.get(g_sel, [])
-                        with st.form("add_carga_prof"):
-                            m_sel = st.multiselect("Materias", mats_disp)
-                            guia = st.checkbox("¿Es Guía?")
-                            if st.form_submit_button("Guardar Carga"):
-                                db.collection("carga_academica").add({"id_docente": pid, "nombre_docente": prof_data.get('nombre','Desconocido'), "grado": g_sel, "materias": m_sel, "es_guia": guia})
-                                st.success("Asignado"); time.sleep(0.5); st.rerun()
-
-                    with c_tabla:
-                        st.markdown("#### Carga Actual")
-                        cargas = db.collection("carga_academica").where("id_docente", "==", pid).stream()
-                        for c in cargas:
-                            cd = c.to_dict()
-                            with st.expander(f"{cd.get('grado','?')} {'(GUIA)' if cd.get('es_guia') else ''}"):
-                                st.write(", ".join(cd.get('materias',[])))
-                                if st.button("Eliminar", key=f"del_carga_{c.id}"):
-                                    db.collection("carga_academica").document(c.id).delete(); st.rerun()
-
-                with tabs_m[1]:
-                    with st.expander("➕ Registrar Movimiento"):
-                        with st.form("ffin"):
-                            tipo = st.selectbox("Tipo", ["Pago Salario (Egreso)", "Préstamo (Deuda)", "Abono Deuda (Ingreso)"])
-                            monto = st.number_input("Monto", min_value=0.01)
-                            desc = st.text_input("Detalle")
-                            if st.form_submit_button("Registrar"):
-                                desc_full = f"{tipo} - {desc}"
-                                if verificar_pago_duplicado_hoy(pid, f"{tipo}") and "Salario" in tipo:
-                                        st.error("⛔ Transacción duplicada (Salario hoy).")
-                                else:
-                                    db.collection("finanzas").add({"tipo": "egreso" if "Salario" in tipo else ("ingreso" if "Abono" in tipo else "interno"), "categoria_persona": "docente", "docente_id": pid, "nombre_persona": prof_data.get('nombre',''), "descripcion": desc_full, "monto": monto, "fecha": firestore.SERVER_TIMESTAMP, "fecha_legible": obtener_hora_actual()})
-                                    st.success("Registrado"); time.sleep(1); st.rerun()
-                    
-                    movs = db.collection("finanzas").where("docente_id", "==", pid).stream()
-                    lm = [m.to_dict() for m in movs]
-                    lm.sort(key=lambda x: x.get('fecha_legible', ''), reverse=True)
-                    if lm: st.dataframe(pd.DataFrame(lm)[['fecha_legible','descripcion','monto']], use_container_width=True)
-                    else: st.info("Sin historial.")
-
-    # --- 5. ASISTENCIA GLOBAL ---
-    elif opcion_seleccionada == "Asistencia Global":
-        st.title("📅 Reporte de Asistencia Global")
-        c1, c2, c3 = st.columns(3)
-        g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
-        f_ini = c2.date_input("Desde:", obtener_fecha_hoy())
-        f_fin = c3.date_input("Hasta:", obtener_fecha_hoy())
-        
-        if st.button("Generar Reporte"):
+    if st.button("Generar Reporte"):
             docs = db.collection("asistencia").where("grado", "==", g).stream()
             stats = {}
             alums = db.collection("alumnos").where("grado_actual", "==", g).stream()

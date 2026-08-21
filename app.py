@@ -51,10 +51,11 @@ if db_error:
 if db_conn:
     db = db_conn
     try:
-        users_ref = db.collection("usuarios").limit(1).stream()
+        users_ref = ("usuarios").limit(1).stream()
         if not list(users_ref):
-            db.collection("usuarios").document("david").set({
-                "usuario": "david", "pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"
+           db.collection("usuarios").document(user).update({
+                "password_hash": nuevo_hash,
+                "pass": firestore.DELETE_FIELD
             })
     except: pass
 

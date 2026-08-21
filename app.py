@@ -18,6 +18,7 @@ from auth import generar_hash, verificar_password
 from styles import aplicar_estilos
 from components.sidebar import mostrar_sidebar
 from views.alumnos import mostrar_consulta_alumnos
+from views.inscripcion import mostrar_inscripcion
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -387,40 +388,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
 
     # --- INSCRIPCIÓN ---
     if opcion_seleccionada == "Inscripción":
-        st.title("📝 Inscripción 2026")
-        with st.form("fi"):
-            c1, c2 = st.columns(2)
-            nie = c1.text_input("NIE*")
-            nom = c1.text_input("Nombres*")
-            ape = c1.text_input("Apellidos*")
-            gra = c2.selectbox("Grado", LISTA_GRADOS_TODO)
-            tur = c2.selectbox("Turno", ["Matutino", "Vespertino"])
-            enc = c2.text_input("Responsable")
-            tel = c2.text_input("Teléfono")
-            dir = st.text_area("Dirección")
-            c3, c4 = st.columns(2)
-            fot = c3.file_uploader("Foto", ["jpg","png"])
-            doc = c4.file_uploader("Docs", ["pdf","jpg"], accept_multiple_files=True)
-            if st.form_submit_button("Guardar"):
-                try:
-                    if nie and nom:
-                        doc_ref = db.collection("alumnos").document(nie)
-                        if doc_ref.get().exists:
-                            st.error(f"⛔ Error Crítico: El NIE {nie} ya está registrado en el sistema.")
-                        else:
-                            r = f"expedientes/{nie}"
-                            urls = [subir_archivo(f, r) for f in (doc or [])]
-                            doc_ref.set({
-                                "nie": nie, "nombre_completo": f"{ape} {nom}", "nombres": nom, "apellidos": ape,
-                                "grado_actual": gra, "turno": tur, "estado": "Activo",
-                                "encargado": {"nombre": enc, "telefono": tel, "direccion": dir},
-                                "documentos": {"foto_url": subir_archivo(fot, r), "doc_urls": [u for u in urls if u]},
-                                "fecha_registro": firestore.SERVER_TIMESTAMP
-                            })
-                            st.success(f"✅ Alumno {nom} {ape} inscrito correctamente.")
-                    else: st.error("Faltan datos obligatorios.")
-                except Exception as e: st.error(f"Error: {e}")
-
+        mostrar_inscripcion(
+            db=db,
+            lista_grados=LISTA_GRADOS_TODO,
+            subir_archivo=subir_archivo,
+        )
+        
     # --- CONSULTA ALUMNOS ---    
     elif opcion_seleccionada == "Consulta Alumnos":
         mostrar_consulta_alumnos(

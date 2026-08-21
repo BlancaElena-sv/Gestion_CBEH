@@ -4,6 +4,18 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+def eliminar_documentos_consulta(query):
+    """
+    Elimina todos los documentos devueltos
+    por una consulta de Firestore.
+    """
+
+    documentos = list(query.stream())
+
+    for documento in documentos:
+        documento.reference.delete()
+
+    return len(documentos)
 
 def mostrar_consulta_alumnos(
     db,
@@ -170,14 +182,15 @@ def mostrar_consulta_alumnos(
             )
 
     tabs = st.tabs(
-        [
-            "📋 Datos y Documentos",
-            "💰 Historial y Solvencia",
-            "📊 Boleta de Notas",
-            "⚙️ Edición Expediente",
-            "📒 Bitácora",
-        ]
-    )
+    [
+        "📋 Datos y Documentos",
+        "💰 Historial y Solvencia",
+        "📊 Boleta de Notas",
+        "⚙️ Edición Expediente",
+        "📒 Bitácora",
+        "🛡️ Estado y Baja",
+    ]
+)
 
         # ==========================================
     # TAB 1 - DATOS Y DOCUMENTOS
@@ -1094,3 +1107,420 @@ def mostrar_consulta_alumnos(
             st.info(
                 "No hay registros en la bitácora."
             )
+        # ==========================================
+    # TAB 6 - ESTADO, BAJA Y ELIMINACIÓN
+    # ==========================================
+
+    with tabs[5]:
+
+        st.subheader("🛡️ Gestión del Estado del Alumno")
+
+        estado_actual = a.get(
+            "estado",
+            "Activo"
+        )
+
+        col_estado, col_info = st.columns(
+            [1, 2]
+        )
+
+        with col_estado:
+
+            if estado_actual == "Activo":
+                st.success(
+                    "✅ Alumno actualmente ACTIVO"
+                )
+
+            elif estado_actual == "Retirado":
+                st.warning(
+                    "⚠️ Alumno dado de BAJA"
+                )
+
+            else:
+                st.info(
+                    f"Estado actual: {estado_actual}"
+                )
+
+        with col_info:
+
+            if a.get("fecha_baja"):
+                st.write(
+                    f"**Fecha de baja:** "
+                    f"{a.get('fecha_baja')}"
+                )
+
+            if a.get("motivo_baja"):
+                st.write(
+                    f"**Motivo:** "
+                    f"{a.get('motivo_baja')}"
+                )
+
+            if a.get("baja_realizada_por"):
+                st.write(
+                    f"**Registrado por:** "
+                    f"{a.get('baja_realizada_por')}"
+                )
+
+        st.divider()
+
+        # ==========================================
+        # DAR DE BAJA
+        # ==========================================
+
+        st.markdown("### 🟠 Dar de baja")
+
+        st.caption(
+            "Esta opción conserva completamente el expediente "
+            "académico, financiero y administrativo del alumno."
+        )
+
+        motivos_baja = [
+            "Retiro voluntario",
+            "Cambio de institución",
+            "Finalización de estudios",
+            "Inasistencia prolongada",
+            "Razones económicas",
+            "Otro",
+        ]
+
+        motivo = st.selectbox(
+            "Motivo de baja",
+            motivos_baja,
+            key=f"motivo_baja_{a['nie']}"
+        )
+
+        motivo_otro = ""
+
+        if motivo == "Otro":
+            motivo_otro = st.text_input(
+                "Especifique el motivo",
+                key=f"motivo_otro_{a['nie']}"
+            )
+
+        if estado_actual == "Activo":
+
+            if st.button(
+                "🟠 Dar de baja al alumno",
+                key=f"btn_baja_{a['nie']}"
+            ):
+
+                motivo_final = (
+                    motivo_otro.strip()
+                    if motivo == "Otro"
+                    else motivo
+                )
+
+                if (
+                    motivo == "Otro"
+                    and not motivo_final
+                ):
+
+                    st.error(
+                        "Debe especificar el motivo."
+                    )
+
+                else:
+
+                    datos_baja = {
+                        "estado": "Retirado",
+                        "activo": False,
+                        "fecha_baja": (
+                            obtener_fecha_hoy()
+                            .strftime("%d/%m/%Y")
+                        ),
+                        "motivo_baja": motivo_final,
+                        "baja_realizada_por": (
+                            st.session_state.get(
+                                "user_name",
+                                "Administrador"
+                            )
+                        ),
+                    }
+
+                    db.collection(
+                        "alumnos"
+                    ).document(
+                        a["nie"]
+                    ).update(
+                        datos_baja
+                    )
+
+                    st.session_state.alum_view.update(
+                        datos_baja
+                    )
+
+                    st.success(
+                        "✅ Alumno dado de baja correctamente."
+                    )
+
+                    time.sleep(1)
+                    st.rerun()
+
+        else:
+
+            st.info(
+                "El alumno ya se encuentra dado de baja."
+            )
+
+            if st.button(
+                "♻️ Reactivar alumno",
+                key=f"btn_reactivar_{a['nie']}"
+            ):
+
+                datos_reactivacion = {
+                    "estado": "Activo",
+                    "activo": True,
+                    "fecha_baja": None,
+                    "motivo_baja": None,
+                    "baja_realizada_por": None,
+                }
+
+                db.collection(
+                    "alumnos"
+                ).document(
+                    a["nie"]
+                ).update(
+                    datos_reactivacion
+                )
+
+                st.session_state.alum_view.update(
+                    datos_reactivacion
+                )
+
+                st.success(
+                    "✅ Alumno reactivado."
+                )
+
+                time.sleep(1)
+                st.rerun()
+
+        # ==========================================
+        # ZONA DE PELIGRO
+        # ==========================================
+
+        st.divider()
+
+        st.markdown("### 🔴 Zona de peligro")
+
+        st.error(
+            "La eliminación definitiva no se puede deshacer. "
+            "Se eliminarán también notas, pagos y bitácora "
+            "relacionados con este alumno."
+        )
+
+        st.write(
+            f"Para confirmar escriba el NIE: **{a['nie']}**"
+        )
+
+        confirmacion = st.text_input(
+            "Confirmación",
+            key=f"confirm_delete_{a['nie']}"
+        )
+
+        confirmar_eliminacion = st.checkbox(
+            "Entiendo que esta acción es irreversible.",
+            key=f"check_delete_{a['nie']}"
+        )
+
+        if st.button(
+            "🗑️ ELIMINAR DEFINITIVAMENTE",
+            key=f"delete_alumno_{a['nie']}"
+        ):
+
+            if confirmacion.strip() != str(
+                a["nie"]
+            ):
+
+                st.error(
+                    "El NIE escrito no coincide."
+                )
+
+            elif not confirmar_eliminacion:
+
+                st.error(
+                    "Debe confirmar que comprende "
+                    "que la eliminación es irreversible."
+                )
+
+            else:
+
+                try:
+
+                    nie = a["nie"]
+
+                    # ==================================
+                    # 1. NOTAS INDIVIDUALES
+                    # ==================================
+
+                    notas_eliminadas = (
+                        eliminar_documentos_consulta(
+                            db.collection("notas")
+                            .where(
+                                "nie",
+                                "==",
+                                nie
+                            )
+                        )
+                    )
+
+                    # ==================================
+                    # 2. FINANZAS
+                    # ==================================
+
+                    pagos_eliminados = (
+                        eliminar_documentos_consulta(
+                            db.collection("finanzas")
+                            .where(
+                                "alumno_nie",
+                                "==",
+                                nie
+                            )
+                        )
+                    )
+
+                    # ==================================
+                    # 3. BITÁCORA
+                    # ==================================
+
+                    logs_eliminados = (
+                        eliminar_documentos_consulta(
+                            db.collection("bitacora")
+                            .where(
+                                "nie",
+                                "==",
+                                nie
+                            )
+                        )
+                    )
+
+                    # ==================================
+                    # 4. NOTAS MENSUALES
+                    # ==================================
+
+                    notas_mensuales = (
+                        db.collection(
+                            "notas_mensuales"
+                        ).stream()
+                    )
+
+                    for documento in notas_mensuales:
+
+                        datos = documento.to_dict()
+
+                        detalles = datos.get(
+                            "detalles",
+                            {}
+                        )
+
+                        if nie in detalles:
+
+                            detalles.pop(
+                                nie,
+                                None
+                            )
+
+                            documento.reference.update(
+                                {
+                                    "detalles": detalles
+                                }
+                            )
+
+                    # ==================================
+                    # 5. ASISTENCIA
+                    # ==================================
+
+                    asistencias = (
+                        db.collection(
+                            "asistencia"
+                        ).stream()
+                    )
+
+                    for documento in asistencias:
+
+                        datos = documento.to_dict()
+
+                        registros = datos.get(
+                            "registros",
+                            {}
+                        )
+
+                        observaciones = datos.get(
+                            "observaciones",
+                            {}
+                        )
+
+                        modificado = False
+
+                        if nie in registros:
+                            registros.pop(
+                                nie,
+                                None
+                            )
+                            modificado = True
+
+                        if nie in observaciones:
+                            observaciones.pop(
+                                nie,
+                                None
+                            )
+                            modificado = True
+
+                        if modificado:
+
+                            documento.reference.update(
+                                {
+                                    "registros": registros,
+                                    "observaciones": (
+                                        observaciones
+                                    ),
+                                }
+                            )
+
+                    # ==================================
+                    # 6. DOCUMENTO PRINCIPAL
+                    # ==================================
+
+                    db.collection(
+                        "alumnos"
+                    ).document(
+                        nie
+                    ).delete()
+
+                    # Limpiar sesión
+                    if (
+                        "alum_view"
+                        in st.session_state
+                    ):
+                        del st.session_state[
+                            "alum_view"
+                        ]
+
+                    st.success(
+                        "✅ Alumno y registros relacionados "
+                        "eliminados definitivamente."
+                    )
+
+                    st.write(
+                        f"Notas eliminadas: "
+                        f"{notas_eliminadas}"
+                    )
+
+                    st.write(
+                        f"Movimientos financieros eliminados: "
+                        f"{pagos_eliminados}"
+                    )
+
+                    st.write(
+                        f"Registros de bitácora eliminados: "
+                        f"{logs_eliminados}"
+                    )
+
+                    time.sleep(2)
+                    st.rerun()
+
+                except Exception as error:
+
+                    st.error(
+                        "No se pudo completar la eliminación: "
+                        f"{error}"
+                    )

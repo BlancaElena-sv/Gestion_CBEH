@@ -1,15 +1,16 @@
 import streamlit as st
 import pandas as pd
-import firebase_admin
-from firebase_admin import credentials, firestore, storage
+from firebase_admin import firestore, storage
+from firebase_service import (
+    conectar_firebase,
+    subir_archivo,
+)
 from datetime import datetime, date, timedelta
 import base64
 import time
 import os
 import streamlit.components.v1 as components
 import re
-import uuid
-import urllib.parse
 
 from config import APP_NAME, COLEGIO_NOMBRE, CICLO_LECTIVO, TZ_SV
 from utils import get_base64, redondear_mined
@@ -43,24 +44,9 @@ def obtener_hora_actual():
 
 db = None
 
-@st.cache_resource
-def conectar_firebase():
-    if not firebase_admin._apps:
-        try:
-            cred = None
-            if os.path.exists("credenciales.json"): cred = credentials.Certificate("credenciales.json")
-            elif os.path.exists("credenciales"): cred = credentials.Certificate("credenciales")
-            elif "firebase_key" in st.secrets: cred = credentials.Certificate(dict(st.secrets["firebase_key"]))
-            else: return None, "No se encontró el archivo de credenciales."
-            
-            firebase_admin.initialize_app(cred, {'storageBucket': 'gestioncbeh.firebasestorage.app'})
-        except Exception as e: return None, str(e)
-    
-    try:
-        return firestore.client(), None
-    except Exception as e: return None, str(e)
-
 db_conn, db_error = conectar_firebase()
+if db_error:
+    st.error(f"Error de conexión con Firebase: {db_error}")
 if db_conn:
     db = db_conn
     try:
@@ -139,30 +125,6 @@ if not st.session_state["logged_in"]:
 # ==========================================
 # 3. FUNCIONES AUXILIARES
 # ==========================================
-def subir_archivo(archivo, ruta):
-    if not archivo or not db: return None
-    try:
-        b = storage.bucket()
-        blob_name = f"{ruta}/{archivo.name.replace(' ', '_')}"
-        blob = b.blob(blob_name)
-        
-        # 1. Subir el archivo primero
-        blob.upload_from_file(archivo)
-        
-        # 2. Generar el token y asignarlo a los metadatos
-        token = str(uuid.uuid4())
-        blob.metadata = {"firebaseStorageDownloadTokens": token}
-        
-        # 3. Hacer "patch" para guardar el token en Firebase
-        blob.patch()
-        
-        # 4. Retornar la URL con el token incluido
-        url = f"https://firebasestorage.googleapis.com/v0/b/{b.name}/o/{urllib.parse.quote(blob_name, safe='')}?alt=media&token={token}"
-        return url
-    except Exception as e:
-        st.error(f"Error al subir archivo: {e}")
-        return None
-
 def borrar_coleccion(coll_name, batch_size=10):
     if not db: return
     docs = db.collection(coll_name).limit(batch_size).stream()

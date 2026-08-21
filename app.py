@@ -11,7 +11,6 @@ import time
 import os
 import streamlit.components.v1 as components
 import re
-st.warning("🚀 VERSION NUEVA EDUMANAGER - PRUEBA 21 AGOSTO")
 
 from config import APP_NAME, COLEGIO_NOMBRE, CICLO_LECTIVO, TZ_SV
 from utils import get_base64, redondear_mined

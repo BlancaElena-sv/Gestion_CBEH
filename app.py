@@ -12,6 +12,7 @@ import uuid
 import urllib.parse
 
 from config import APP_NAME, COLEGIO_NOMBRE, CICLO_LECTIVO, TZ_SV
+from utils import get_base64, redondear_mined
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -161,20 +162,6 @@ def subir_archivo(archivo, ruta):
     except Exception as e:
         st.error(f"Error al subir archivo: {e}")
         return None
-
-def get_base64(path):
-    try:
-        with open(path, "rb") as f:
-            return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
-    except:
-        return ""
-
-def redondear_mined(valor):
-    if valor is None: return 0.0
-    parte_entera = int(valor)
-    parte_decimal = valor - parte_entera
-    if parte_decimal >= 0.5: return float(parte_entera + 1)
-    else: return float(parte_entera)
 
 def borrar_coleccion(coll_name, batch_size=10):
     if not db: return

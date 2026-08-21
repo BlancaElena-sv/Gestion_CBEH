@@ -110,16 +110,8 @@ def login():
             )
 
             if submitted:
+                if db:
 
-                # Acceso temporal del administrador principal
-                if user == "admin" and password == "master2026":
-                    st.session_state["logged_in"] = True
-                    st.session_state["user_role"] = "admin"
-                    st.session_state["user_name"] = "Super Admin"
-                    st.session_state["user_id"] = "admin"
-                    st.rerun()
-
-                elif db:
                     try:
                         doc = db.collection("usuarios").document(user).get()
 
@@ -137,34 +129,15 @@ def login():
                                     password,
                                     d["password_hash"]
                                 )
-
-                            # ==========================================
-                            # SISTEMA ANTIGUO
-                            # ==========================================
-                            elif d.get("pass") == password:
-
-                                password_valida = True
-
-                                # Migración automática hacia bcrypt
-                                nuevo_hash = generar_hash(password)
-
-                                db.collection("usuarios").document(user).update({
-                                    "password_hash": nuevo_hash
-                                })
-
+                           
                             # ==========================================
                             # RESULTADO DEL LOGIN
                             # ==========================================
                             if password_valida:
-
                                 st.session_state["logged_in"] = True
                                 st.session_state["user_role"] = d["rol"]
-                                st.session_state["user_name"] = d.get(
-                                    "nombre",
-                                    user
-                                )
+                                st.session_state["user_name"] = d.get("nombre", user)
                                 st.session_state["user_id"] = user
-
                                 st.rerun()
 
                             else:

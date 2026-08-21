@@ -41,7 +41,16 @@ def mostrar_maestros(
         nombre = data.get("nombre", "Sin Nombre")
         codigo = data.get("codigo", "S/C")
 
-        key_name = f"{codigo} - {nombre}"
+        estado_texto = (
+            "ACTIVO"
+            if data.get("activo", True)
+            else "BAJA"
+        )
+
+        key_name = (
+            f"{codigo} - {nombre} "
+            f"[{estado_texto}]"
+        )
 
         mapa_profesores[key_name] = {
             "id": documento.id,
@@ -58,7 +67,7 @@ def mostrar_maestros(
         sel_prof = st.selectbox(
             "Seleccionar Docente:",
             opciones_prof,
-            key="sel_prof_main"
+            key="sel_prof_main",
         )
 
     st.markdown("---")
@@ -313,6 +322,7 @@ def mostrar_maestros(
         [
             "📚 Carga Académica",
             "💰 Historial Financiero",
+            "🛡️ Estado y Baja",
         ]
     )
 
@@ -624,3 +634,332 @@ def mostrar_maestros(
             st.info(
                 "Sin historial financiero."
             )
+
+    # ==========================================
+    # ESTADO, BAJA Y ELIMINACIÓN
+    # ==========================================
+
+    with tabs_m[2]:
+
+        st.subheader("🛡️ Gestión del Estado del Docente")
+
+        activo_actual = prof_data.get(
+            "activo",
+            True
+        )
+
+        estado_actual = prof_data.get(
+            "estado",
+            "Activo" if activo_actual else "Baja"
+        )
+
+        col_estado, col_info = st.columns(
+            [1, 2]
+        )
+
+        with col_estado:
+
+            if activo_actual:
+                st.success(
+                    "✅ Docente actualmente ACTIVO"
+                )
+            else:
+                st.warning(
+                    "⚠️ Docente dado de BAJA"
+                )
+
+        with col_info:
+
+            if prof_data.get("fecha_baja"):
+                st.write(
+                    f"**Fecha de baja:** "
+                    f"{prof_data.get('fecha_baja')}"
+                )
+
+            if prof_data.get("motivo_baja"):
+                st.write(
+                    f"**Motivo:** "
+                    f"{prof_data.get('motivo_baja')}"
+                )
+
+            if prof_data.get(
+                "baja_realizada_por"
+            ):
+                st.write(
+                    f"**Registrado por:** "
+                    f"{prof_data.get('baja_realizada_por')}"
+                )
+
+        st.divider()
+
+        # ==========================================
+        # DAR DE BAJA
+        # ==========================================
+
+        st.markdown("### 🟠 Dar de baja")
+
+        st.caption(
+            "Esta opción conserva el perfil, "
+            "historial financiero y carga académica."
+        )
+
+        motivos_baja = [
+            "Renuncia",
+            "Finalización de contrato",
+            "Despido",
+            "Traslado",
+            "Jubilación",
+            "Otro",
+        ]
+
+        motivo = st.selectbox(
+            "Motivo de baja",
+            motivos_baja,
+            key=f"motivo_baja_doc_{pid}"
+        )
+
+        motivo_otro = ""
+
+        if motivo == "Otro":
+            motivo_otro = st.text_input(
+                "Especifique el motivo",
+                key=f"motivo_otro_doc_{pid}"
+            )
+
+        if activo_actual:
+
+            if st.button(
+                "🟠 Dar de baja al docente",
+                key=f"btn_baja_doc_{pid}"
+            ):
+
+                motivo_final = (
+                    motivo_otro.strip()
+                    if motivo == "Otro"
+                    else motivo
+                )
+
+                if (
+                    motivo == "Otro"
+                    and not motivo_final
+                ):
+
+                    st.error(
+                        "Debe especificar el motivo."
+                    )
+
+                else:
+
+                    datos_baja = {
+                        "activo": False,
+                        "estado": "Baja",
+                        "fecha_baja": (
+                            obtener_fecha_hoy()
+                            .strftime("%d/%m/%Y")
+                        ),
+                        "motivo_baja": motivo_final,
+                        "baja_realizada_por": (
+                            st.session_state.get(
+                                "user_name",
+                                "Administrador"
+                            )
+                        ),
+                    }
+
+                    db.collection(
+                        "maestros_perfil"
+                    ).document(
+                        pid
+                    ).update(
+                        datos_baja
+                    )
+
+                    st.success(
+                        "✅ Docente dado de baja correctamente."
+                    )
+
+                    time.sleep(1)
+                    st.rerun()
+
+        else:
+
+            st.info(
+                "El docente ya se encuentra dado de baja."
+            )
+
+            if st.button(
+                "♻️ Reactivar docente",
+                key=f"btn_reactivar_doc_{pid}"
+            ):
+
+                datos_reactivacion = {
+                    "activo": True,
+                    "estado": "Activo",
+                    "fecha_baja": None,
+                    "motivo_baja": None,
+                    "baja_realizada_por": None,
+                }
+
+                db.collection(
+                    "maestros_perfil"
+                ).document(
+                    pid
+                ).update(
+                    datos_reactivacion
+                )
+
+                st.success(
+                    "✅ Docente reactivado correctamente."
+                )
+
+                time.sleep(1)
+                st.rerun()
+
+        # ==========================================
+        # ZONA DE PELIGRO
+        # ==========================================
+
+        st.divider()
+
+        st.markdown("### 🔴 Zona de peligro")
+
+        st.error(
+            "La eliminación definitiva no se puede deshacer. "
+            "Se eliminará también la carga académica asociada "
+            "y los movimientos financieros vinculados al docente."
+        )
+
+        codigo_docente = str(
+            prof_data.get(
+                "codigo",
+                pid
+            )
+        )
+
+        st.write(
+            f"Para confirmar escriba el código: "
+            f"**{codigo_docente}**"
+        )
+
+        confirmacion = st.text_input(
+            "Confirmación",
+            key=f"confirm_delete_doc_{pid}"
+        )
+
+        confirmar_eliminacion = st.checkbox(
+            "Entiendo que esta acción es irreversible.",
+            key=f"check_delete_doc_{pid}"
+        )
+
+        if st.button(
+            "🗑️ ELIMINAR DEFINITIVAMENTE",
+            key=f"delete_docente_{pid}"
+        ):
+
+            if (
+                confirmacion.strip()
+                != codigo_docente
+            ):
+
+                st.error(
+                    "El código escrito no coincide."
+                )
+
+            elif not confirmar_eliminacion:
+
+                st.error(
+                    "Debe confirmar que comprende "
+                    "que la eliminación es irreversible."
+                )
+
+            else:
+
+                try:
+
+                    # ==================================
+                    # 1. CARGA ACADÉMICA
+                    # ==================================
+
+                    cargas = (
+                        db.collection(
+                            "carga_academica"
+                        )
+                        .where(
+                            "id_docente",
+                            "==",
+                            pid
+                        )
+                        .stream()
+                    )
+
+                    cargas_eliminadas = 0
+
+                    for carga in cargas:
+                        carga.reference.delete()
+                        cargas_eliminadas += 1
+
+                    # ==================================
+                    # 2. FINANZAS DEL DOCENTE
+                    # ==================================
+
+                    movimientos = (
+                        db.collection(
+                            "finanzas"
+                        )
+                        .where(
+                            "docente_id",
+                            "==",
+                            pid
+                        )
+                        .stream()
+                    )
+
+                    movimientos_eliminados = 0
+
+                    for movimiento in movimientos:
+                        movimiento.reference.delete()
+                        movimientos_eliminados += 1
+
+                    # ==================================
+                    # 3. PERFIL PRINCIPAL
+                    # ==================================
+
+                    db.collection(
+                        "maestros_perfil"
+                    ).document(
+                        pid
+                    ).delete()
+
+                    # Limpiar estados relacionados
+                    if (
+                        "edit_prof_mode"
+                        in st.session_state
+                    ):
+                        del st.session_state[
+                            "edit_prof_mode"
+                        ]
+
+                    st.success(
+                        "✅ Docente y registros relacionados "
+                        "eliminados definitivamente."
+                    )
+
+                    st.write(
+                        f"Cargas académicas eliminadas: "
+                        f"{cargas_eliminadas}"
+                    )
+
+                    st.write(
+                        f"Movimientos financieros eliminados: "
+                        f"{movimientos_eliminados}"
+                    )
+
+                    time.sleep(2)
+                    st.rerun()
+
+                except Exception as error:
+
+                    st.error(
+                        "No se pudo completar la eliminación: "
+                        f"{error}"
+                    )

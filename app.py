@@ -21,6 +21,7 @@ from views.alumnos import mostrar_consulta_alumnos
 from views.inscripcion import mostrar_inscripcion
 from views.docentes import mostrar_maestros
 from views.promocion import mostrar_promocion
+from views.asistencia import mostrar_asistencia_global
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -424,48 +425,11 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             f"📅 Ciclo Lectivo actual: {CICLO_LECTIVO}"
         )
     elif opcion_seleccionada == "Asistencia Global":
-        st.title("📅 Reporte de Asistencia Global")
-        c1, c2, c3 = st.columns(3)
-        g = c1.selectbox("Grado", LISTA_GRADOS_TODO)
-        f_ini = c2.date_input("Desde:", obtener_fecha_hoy())
-        f_fin = c3.date_input("Hasta:", obtener_fecha_hoy())
-            
-        if st.button("Generar Reporte"):
-                docs = db.collection("asistencia").where("grado", "==", g).stream()
-                stats = {}
-                alums = (
-                    db.collection("alumnos")
-                    .where("grado_actual", "==", g)
-                    .where("estado", "==", "Activo")
-                    .stream()
-                )
-                for a in alums: stats[a.to_dict()['nie']] = {"Nombre": f"{a.to_dict().get('apellidos', '')} {a.to_dict().get('nombres', '')}", "P": 0, "A": 0, "Obs": []}
-                total_dias = 0
-                
-                for d in docs:
-                    data_doc = d.to_dict()
-                    fecha_doc = data_doc.get("fecha")
-                    if not fecha_doc: continue
-                    # Manejo de Timestamp para TZ
-                    if isinstance(fecha_doc, datetime): f_obj = fecha_doc.astimezone(TZ_SV).date()
-                    else: f_obj = datetime.fromtimestamp(fecha_doc.timestamp(), TZ_SV).date()
-                    
-                    if f_ini <= f_obj <= f_fin:
-                        total_dias += 1
-                        regs = data_doc.get('registros', {})
-                        obs_regs = data_doc.get('observaciones', {})
-                        for nie, est in regs.items():
-                            if nie in stats: 
-                                if est == "Presente": stats[nie]["P"] += 1
-                                elif est == "Ausente": 
-                                    stats[nie]["A"] += 1
-                                    if obs_regs.get(nie): stats[nie]["Obs"].append(f"{f_obj.strftime('%d/%m')}: {obs_regs[nie]}")
-                
-                if total_dias > 0:
-                    data = [{"Alumno": v["Nombre"], "Asistencias": v["P"], "Faltas": v["A"], "% Asist": f"{(v['P']/total_dias)*100:.0f}%", "Observaciones": ", ".join(v["Obs"])} for v in stats.values()]
-                    st.dataframe(pd.DataFrame(data), use_container_width=True)
-                else: st.info("No hay tomas de asistencia registradas para este periodo.")
-
+        mostrar_asistencia_global(
+            db=db,
+            lista_grados=LISTA_GRADOS_TODO,
+            obtener_fecha_hoy=obtener_fecha_hoy,
+        )
     # --- 6. NOTAS (ACTUALIZADO CON REPORTES) ---
     elif opcion_seleccionada == "Notas":
         st.title("📊 Gestión y Reportes de Notas")

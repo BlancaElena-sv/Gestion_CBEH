@@ -1052,7 +1052,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     if u_user == "david" and st.session_state["user_id"] != "david":
                         st.error("No tienes permiso para modificar al Super Admin.")
                     else:
-                        db.collection("usuarios").document(u_user).set({"usuario": u_user, "pass": u_pass, "rol": u_rol, "nombre": u_name})
+                        db.collection("usuarios").document(u_user).set({"usuario": u_user, "password_hash": generar_hash(u_pass), "rol": u_rol, "nombre": u_name})
                         st.success("Usuario creado/actualizado"); time.sleep(1); st.rerun()
 
         with t_db:

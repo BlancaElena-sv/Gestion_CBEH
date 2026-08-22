@@ -20,6 +20,7 @@ from components.sidebar import mostrar_sidebar
 from views.alumnos import mostrar_consulta_alumnos
 from views.inscripcion import mostrar_inscripcion
 from views.docentes import mostrar_maestros
+from views.promocion import mostrar_promocion
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -418,6 +419,10 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             verificar_pago_duplicado_hoy=verificar_pago_duplicado_hoy,
         )
         # --- 5. ASISTENCIA GLOBAL ---
+
+        st.caption(
+            f"📅 Ciclo Lectivo actual: {CICLO_LECTIVO}"
+        )
     elif opcion_seleccionada == "Asistencia Global":
         st.title("📅 Reporte de Asistencia Global")
         c1, c2, c3 = st.columns(3)
@@ -1016,6 +1021,14 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                     html_reporte = f"""<div style="font-family:Arial; padding:20px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #333; padding-bottom:10px;"><div style="display:flex; align-items:center; gap:15px;">{hi}<div><h2 style="margin:0;">COLEGIO BLANCA ELENA</h2><p style="margin:0;">{titulo_reporte}</p></div></div><div style="text-align:right;"><p><b>Desde:</b> {f_inicio.strftime('%d/%m/%Y')}<br><b>Hasta:</b> {f_fin.strftime('%d/%m/%Y')}</p></div></div><br><div style="display:flex; gap:20px; margin-bottom:20px;"><div style="background:#e8f5e9; padding:10px; border:1px solid #4caf50; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#2e7d32;">INGRESOS</h4><h2 style="margin:0;">${tot_ing:.2f}</h2></div><div style="background:#ffebee; padding:10px; border:1px solid #e57373; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0; color:#c62828;">EGRESOS</h4><h2 style="margin:0;">${tot_egr:.2f}</h2></div><div style="background:#f5f5f5; padding:10px; border:1px solid #999; border-radius:5px; flex:1; text-align:center;"><h4 style="margin:0;">BALANCE</h4><h2 style="margin:0;">${tot_ing - tot_egr:.2f}</h2></div></div><table style="width:100%; border-collapse:collapse; font-size:12px;" border="1" bordercolor="#ddd"><tr style="background:#333; color:white;"><th padding="5">Fecha</th><th>Grado</th><th>Persona/Entidad</th><th>Descripción</th><th>Monto</th></tr>{rows_html}</table><br><br><div style="text-align:center;">__________________________<br>Firma Dirección</div></div>"""
                     components.html(f"""<html><body>{html_reporte}<br><center><button onclick="window.print()" style="background:#333; color:white; padding:10px 20px; cursor:pointer;">🖨️ IMPRIMIR REPORTE PDF</button></center></body></html>""", height=600, scrolling=True)
             else: st.info("No hay registros en este rango.")
+
+    elif opcion_seleccionada == "Promoción de Grado":
+        mostrar_promocion(
+            db=db,
+            obtener_fecha_hoy=obtener_fecha_hoy,
+            ciclo_origen=2026,
+                ciclo_destino=2027,
+        )
 
     # --- 8. CONFIGURACIÓN (USUARIOS) ---
     elif opcion_seleccionada == "Configuración (Usuarios)":

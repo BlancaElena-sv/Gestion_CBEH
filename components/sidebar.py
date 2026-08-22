@@ -1,6 +1,5 @@
 import streamlit as st
 
-
 def mostrar_sidebar(nombre_usuario, rol_usuario):
     """
     Sidebar principal de EduManager.
@@ -124,6 +123,12 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
                 "💰  Finanzas",
                 "Finanzas",
                 "menu_finanzas"
+            )
+
+            opcion_menu(
+                "🎓  Promoción de Grado",
+                "Promoción de Grado",
+                "menu_promocion"
             )
 
             st.markdown(

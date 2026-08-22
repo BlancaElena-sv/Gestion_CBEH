@@ -158,6 +158,11 @@ def mostrar_consulta_alumnos(
                 f"**Turno:** {a.get('turno')}"
             )
 
+            st.markdown(
+                f"**Ciclo Lectivo:** "
+                f"{a.get('ciclo_lectivo', 'No definido')}" 
+            )
+
             st.info(
                 f"👨‍🏫 **Maestro Guía:** {maestro_guia}"
             )

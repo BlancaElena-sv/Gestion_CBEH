@@ -470,11 +470,7 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
             obtener_hora_actual=obtener_hora_actual,
             verificar_pago_duplicado_hoy=verificar_pago_duplicado_hoy,
         )
-        # --- 5. ASISTENCIA GLOBAL ---
-
-        st.caption(
-            f"📅 Ciclo Lectivo actual: {CICLO_LECTIVO}"
-        )
+        
     elif opcion_seleccionada == "Asistencia Global":
         mostrar_asistencia_global(
             db=db,
@@ -506,8 +502,8 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
         mostrar_promocion(
             db=db,
             obtener_fecha_hoy=obtener_fecha_hoy,
-            ciclo_origen=2026,
-                ciclo_destino=2027,
+            ciclo_origen=CICLO_LECTIVO,
+                ciclo_destino=CICLO_LECTIVO + 1,
         )
 
     elif opcion_seleccionada == "Configuración (Usuarios)":

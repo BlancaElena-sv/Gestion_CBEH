@@ -24,6 +24,7 @@ from views.promocion import mostrar_promocion
 from views.asistencia import mostrar_asistencia_global
 from views.notas import mostrar_notas
 from views.finanzas import mostrar_finanzas
+from views.configuracion import mostrar_configuracion
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -114,45 +115,92 @@ def login():
                 use_container_width=True
             )
 
-            if submitted:
-                if db:
+        if submitted:
 
-                    try:
-                        doc = db.collection("usuarios").document(user).get()
+                # ------------------------------------------
+                # VALIDACIONES BÁSICAS
+                # ------------------------------------------
 
-                        if doc.exists:
-                            d = doc.to_dict()
+                if not user.strip():
+                    st.error("❌ Ingrese su usuario.")
+                    return
 
-                            password_valida = False
+                if not password:
+                    st.error("❌ Ingrese su contraseña.")
+                    return
 
-                            # ==========================================
-                            # NUEVO SISTEMA: BCRYPT
-                            # ==========================================
-                            if d.get("password_hash"):
+                if not db:
+                    st.error("⚠️ Sin conexión con la base de datos.")
+                    return
 
-                                password_valida = verificar_password(
-                                    password,
-                                    d["password_hash"]
-                                )
+                try:
+                    # --------------------------------------
+                    # BUSCAR USUARIO
+                    # --------------------------------------
 
-                            # ==========================================
-                            # RESULTADO DEL LOGIN
-                            # ==========================================
-                            if password_valida:
-                                st.session_state["logged_in"] = True
-                                st.session_state["user_role"] = d["rol"]
-                                st.session_state["user_name"] = d.get("nombre", user)
-                                st.session_state["user_id"] = user
-                                st.rerun()
+                    doc = (
+                        db.collection("usuarios")
+                        .document(user.strip())
+                        .get()
+                    )
 
-                            else:
-                                st.error("❌ Contraseña incorrecta")
+                    if not doc.exists:
+                        st.error("❌ Usuario no encontrado.")
+                        return
 
-                        else:
-                            st.error("❌ Usuario no encontrado")
+                    d = doc.to_dict()
 
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                    # --------------------------------------
+                    # COMPROBAR ESTADO
+                    # --------------------------------------
+
+                    if not d.get("activo", True):
+                        st.error(
+                            "⛔ Este usuario se encuentra inactivo. "
+                            "Contacte a la Administración."
+                        )
+                        return
+
+                    # --------------------------------------
+                    # COMPROBAR CONTRASEÑA HASH
+                    # --------------------------------------
+
+                    password_hash = d.get("password_hash")
+
+                    if not password_hash:
+                        st.error(
+                            "⚠️ La cuenta no posee una credencial válida. "
+                            "Contacte a la Administración."
+                        )
+                        return
+
+                    password_valida = verificar_password(
+                        password,
+                        password_hash
+                    )
+
+                    if not password_valida:
+                        st.error("❌ Contraseña incorrecta.")
+                        return
+
+                    # --------------------------------------
+                    # LOGIN CORRECTO
+                    # --------------------------------------
+
+                    st.session_state["logged_in"] = True
+                    st.session_state["user_role"] = d.get("rol")
+                    st.session_state["user_name"] = d.get(
+                        "nombre",
+                        user
+                    )
+                    st.session_state["user_id"] = user.strip()
+
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(
+                        f"❌ Error al iniciar sesión: {e}"
+                    )
 
                 else:
                     st.error("⚠️ Sin conexión.")
@@ -461,41 +509,12 @@ if st.session_state["user_role"] == "admin" and opcion_seleccionada != "Inicio":
                 ciclo_destino=2027,
         )
 
-    # --- 8. CONFIGURACIÓN (USUARIOS) ---
     elif opcion_seleccionada == "Configuración (Usuarios)":
-        st.header("⚙️ Configuración")
-        t_usr, t_db = st.tabs(["👥 Usuarios", "⚠️ Base de Datos"])
-        
-        with t_usr:
-            st.subheader("Crear / Editar Credenciales")
-            ur = db.collection("usuarios").stream()
-            lu = [u.to_dict() for u in ur]
-            if st.session_state["user_id"] != "david":
-                lu = [x for x in lu if x["usuario"] != "david"]
-            st.dataframe(pd.DataFrame(lu), use_container_width=True)
-            with st.form("add_user"):
-                c1, c2 = st.columns(2)
-                u_user = c1.text_input("Usuario (ID)")
-                u_pass = c2.text_input("Contraseña", type="password")
-                u_name = c1.text_input("Nombre Real")
-                u_rol = c2.selectbox("Rol", ["docente", "admin"])
-                if st.form_submit_button("Guardar"):
-                    if u_user == "david" and st.session_state["user_id"] != "david":
-                        st.error("No tienes permiso para modificar al Super Admin.")
-                    else:
-                        db.collection("usuarios").document(u_user).set({"usuario": u_user, "password_hash": generar_hash(u_pass), "rol": u_rol, "nombre": u_name})
-                        st.success("Usuario creado/actualizado"); time.sleep(1); st.rerun()
-
-        with t_db:
-            if st.session_state["user_id"] == "david":
-                st.warning("Zona de Peligro")
-                if st.button("🔴 BORRAR TODO") and st.text_input("Confirmar:") == "BORRAR":
-                    borrar_coleccion("alumnos"); borrar_coleccion("maestros_perfil"); borrar_coleccion("carga_academica"); borrar_coleccion("finanzas"); borrar_coleccion("notas")
-                    borrar_coleccion("usuarios")
-                    db.collection("usuarios").document("david").set({"usuario": "david", "pass": "admin123", "rol": "admin", "nombre": "David Fuentes (Dev)"})
-                    st.success("Borrado completo.")
-            else:
-                st.info("Función reservada para el desarrollador.")
+        mostrar_configuracion(
+            db=db,
+            generar_hash=generar_hash,
+            borrar_coleccion=borrar_coleccion,
+        )
 
 # ==========================================
 # MÓDULOS DE DOCENTE

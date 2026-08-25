@@ -74,12 +74,31 @@ MAPA_CURRICULAR = {
     "Noveno Grado": MAT_III_CICLO,
 }
 
-LISTA_GRADOS_TODO = list(MAPA_CURRICULAR.keys())
+LISTA_GRADOS_TODO = [
+    "Kinder 4",
+    "Kinder 5",
+    "Preparatoria",
+    "Primer Grado",
+    "Segundo Grado",
+    "Tercer Grado",
+    "Cuarto Grado",
+    "Quinto Grado",
+    "Sexto Grado",
+    "Séptimo Grado",
+    "Octavo Grado",
+    "Noveno Grado",
+]
 
 LISTA_GRADOS_NOTAS = [
-    grado
-    for grado in LISTA_GRADOS_TODO
-    if "Kinder" not in grado and "Prepa" not in grado
+    "Primer Grado",
+    "Segundo Grado",
+    "Tercer Grado",
+    "Cuarto Grado",
+    "Quinto Grado",
+    "Sexto Grado",
+    "Séptimo Grado",
+    "Octavo Grado",
+    "Noveno Grado",
 ]
 
 LISTA_MESES = [

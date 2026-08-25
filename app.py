@@ -26,6 +26,10 @@ from views.notas import mostrar_notas
 from views.finanzas import mostrar_finanzas
 from views.configuracion import mostrar_configuracion
 from views.docente_panel import mostrar_panel_docente
+from views.dashboard import (
+    mostrar_dashboard_admin,
+    mostrar_dashboard_docente,
+)
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -283,156 +287,27 @@ if opcion_seleccionada == "__logout__":
 
 # --- INICIO ---
 if opcion_seleccionada == "Inicio":
-    st.title("🍎 Tablero Institucional")
 
-    if st.session_state["user_role"] == "docente" and db:
-        nombre_limpio = limpiar_nombre(st.session_state.get("user_name", ""))
-        found_prof = None
-
-        try:
-            q_prof = (
-                db.collection("maestros_perfil")
-                .where("nombre", "==", st.session_state["user_name"])
-                .stream()
-            )
-            for p in q_prof:
-                found_prof = p.to_dict()
-        except Exception:
-            pass
-
-        if not found_prof:
-            try:
-                q_prof_clean = (
-                    db.collection("maestros_perfil")
-                    .where("nombre", "==", nombre_limpio)
-                    .stream()
-                )
-                for p in q_prof_clean:
-                    found_prof = p.to_dict()
-            except Exception:
-                pass
-
-        col_p1, col_p2 = st.columns([1, 4])
-
-        with col_p1:
-            if found_prof and found_prof.get("foto_url"):
-                st.image(found_prof["foto_url"], width=150)
-            else:
-                st.markdown(
-                    "<h1 style='text-align: center;'>👤</h1>",
-                    unsafe_allow_html=True,
-                )
-
-        with col_p2:
-            st.subheader(f"Bienvenido, {nombre_limpio}")
-            st.info("Panel Docente - EduManager")
-
-            if found_prof:
-                st.write(
-                    f"📞 {found_prof.get('telefono', '')} | "
-                    f"📧 {found_prof.get('email', '')}"
-                )
-
-    else:
-        st.markdown(
-            f"""
-<div class="dashboard-header">
-    <div class="dashboard-eyebrow">PANEL ADMINISTRATIVO</div>
-    <div class="dashboard-title">
-        Bienvenido, {limpiar_nombre(st.session_state['user_name'])}
-    </div>
-    <div class="dashboard-subtitle">
-        {COLEGIO_NOMBRE} · Ciclo Lectivo {CICLO_LECTIVO}
-    </div>
-</div>
-""",
-            unsafe_allow_html=True,
+    if (
+        st.session_state["user_role"] == "admin"
+        and db
+    ):
+        mostrar_dashboard_admin(
+            db=db,
+            nombre_usuario=limpiar_nombre(
+                st.session_state["user_name"]
+            ),
         )
 
-        try:
-            alumnos_activos = list(
-                db.collection("alumnos")
-                .where("estado", "==", "Activo")
-                .stream()
-            )
-
-            docentes_activos = list(
-                db.collection("maestros_perfil")
-                .where("activo", "==", True)
-                .stream()
-            )
-
-            total_alumnos = len(alumnos_activos)
-            total_docentes = len(docentes_activos)
-
-        except Exception:
-            total_alumnos = 0
-            total_docentes = 0
-
-        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-
-        with kpi1:
-            st.metric(
-                label="👨‍🎓 Alumnos activos",
-                value=total_alumnos,
-            )
-
-        with kpi2:
-            st.metric(
-                label="👩‍🏫 Docentes activos",
-                value=total_docentes,
-            )
-
-        with kpi3:
-            st.metric(
-                label="📅 Ciclo lectivo",
-                value=CICLO_LECTIVO,
-            )
-
-        with kpi4:
-            st.metric(
-                label="🟢 Estado",
-                value="Operativo",
-            )
-
-    st.markdown("---")
-    st.subheader("📅 Agenda de Actividades")
-
-    col_izq, col_der = st.columns(2)
-
-    with col_izq:
-        st.info("**ESTADO: PERIODO DE INSCRIPCIÓN FINALIZADO**")
-        st.write("- Recepción de documentos.")
-        st.write("- Actualización de datos.")
-
-    with col_der:
-        st.success("**PRÓXIMO: INICIO DE EXÁMENES MENSUALES**")
-        st.metric("Fecha", "23 de Febrero", "2026")
-
-    cronograma = [
-        {
-            "Fecha": "16 Feb - 18 Feb",
-            "Actividad": "Matrícula Extraordinaria",
-            "Estado": "En Curso",
-        },
-        {
-            "Fecha": "20 Feb",
-            "Actividad": "Última fecha de Pagos",
-            "Estado": "En Curso",
-        },
-        {
-            "Fecha": "19 Feb",
-            "Actividad": "Entrega de Exámenes a Dirección",
-            "Estado": "Programado",
-        },
-        {
-            "Fecha": "23 Feb",
-            "Actividad": "Inicio de exámenes mensuales",
-            "Estado": "Pendiente",
-        },
-    ]
-
-    st.table(pd.DataFrame(cronograma))
+    elif (
+        st.session_state["user_role"] == "docente"
+        and db
+    ):
+        mostrar_dashboard_docente(
+            db=db,
+            nombre_usuario=st.session_state["user_name"],
+            limpiar_nombre=limpiar_nombre,
+        )
 
 
 # ==========================================

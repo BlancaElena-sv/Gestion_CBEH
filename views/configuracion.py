@@ -3,6 +3,10 @@ import time
 import pandas as pd
 import streamlit as st
 
+from views.configuracion_dashboard import (
+    mostrar_configuracion_dashboard,
+)
+
 
 def mostrar_configuracion(
     db,
@@ -22,12 +26,13 @@ def mostrar_configuracion(
 
     st.header("⚙️ Configuración")
 
-    tab_usuarios, tab_db = st.tabs(
-        [
-            "👥 Usuarios",
-            "⚠️ Base de Datos",
-        ]
-    )
+    tab_usuarios, tab_dashboard, tab_db = st.tabs(
+    [
+        "👥 Usuarios",
+        "🖥️ Dashboard",
+        "⚠️ Base de Datos",
+    ]
+)
 
     # ========================================================
     # USUARIOS
@@ -557,6 +562,11 @@ def mostrar_configuracion(
     # ========================================================
     # BASE DE DATOS
     # ========================================================
+
+    with tab_dashboard:
+        mostrar_configuracion_dashboard(
+            db=db,
+    )
 
     with tab_db:
 

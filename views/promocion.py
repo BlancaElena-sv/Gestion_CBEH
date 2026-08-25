@@ -72,6 +72,23 @@ def mostrar_promocion(
     for doc in alumnos_docs:
         data = doc.to_dict()
 
+        historial = data.get(
+            "historial_academico",
+            []
+        )
+
+        ya_promovido = any(
+            registro.get("ciclo") == ciclo_origen
+            and registro.get("resultado") in [
+                "Promovido",
+                "Graduado",
+            ]
+            for registro in historial
+        )
+
+        if ya_promovido:
+            continue
+
         alumnos.append(
             {
                 "id": doc.id,
@@ -200,6 +217,7 @@ def mostrar_promocion(
                                 "grado": grado_origen,
                                 "resultado": "Graduado",
                                 "fecha": fecha,
+                                "usuario": usuario,
                             }
                         )
 
@@ -207,10 +225,12 @@ def mostrar_promocion(
                             "estado": "Graduado",
                             "activo": False,
                             "fecha_baja": fecha,
+                            "fecha_graduacion": fecha,
                             "motivo_baja": "Graduación",
                             "baja_realizada_por": usuario,
                             "ciclo_lectivo": ciclo_origen,
                             "historial_academico": historial,
+                            
                         }
 
                         graduados += 1
@@ -222,14 +242,37 @@ def mostrar_promocion(
                                 "grado": grado_origen,
                                 "resultado": "Promovido",
                                 "grado_destino": grado_destino,
+                                "ciclo_destino": ciclo_destino,
+                                "turno_origen": data.get(
+                                    "turno", 
+                                    "_"
+                                ),
+                                "turno_destino": (
+                                    "Vespertino"
+                                    if grado_origen == "Cuarto Grado"
+                                    else data.get(
+                                        "turno",
+                                        "_",
+                                    )
+                                ),
                                 "fecha": fecha,
+                                "usuario": usuario,
                             }
                         )
+
+                        nuevo_turno = data.get(
+                            "turno", 
+                            "Matutino"
+                        )
+
+                        if grado_origen == "Cuarto Grado":
+                            nuevo_turno = "Vespertino"
 
                         update_data = {
                             "grado_anterior": grado_origen,
                             "grado_actual": grado_destino,
                             "ciclo_lectivo": ciclo_destino,
+                            "turno": nuevo_turno,
                             "estado": "Activo",
                             "activo": True,
                             "fecha_promocion": fecha,

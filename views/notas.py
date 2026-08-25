@@ -3,6 +3,7 @@ import time
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+from views.notas_historicas import mostrar_notas_historicas
 
 from config import CICLO_LECTIVO
 
@@ -32,12 +33,13 @@ def mostrar_notas(
         f"📅 Ciclo lectivo actual: {CICLO_LECTIVO}"
     )
 
-    tab_registro, tab_reporte_grado = st.tabs(
-        [
-            "📝 Registro Mensual",
-            "📜 Reporte por Grado (Cuadros)",
-        ]
-    )
+    tab_registro, tab_reporte_grado, tab_historico = st.tabs(
+    [
+        "📝 Registro Mensual",
+        "📜 Reporte por Grado (Cuadros)",
+        "🕰️ Consulta Histórica",
+    ]
+)
 
     # ========================================================
     # 1. REGISTRO MENSUAL
@@ -791,6 +793,19 @@ def mostrar_notas(
                         height=800,
                         scrolling=True,
                     )
+
+    # ========================================================
+    # CONSULTA HISTÓRICA
+    # ========================================================
+
+    with tab_historico:
+        mostrar_notas_historicas(
+            db=db,
+            lista_grados_notas=lista_grados_notas,
+            mapa_curricular=mapa_curricular,
+            redondear_mined=redondear_mined,
+            get_base64=get_base64,
+        )
 
     # ========================================================
     # 3. IMPRESIÓN MASIVA DE BOLETAS

@@ -194,6 +194,7 @@ def mostrar_consulta_alumnos(
         "⚙️ Edición Expediente",
         "📒 Bitácora",
         "🛡️ Estado y Baja",
+        "📚 Historial Académico",
     ]
 )
 
@@ -1167,6 +1168,161 @@ def mostrar_consulta_alumnos(
                 )
 
         st.divider()
+
+            # ==========================================
+    # TAB 7 - HISTORIAL ACADÉMICO
+    # ==========================================
+
+    with tabs[6]:
+
+        st.subheader("📚 Historial Académico")
+
+        historial = a.get(
+            "historial_academico",
+            []
+        )
+
+        if not historial:
+
+            st.info(
+                "Este alumno todavía no tiene "
+                "registros históricos de promoción."
+            )
+
+            st.caption(
+                "El historial comenzará a generarse "
+                "cuando se ejecute una promoción de grado."
+            )
+
+        else:
+
+            # Ordenar de más reciente a más antiguo
+            historial_ordenado = sorted(
+                historial,
+                key=lambda registro: registro.get(
+                    "ciclo",
+                    0
+                ),
+                reverse=True
+            )
+
+            filas = []
+
+            for registro in historial_ordenado:
+
+                resultado = registro.get(
+                    "resultado",
+                    "-"
+                )
+
+                grado = registro.get(
+                    "grado",
+                    "-"
+                )
+
+                grado_destino = registro.get(
+                    "grado_destino",
+                    "-"
+                )
+
+                ciclo = registro.get(
+                    "ciclo",
+                    "-"
+                )
+
+                ciclo_destino = registro.get(
+                    "ciclo_destino",
+                    "-"
+                )
+
+                fecha = registro.get(
+                    "fecha",
+                    "-"
+                )
+
+                usuario = registro.get(
+                    "usuario",
+                    "-"
+                )
+
+                if resultado == "Graduado":
+                    destino_mostrar = "Graduado"
+                else:
+                    destino_mostrar = grado_destino
+
+                filas.append(
+                    {
+                        "Ciclo": ciclo,
+                        "Grado cursado": grado,
+                        "Resultado": resultado,
+                        "Destino": destino_mostrar,
+                        "Ciclo destino": ciclo_destino,
+                        "Fecha": fecha,
+                        "Procesado por": usuario,
+                    }
+                )
+
+            df_historial = pd.DataFrame(
+                filas
+            )
+
+            st.dataframe(
+                df_historial,
+                width="stretch",
+                hide_index=True
+            )
+
+            st.divider()
+
+            st.markdown(
+                "### 📖 Trayectoria del alumno"
+            )
+
+            for registro in historial_ordenado:
+
+                ciclo = registro.get(
+                    "ciclo",
+                    "-"
+                )
+
+                grado = registro.get(
+                    "grado",
+                    "-"
+                )
+
+                resultado = registro.get(
+                    "resultado",
+                    "-"
+                )
+
+                grado_destino = registro.get(
+                    "grado_destino",
+                    ""
+                )
+
+                if resultado == "Graduado":
+
+                    st.success(
+                        f"🎓 {ciclo} · "
+                        f"{grado} · "
+                        f"Graduado"
+                    )
+
+                elif resultado == "Promovido":
+
+                    st.info(
+                        f"📘 {ciclo} · "
+                        f"{grado} → "
+                        f"{grado_destino}"
+                    )
+
+                else:
+
+                    st.write(
+                        f"{ciclo} · "
+                        f"{grado} · "
+                        f"{resultado}"
+                    )
 
         # ==========================================
         # DAR DE BAJA

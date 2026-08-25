@@ -17,6 +17,21 @@ def eliminar_documentos_consulta(query):
 
     return len(documentos)
 
+
+def _es_alumno_graduado(data):
+    """
+    Detecta expedientes graduados de forma tolerante a mayúsculas,
+    espacios y registros antiguos.
+    """
+    estado = str(data.get("estado", "")).strip().casefold()
+    motivo = str(data.get("motivo_baja", "")).strip().casefold()
+
+    return (
+        estado == "graduado"
+        or motivo in {"graduación", "graduacion"}
+        or bool(data.get("fecha_graduacion"))
+    )
+
 def mostrar_consulta_alumnos(
     db,
     lista_grados,
@@ -68,20 +83,39 @@ def mostrar_consulta_alumnos(
                 ["Todos"] + lista_grados
             )
 
+            res = []
+
             if g != "Todos":
-                res = [
-                    d.to_dict()
-                    for d in db.collection("alumnos")
+                documentos = (
+                    db.collection("alumnos")
                     .where("grado_actual", "==", g)
                     .stream()
-                ]
+                )
+
+                for documento in documentos:
+                    data = documento.to_dict()
+
+                    if _es_alumno_graduado(data):
+                        continue
+
+                    res.append(data)
+
             else:
-                res = [
-                    d.to_dict()
-                    for d in db.collection("alumnos")
-                    .limit(20)
+                documentos = (
+                    db.collection("alumnos")
                     .stream()
-                ]
+                )
+
+                for documento in documentos:
+                    data = documento.to_dict()
+
+                    if _es_alumno_graduado(data):
+                        continue
+
+                    res.append(data)
+
+                    if len(res) >= 50:
+                        break
 
             sel = st.selectbox(
                 "Seleccionar Alumno",

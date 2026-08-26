@@ -4,6 +4,7 @@ credenciales
 .streamlit/secrets.toml
 
 # Respaldos locales
+backups/
 *respaldo*.py
 *backup*.py
 
@@ -27,4 +28,3 @@ Desktop.ini
 # VS Code
 .vscode/
 
-backups/

@@ -5,6 +5,9 @@ import streamlit as st
 
 
 MAPA_PROMOCION = {
+    "Kinder 4": "Kinder 5",
+    "Kinder 5": "Preparatoria",
+    "Preparatoria": "Primer Grado",
     "Primer Grado": "Segundo Grado",
     "Segundo Grado": "Tercer Grado",
     "Tercer Grado": "Cuarto Grado",

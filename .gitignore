@@ -1,6 +1,8 @@
 # Credenciales y secretos
 credenciales.json
 credenciales
+credenciales_demo.json
+credenciales_*.json
 .streamlit/secrets.toml
 
 # Respaldos locales

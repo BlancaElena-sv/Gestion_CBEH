@@ -147,33 +147,14 @@ def mostrar_notas(
                     f"{CICLO_LECTIVO}_{id_base}"
                 )
 
-                doc_nuevo = (
+                # SIEMPRE usar el documento con prefijo de ciclo
+                doc_ref = (
                     db.collection("notas_mensuales")
                     .document(id_nuevo)
                     .get()
                 )
 
-                if CICLO_LECTIVO == 2026:
-                    id_legacy = id_base
-                    doc_antiguo = (
-                        db.collection(
-                            "notas_mensuales"
-                        )
-                        .document(id_legacy)
-                        .get()
-                    )
-
-                    if doc_antiguo.exists:
-                        id_doc = id_legacy
-                        doc_ref = doc_antiguo
-
-                    else:
-                        id_doc = id_nuevo
-                        doc_ref = doc_nuevo
-
-                else:
-                    id_doc = id_nuevo
-                    doc_ref = doc_nuevo
+                id_doc = id_nuevo
 
                 # ============================================
                 # COLUMNAS

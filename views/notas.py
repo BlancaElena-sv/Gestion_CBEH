@@ -297,114 +297,117 @@ def mostrar_notas(
                     key=f"editor_{id_doc}",
                 )
 
+                                # ============================================
+                # BOTÓN: IMPRIMIR CUADRO DEL MES (PDF)
                 # ============================================
-                # GUARDAR
-                # ============================================
 
-                if st.button(
-                    "💾 Guardar Notas",
-                    type="primary",
-                ):
+                st.markdown("---")
+                st.markdown("### 🖨️ Respaldo del Cuadro de Notas")
 
-                    batch = db.batch()
+                if st.button(" Generar PDF del Cuadro de este Mes"):
+                    logo_b64 = get_base64("logo.png")
+                    imagen_logo = f'<img src="{logo_b64}" height="50">' if logo_b64 else ""
+                    fecha_impresion = time.strftime("%d/%m/%Y %H:%M")
 
-                    detalles = {}
+                    # Construir las filas de la tabla
+                    filas_html = ""
+                    for _, fila in df.iterrows():
+                        celdas_notas = ""
+                        for col in columnas_notas:
+                            valor = fila[col]
+                            celdas_notas += f"<td>{valor}</td>"
+                        
+                        filas_html += f"""
+                        <tr>
+                            <td style="text-align:left; padding-left:5px;">{fila['Nombre']}</td>
+                            <td>{fila['NIE']}</td>
+                            {celdas_notas}
+                            <td style="background:#1e3a8a; color:white; font-weight:bold;">{fila['Promedio']}</td>
+                        </tr>
+                        """
 
-                    for _, fila in editor.iterrows():
+                    # Encabezados de la tabla
+                    encabezados_notas = "".join([f"<th>{col}</th>" for col in columnas_notas])
 
-                        if materia == "Conducta":
+                    html_cuadro = f"""
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <div style="display:flex; align-items:center; border-bottom:2px solid #333; margin-bottom:15px;">
+                            {imagen_logo}
+                            <div style="margin-left:20px;">
+                                <h2 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
+                                <h4 style="margin:5px 0 0 0; color:#555;">CUADRO DE NOTAS MENSUAL - CICLO {CICLO_LECTIVO}</h4>
+                            </div>
+                        </div>
 
-                            promedio = (
-                                fila[
-                                    columnas_notas[0]
-                                ]
-                            )
+                        <table style="width:100%; font-size:12px; margin-bottom:15px;">
+                            <tr>
+                                <td><b>GRADO:</b> {grado}</td>
+                                <td><b>ASIGNATURA:</b> {materia}</td>
+                                <td><b>MES:</b> {mes}</td>
+                            </tr>
+                            <tr>
+                                <td><b>TOTAL ALUMNOS:</b> {len(df)}</td>
+                                <td><b>FECHA DE IMPRESIÓN:</b> {fecha_impresion}</td>
+                                <td></td>
+                            </tr>
+                        </table>
 
-                        else:
+                        <table border="1" style="width:100%; border-collapse:collapse; text-align:center; font-size:11px;">
+                            <tr style="background:#f2f2f2; font-weight:bold;">
+                                <th style="text-align:left; padding-left:5px;">NOMBRE DEL ALUMNO</th>
+                                <th>NIE</th>
+                                {encabezados_notas}
+                                <th style="background:#1e3a8a; color:white;">PROMEDIO</th>
+                            </tr>
+                            {filas_html}
+                        </table>
 
-                            promedio = (
-                                fila[
-                                    columnas_notas[0]
-                                ] * 0.25
-                                + fila[
-                                    columnas_notas[1]
-                                ] * 0.25
-                                + fila[
-                                    columnas_notas[2]
-                                ] * 0.10
-                                + fila[
-                                    columnas_notas[3]
-                                ] * 0.10
-                                + fila[
-                                    columnas_notas[4]
-                                ] * 0.30
-                            )
+                        <br><br>
+                        <div style="display:flex; justify-content:space-between; margin-top:60px;">
+                            <div style="width:40%; border-top:1px solid black; text-align:center; font-size:11px;">
+                                <br>Firma del Docente
+                            </div>
+                            <div style="width:40%; border-top:1px solid black; text-align:center; font-size:11px;">
+                                <br>Firma de Coordinación
+                            </div>
+                        </div>
+                    </div>
+                    """
 
-                        promedio_redondeado = (
-                            redondear_mined(
-                                promedio
-                            )
-                        )
-
-                        nie = fila["NIE"]
-
-                        detalles[nie] = {
-                            columna: fila[columna]
-                            for columna
-                            in columnas_notas
-                        }
-
-                        detalles[nie][
-                            "Promedio"
-                        ] = promedio_redondeado
-
-                        ref_nota = (
-                            db.collection("notas")
-                            .document(
-                                f"{nie}_{id_doc}"
-                            )
-                        )
-
-                        batch.set(
-                            ref_nota,
-                            {
-                                "nie": nie,
-                                "ciclo_lectivo": (
-                                    CICLO_LECTIVO
-                                ),
-                                "grado": grado,
-                                "materia": materia,
-                                "mes": mes,
-                                "promedio_final": (
-                                    promedio_redondeado
-                                ),
-                            },
-                        )
-
-                    db.collection(
-                        "notas_mensuales"
-                    ).document(
-                        id_doc
-                    ).set(
-                        {
-                            "ciclo_lectivo": (
-                                CICLO_LECTIVO
-                            ),
-                            "grado": grado,
-                            "materia": materia,
-                            "mes": mes,
-                            "detalles": detalles,
-                        }
+                    components.html(
+                        f"""
+                        <html>
+                        <head>
+                            <style>
+                                @media print {{
+                                    button {{ display:none; }}
+                                    body {{ margin: 0.5cm; }}
+                                }}
+                                body {{ font-family: Arial, sans-serif; }}
+                            </style>
+                        </head>
+                        <body>
+                            {html_cuadro}
+                            <br>
+                            <center>
+                                <button onclick="window.print()" style="
+                                    padding:12px 24px;
+                                    background:#2e7d32;
+                                    color:white;
+                                    border:none;
+                                    border-radius:5px;
+                                    font-size:15px;
+                                    cursor:pointer;
+                                ">
+                                    🖨️ IMPRIMIR / GUARDAR COMO PDF
+                                </button>
+                            </center>
+                        </body>
+                        </html>
+                        """,
+                        height=700,
+                        scrolling=True,
                     )
-
-                    batch.commit()
-
-                    st.success(
-                        "✅ Notas guardadas correctamente."
-                    )
-
-                    time.sleep(1)
-                    st.rerun()
 
     # ========================================================
     # 2. REPORTE ANUAL POR GRADO

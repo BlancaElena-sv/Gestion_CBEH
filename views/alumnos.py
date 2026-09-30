@@ -4,6 +4,8 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+from config import CICLO_LECTIVO
+
 def eliminar_documentos_consulta(query):
     """
     Elimina todos los documentos devueltos
@@ -634,13 +636,16 @@ def mostrar_consulta_alumnos(
                     height=350
                 )
 
-    # ==========================================
+        # ==========================================
     # TAB 3 - BOLETA
     # ==========================================
 
     with tabs[2]:
         st.subheader("Boleta Oficial")
 
+        # Obtener el ciclo del alumno para filtrar correctamente
+        ciclo_actual_alumno = str(a.get("ciclo_lectivo", CICLO_LECTIVO))
+        
         notas = (
             db.collection("notas")
             .where("nie", "==", a["nie"])
@@ -651,13 +656,16 @@ def mostrar_consulta_alumnos(
 
         for doc in notas:
             dd = doc.to_dict()
+            
+            # FILTRO CRÍTICO: Ignorar notas de otros ciclos lectivos
+            if str(dd.get("ciclo_lectivo", "")) != ciclo_actual_alumno:
+                continue
 
             if dd["materia"] not in nm:
                 nm[dd["materia"]] = {}
 
-            nm[dd["materia"]][dd["mes"]] = (
-                dd["promedio_final"]
-            )
+            nm[dd["materia"]][dd["mes"]] = dd["promedio_final"]
+            
 
         filas = []
 

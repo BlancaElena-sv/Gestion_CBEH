@@ -40,25 +40,37 @@ def obtener_credenciales():
     el entorno donde se ejecute EduManager.
     """
 
+    # ----------------------------------------
+    # ENTORNO LOCAL
+    # ----------------------------------------
+
     if os.path.exists("credenciales.json"):
         return credentials.Certificate("credenciales.json")
 
     if os.path.exists("credenciales"):
         return credentials.Certificate("credenciales")
 
-    import json
+    # ----------------------------------------
+    # STREAMLIT CLOUD
+    # ----------------------------------------
 
-    # Para Streamlit Cloud - parsear JSON correctamente
     if "firebase_key" in st.secrets:
-        credenciales_json = st.secrets["firebase_key"]
 
-        # Si es un string, convertirlo a diccionario
-        if isinstance(credenciales_json, str):
-            credenciales_dict = json.loads(credenciales_json)
-        else:
-            credenciales_dict = dict(credenciales_json)
+        credenciales_dict = dict(
+            st.secrets["firebase_key"]
+        )
 
-        return credentials.Certificate(credenciales_dict)
+        # Firebase necesita saltos de línea reales
+        # dentro de la clave privada.
+        if "private_key" in credenciales_dict:
+            credenciales_dict["private_key"] = (
+                credenciales_dict["private_key"]
+                .replace("\\n", "\n")
+            )
+
+        return credentials.Certificate(
+            credenciales_dict
+        )
 
     return None
 

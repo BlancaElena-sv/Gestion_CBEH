@@ -4,6 +4,12 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+from config import(
+    COLEGIO_NOMBRE,
+    SELLO_INSTITUCIONAL,
+    LOGO_INSTITUCIONAL,
+) 
+
 def eliminar_documentos_consulta(query):
     """
     Elimina todos los documentos devueltos
@@ -360,7 +366,7 @@ def mostrar_consulta_alumnos(
                         "Visualizar Recibo",
                         key="btn_visualizar_recibo_alumno"
                     ):
-                        logo = get_base64("logo.png")
+                        logo = get_base64(LOGO_INSTITUCIONAL)
 
                         hi = (
                             f'<img src="{logo}" height="60">'
@@ -384,8 +390,7 @@ def mostrar_consulta_alumnos(
 
                                     <td width="60%" align="center">
                                         <h3 style="margin:0;">
-                                            COLEGIO PROFA. BLANCA ELENA
-                                            DE HERNÁNDEZ
+                                            {COLEGIO_NOMBRE.upper()}
                                         </h3>
 
                                         <p style="
@@ -525,7 +530,7 @@ def mostrar_consulta_alumnos(
                     .strftime("%d/%m/%Y")
                 )
 
-                logo = get_base64("logo.png")
+                logo = get_base64(LOGO_INSTITUCIONAL)
 
                 hi = (
                     f'<img src="{logo}" height="40">'
@@ -548,7 +553,7 @@ def mostrar_consulta_alumnos(
                         justify-content:center;
                     ">
                         {hi}
-                        <b>COLEGIO BLANCA ELENA</b>
+                        <b>{COLEGIO_NOMBRE.upper()}</b>
                     </div>
 
                     <h4 style="
@@ -739,8 +744,8 @@ def mostrar_consulta_alumnos(
                     """
                 )
 
-        logo = get_base64("logo.png")
-        sello = get_base64("sello.png")
+        logo = get_base64(LOGO_INSTITUCIONAL)
+        sello = get_base64(SELLO_INSTITUCIONAL)
 
         hi = (
             f'<img src="{logo}" height="60">'
@@ -770,7 +775,7 @@ def mostrar_consulta_alumnos(
 
                 <div style="margin-left:20px">
                     <h2>
-                        COLEGIO PROFA. BLANCA ELENA
+                        {COLEGIO_NOMBRE.upper()}
                     </h2>
 
                     <h4>

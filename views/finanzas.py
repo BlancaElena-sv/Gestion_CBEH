@@ -6,8 +6,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 from firebase_admin import firestore
 
-from config import TZ_SV, CICLO_LECTIVO
-
+from config import(
+    COLEGIO_NOMBRE,
+    CICLO_LECTIVO,
+    TZ_SV,
+    LOGO_INSTITUCIONAL,
+)
 
 def mostrar_finanzas(
     db,
@@ -157,7 +161,7 @@ def mostrar_corte_caja(
             "🖨️ Imprimir Corte del Día",
             key="fin_imprimir_corte",
         ):
-            logo = get_base64("logo.png")
+            logo = get_base64(LOGO_INSTITUCIONAL)
             hi = f'<img src="{logo}" height="40">' if logo else ""
 
             html_corte = f"""
@@ -170,7 +174,7 @@ def mostrar_corte_caja(
             ">
                 <div style="text-align:center;">
                     {hi}<br>
-                    <b>COLEGIO BLANCA ELENA</b><br>
+                    <b>{COLEGIO_NOMBRE.upper()}</b><br>
                     CORTE DE CAJA
                 </div>
 
@@ -561,7 +565,7 @@ def mostrar_cobros_alumnos(
         if "recibo_temp" in st.session_state:
             r = st.session_state["recibo_temp"]
 
-            logo = get_base64("logo.png")
+            logo = get_base64(LOGO_INSTITUCIONAL)
             hi = (
                 f'<img src="{logo}" height="60">'
                 if logo
@@ -581,7 +585,7 @@ def mostrar_cobros_alumnos(
                         <td width="20%">{hi}</td>
                         <td width="60%" align="center">
                             <h3 style="margin:0;">
-                                COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ
+                                {COLEGIO_NOMBRE.upper()}
                             </h3>
                             <p style="margin:5px;font-size:12px;">
                                 San Felipe, San Bartolo, Ilopango
@@ -843,7 +847,7 @@ def mostrar_gastos(
         if "gasto_temp" in st.session_state:
             r = st.session_state["gasto_temp"]
 
-            logo = get_base64("logo.png")
+            logo = get_base64(LOGO_INSTITUCIONAL)
             hi = (
                 f'<img src="{logo}" height="60">'
                 if logo
@@ -863,7 +867,7 @@ def mostrar_gastos(
                         <td width="20%">{hi}</td>
                         <td width="60%" align="center">
                             <h3 style="margin:0;">
-                                COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ
+                                {COLEGIO_NOMBRE.upper()}
                             </h3>
                             <p style="margin:0;font-size:12px;">
                                 <b>COMPROBANTE DE EGRESO (GASTO)</b>
@@ -1298,7 +1302,7 @@ def mostrar_reportes(
             key="fin_imprimir_reporte",
         ):
             logo = get_base64(
-                "logo.png"
+                LOGO_INSTITUCIONAL
             )
 
             hi = (
@@ -1372,7 +1376,7 @@ def mostrar_reportes(
 
                         <div>
                             <h2 style="margin:0;">
-                                COLEGIO BLANCA ELENA
+                                {COLEGIO_NOMBRE.upper()}
                             </h2>
 
                             <p style="margin:0;">

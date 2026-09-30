@@ -1,7 +1,11 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-from config import CICLO_LECTIVO
+from config import( 
+    COLEGIO_NOMBRE,
+    CICLO_LECTIVO,
+    LOGO_INSTITUCIONAL,
+)
 
 
 def _normalizar_ciclo(valor):
@@ -295,7 +299,7 @@ def mostrar_notas_historicas(
             </tr>
             """
 
-        logo = get_base64("logo.png")
+        logo = get_base64(LOGO_INSTITUCIONAL)
         imagen_logo = f'<img src="{logo}" height="60">' if logo else ""
 
         html = f"""
@@ -347,7 +351,7 @@ def mostrar_notas_historicas(
             <div class="encabezado">
                 {imagen_logo}
                 <div class="titulo">
-                    <h2>COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
+                    <h2>{COLEGIO_NOMBRE.upper()}</h2>
                     <h4>INFORME HISTÓRICO DE RENDIMIENTO ACADÉMICO</h4>
                     <strong>CICLO {ciclo_seleccionado}</strong>
                 </div>

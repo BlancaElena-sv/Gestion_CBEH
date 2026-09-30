@@ -6,8 +6,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 from firebase_admin import firestore
 
-from config import CICLO_LECTIVO
-
+from config import (
+    COLEGIO_NOMBRE, 
+    SELLO_INSTITUCIONAL, 
+    CICLO_LECTIVO,
+    LOGO_INSTITUCIONAL,
+)
 
 def mostrar_panel_docente(
     opcion_seleccionada,
@@ -36,11 +40,11 @@ def mostrar_panel_docente(
             lista = sorted([f"{d.to_dict().get('apellidos', '')} {d.to_dict().get('nombres', '')}" for d in docs])
             if not lista: st.warning("Sin alumnos")
             else:
-                logo = get_base64("logo.png"); hi = f'<img src="{logo}" height="50">' if logo else ""
+                logo = get_base64(LOGO_INSTITUCIONAL); hi = f'<img src="{logo}" height="50">' if logo else ""
                 rows = ""
                 for i, n in enumerate(lista):
                     rows += f"<tr><td>{i+1}</td><td style='text-align:left;padding-left:5px;'>{n}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>"
-                html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>COLEGIO PROFA. BLANCA ELENA</h3><h4>CONTROL DE EVALUACIÓN - {mes_lista.upper()} - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='40%'>NOMBRE</td><td width='8%'>ACT1</td><td width='8%'>ACT2</td><td width='8%'>ALT1</td><td width='8%'>ALT2</td><td width='8%'>EXAM</td><td width='10%'>PROM</td></tr>{rows}</table></div>"""
+                html = f"""<div style='font-family:Arial;font-size:12px;padding:20px;'><div style='display:flex;align-items:center;border-bottom:2px solid black;margin-bottom:10px;'>{hi}<div style='margin-left:15px'><h3>{COLEGIO_NOMBRE.upper()}</h3><h4>CONTROL DE EVALUACIÓN - {mes_lista.upper()} - {g.upper()}</h4></div></div><table border='1' style='width:100%;border-collapse:collapse;text-align:center;'><tr style='background:#eee;font-weight:bold;'><td width='5%'>No.</td><td width='40%'>NOMBRE</td><td width='8%'>ACT1</td><td width='8%'>ACT2</td><td width='8%'>ALT1</td><td width='8%'>ALT2</td><td width='8%'>EXAM</td><td width='10%'>PROM</td></tr>{rows}</table></div>"""
                 components.html(f"""<html><body>{html}<br><button onclick="window.print()">🖨️ IMPRIMIR LISTADO</button><style>@media print{{button{{display:none;}}}}</style></body></html>""", height=600, scrolling=True)
 
     elif opcion_seleccionada == "Tomar Asistencia":
@@ -923,7 +927,7 @@ def mostrar_panel_docente(
         # ==========================================
 
         logo = get_base64(
-            "logo.png"
+            LOGO_INSTITUCIONAL
         )
 
         hi = (
@@ -933,8 +937,8 @@ def mostrar_panel_docente(
         )
 
         sello = get_base64(
-            "sello.png"
-        )
+            SELLO_INSTITUCIONAL
+                )
 
         hs = (
             f'<img src="{sello}" height="80">'
@@ -961,7 +965,7 @@ def mostrar_panel_docente(
                 <div style="margin-left:20px">
 
                     <h2>
-                        COLEGIO PROFA. BLANCA ELENA
+                        {COLEGIO_NOMBRE.upper()}
                     </h2>
 
                     <h4>

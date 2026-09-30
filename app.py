@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 from firebase_admin import firestore
-from firebase_service import (
-    conectar_firebase,
-    subir_archivo,
+from firebase_demo_service import (
+    conectar_firebase_demo as conectar_firebase,
+    subir_archivo_demo as subir_archivo,
 )
 from datetime import datetime, date, timedelta
 import base64
@@ -12,7 +12,13 @@ import os
 import streamlit.components.v1 as components
 import re
 
-from config import APP_NAME, COLEGIO_NOMBRE, CICLO_LECTIVO, TZ_SV
+from config import(
+    APP_NAME,
+    COLEGIO_NOMBRE,
+    CICLO_LECTIVO,
+    TZ_SV,
+    LOGO_INSTITUCIONAL,
+)
 from utils import get_base64, redondear_mined
 from auth import generar_hash, verificar_password
 from styles import aplicar_estilos
@@ -90,7 +96,7 @@ def login():
             sc1, sc2, sc3 = st.columns([1, 1, 1])
 
             with sc2:
-                st.image("logo.png", use_container_width=True)
+                st.image(LOGO_INSTITUCIONAL, use_container_width=True)
 
         except Exception:
             st.warning("⚠️")
@@ -101,9 +107,11 @@ def login():
         )
 
         st.markdown(
-            "<h4 style='text-align: center; color: #555;'>"
-            "Colegio Profa. Blanca Elena de Hernández"
-            "</h4>",
+            f"""
+            <h4 style='text-align: center; color: #555;'>
+            {COLEGIO_NOMBRE}
+            </h4>
+            """, 
             unsafe_allow_html=True
         )
 
@@ -218,7 +226,7 @@ def login():
         st.markdown(
             "<div style='text-align: center; color: grey; "
             "font-size: 11px; margin-top: 40px;'>"
-            "<p>© 2026 David Fuentes Development | "
+            "<p>© 2026 It solutions El Salvador | "
             "Todos los derechos reservados.</p>"
             "</div>",
             unsafe_allow_html=True

@@ -1,5 +1,7 @@
 import streamlit as st
 
+from config import LOGO_INSTITUCIONAL
+
 def mostrar_sidebar(nombre_usuario, rol_usuario):
     """
     Sidebar principal de EduManager.
@@ -19,7 +21,7 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
         # IDENTIDAD
         # ==========================================
         try:
-            st.image("logo.png", width=85)
+            st.image(LOGO_INSTITUCIONAL, width=85)
         except Exception:
             pass
 
@@ -211,6 +213,6 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
         ):
             return "__logout__"
 
-        st.caption("©David Fuentes - EduManager · Ciclo 2026")
+        st.caption("©It solutions El Salvador - EduManager · Ciclo 2026")
 
     return st.session_state["menu_actual"]

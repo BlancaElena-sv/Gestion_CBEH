@@ -5,7 +5,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 from views.notas_historicas import mostrar_notas_historicas
 
-from config import CICLO_LECTIVO
+from config import(
+    COLEGIO_NOMBRE,
+    CICLO_LECTIVO, 
+    LOGO_INSTITUCIONAL,
+)
 
 
 def mostrar_notas(
@@ -691,7 +695,7 @@ def mostrar_notas(
                             """
 
                     logo = get_base64(
-                        "logo.png"
+                        LOGO_INSTITUCIONAL
                     )
 
                     imagen_logo = (
@@ -714,8 +718,7 @@ def mostrar_notas(
                             {imagen_logo}
 
                             <h2>
-                                COLEGIO PROFA. BLANCA ELENA
-                                DE HERNÁNDEZ
+                                {COLEGIO_NOMBRE.upper()}
                             </h2>
 
                             <h3>
@@ -1007,7 +1010,7 @@ def mostrar_notas(
                 # --------------------------------------------
 
                 logo_b64 = get_base64(
-                    "logo.png"
+                    LOGO_INSTITUCIONAL
                 )
 
                 imagen_logo = (
@@ -1154,8 +1157,7 @@ def mostrar_notas(
                                     margin:0;
                                     font-size:16px;
                                 ">
-                                    COLEGIO PROFA. BLANCA ELENA
-                                    DE HERNÁNDEZ
+                                    {COLEGIO_NOMBRE.upper()}
                                 </h2>
 
                                 <h4 style="

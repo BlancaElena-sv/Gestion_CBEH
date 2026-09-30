@@ -46,10 +46,19 @@ def obtener_credenciales():
     if os.path.exists("credenciales"):
         return credentials.Certificate("credenciales")
 
+    import json
+
+    # Para Streamlit Cloud - parsear JSON correctamente
     if "firebase_key" in st.secrets:
-        return credentials.Certificate(
-            dict(st.secrets["firebase_key"])
-        )
+        credenciales_json = st.secrets["firebase_key"]
+
+        # Si es un string, convertirlo a diccionario
+        if isinstance(credenciales_json, str):
+            credenciales_dict = json.loads(credenciales_json)
+        else:
+            credenciales_dict = dict(credenciales_json)
+
+        return credentials.Certificate(credenciales_dict)
 
     return None
 

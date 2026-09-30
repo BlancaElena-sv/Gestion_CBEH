@@ -135,7 +135,7 @@ def mostrar_notas(
                 )
 
                 # ============================================
-                # IDENTIFICADOR POR CICLO
+                # IDENTIFICADOR POR CICLO (CORREGIDO)
                 # ============================================
 
                 id_base = (
@@ -147,20 +147,14 @@ def mostrar_notas(
                     f"{CICLO_LECTIVO}_{id_base}"
                 )
 
-                # Compatibilidad con documentos 2026 antiguos
-                id_legacy = id_base
-
                 doc_nuevo = (
                     db.collection("notas_mensuales")
                     .document(id_nuevo)
                     .get()
                 )
 
-                if doc_nuevo.exists:
-                    id_doc = id_nuevo
-                    doc_ref = doc_nuevo
-
-                elif CICLO_LECTIVO == 2026:
+                if CICLO_LECTIVO == 2026:
+                    id_legacy = id_base
                     doc_antiguo = (
                         db.collection(
                             "notas_mensuales"

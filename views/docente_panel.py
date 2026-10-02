@@ -418,6 +418,141 @@ def mostrar_panel_docente(
             time.sleep(1)
             st.rerun()
 
+        # ======================================================
+        # RESPALDO DEL CUADRO DE NOTAS (PDF)
+        # ======================================================
+        st.markdown("---")
+        st.markdown("### 🖨️ Respaldo del Cuadro de Notas")
+
+        if st.button(
+            "📄 Generar PDF del Cuadro de este Mes",
+            key="doc_pdf_cuadro_mes",
+        ):
+            logo_b64 = get_base64("logo.png")
+            imagen_logo = (
+                f'<img src="{logo_b64}" height="50">'
+                if logo_b64
+                else ""
+            )
+            fecha_impresion = time.strftime("%d/%m/%Y %H:%M")
+
+            df_impresion = editor.copy()
+
+            if materia == "Conducta":
+                df_impresion["Promedio"] = df_impresion[
+                    columnas_notas[0]
+                ]
+            else:
+                df_impresion["Promedio"] = (
+                    df_impresion["Act1 (25%)"] * 0.25
+                    + df_impresion["Act2 (25%)"] * 0.25
+                    + df_impresion["Alt1 (10%)"] * 0.10
+                    + df_impresion["Alt2 (10%)"] * 0.10
+                    + df_impresion["Examen (30%)"] * 0.30
+                ).apply(redondear_mined)
+
+            filas_html = ""
+            for _, fila in df_impresion.iterrows():
+                celdas_notas = ""
+                for col in columnas_notas:
+                    celdas_notas += f"<td>{fila[col]}</td>"
+                filas_html += f"""
+                <tr>
+                    <td style="text-align:left; padding-left:5px;">
+                        {fila['Nombre']}
+                    </td>
+                    <td>{fila['NIE']}</td>
+                    {celdas_notas}
+                    <td style="background:#1e3a8a; color:white; font-weight:bold;">
+                        {fila['Promedio']}
+                    </td>
+                </tr>
+                """
+
+            encabezados_notas = "".join(
+                [f"<th>{col}</th>" for col in columnas_notas]
+            )
+
+            html_cuadro = f"""
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+                <div style="display:flex; align-items:center; border-bottom:2px solid #333; margin-bottom:15px;">
+                    {imagen_logo}
+                    <div style="margin-left:20px;">
+                        <h2 style="margin:0;">COLEGIO PROFA. BLANCA ELENA DE HERNÁNDEZ</h2>
+                        <h4 style="margin:5px 0 0 0; color:#555;">CUADRO DE NOTAS MENSUAL - CICLO {CICLO_LECTIVO}</h4>
+                    </div>
+                </div>
+
+                <table style="width:100%; font-size:12px; margin-bottom:15px;">
+                    <tr>
+                        <td><b>GRADO:</b> {grado}</td>
+                        <td><b>ASIGNATURA:</b> {materia}</td>
+                        <td><b>MES:</b> {mes}</td>
+                    </tr>
+                    <tr>
+                        <td><b>TOTAL ALUMNOS:</b> {len(df_impresion)}</td>
+                        <td><b>FECHA DE IMPRESIÓN:</b> {fecha_impresion}</td>
+                        <td></td>
+                    </tr>
+                </table>
+
+                <table border="1" style="width:100%; border-collapse:collapse; text-align:center; font-size:11px;">
+                    <tr style="background:#f2f2f2; font-weight:bold;">
+                        <th style="text-align:left; padding-left:5px;">NOMBRE DEL ALUMNO</th>
+                        <th>NIE</th>
+                        {encabezados_notas}
+                        <th style="background:#1e3a8a; color:white;">PROMEDIO</th>
+                    </tr>
+                    {filas_html}
+                </table>
+
+                <br><br>
+                <div style="display:flex; justify-content:space-between; margin-top:60px;">
+                    <div style="width:40%; border-top:1px solid black; text-align:center; font-size:11px;">
+                        <br>Firma del Docente
+                    </div>
+                    <div style="width:40%; border-top:1px solid black; text-align:center; font-size:11px;">
+                        <br>Firma de Coordinación
+                    </div>
+                </div>
+            </div>
+            """
+
+            components.html(
+                f"""
+                <html>
+                <head>
+                    <style>
+                        @media print {{
+                            button {{ display:none; }}
+                            body {{ margin: 0.5cm; }}
+                        }}
+                        body {{ font-family: Arial, sans-serif; }}
+                    </style>
+                </head>
+                <body>
+                    {html_cuadro}
+                    <br>
+                    <center>
+                        <button onclick="window.print()" style="
+                            padding:12px 24px;
+                            background:#2e7d32;
+                            color:white;
+                            border:none;
+                            border-radius:5px;
+                            font-size:15px;
+                            cursor:pointer;
+                        ">
+                            🖨️ IMPRIMIR / GUARDAR COMO PDF
+                        </button>
+                    </center>
+                </body>
+                </html>
+                """,
+                height=700,
+                scrolling=True,
+            )
+
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")
         cargas = (
@@ -862,243 +997,9 @@ def mostrar_panel_docente(
                             <b>{t3}</b>
                         </td>
 
-                        <td style='
-                            background:#333;
-                            color:white;
-                        '>
+                        <td style='background:#d9edf7'>
                             <b>{fin}</b>
                         </td>
-
                     </tr>
                     """
                 )
-
-            else:
-
-                filas.append(
-                    f"""
-                    <tr>
-
-                        <td style='text-align:left'>
-                            {mat}
-                        </td>
-
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-
-                        <td style='background:#eee'>
-                            <b>0.0</b>
-                        </td>
-
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-
-                        <td style='background:#eee'>
-                            <b>0.0</b>
-                        </td>
-
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-
-                        <td style='background:#eee'>
-                            <b>0.0</b>
-                        </td>
-
-                        <td style='
-                            background:#333;
-                            color:white;
-                        '>
-                            <b>0.0</b>
-                        </td>
-
-                    </tr>
-                    """
-                )
-
-        # ==========================================
-        # BOLETA
-        # ==========================================
-
-        logo = get_base64(
-            "logo.png"
-        )
-
-        hi = (
-            f'<img src="{logo}" height="60">'
-            if logo
-            else ""
-        )
-
-        sello = get_base64(
-            "sello.png"
-        )
-
-        hs = (
-            f'<img src="{sello}" height="80">'
-            if sello
-            else ""
-        )
-
-        html = f"""
-        <div style="
-            font-family:Arial;
-            font-size:12px;
-            padding:20px;
-        ">
-
-            <div style="
-                display:flex;
-                align-items:center;
-                border-bottom:2px solid black;
-                margin-bottom:10px;
-            ">
-
-                {hi}
-
-                <div style="margin-left:20px">
-
-                    <h2>
-                        COLEGIO PROFA. BLANCA ELENA
-                    </h2>
-
-                    <h4>
-                        INFORME DE NOTAS
-                        - CICLO {CICLO_LECTIVO}
-                    </h4>
-
-                </div>
-
-            </div>
-
-            <p>
-                <b>Alumno:</b>
-                {nombre_alum}
-
-                |
-
-                <b>Grado:</b>
-                {grado_sel}
-
-                |
-
-                <b>Guía:</b>
-                {maestro_guia}
-            </p>
-
-            <table
-                border='1'
-                style='
-                    width:100%;
-                    border-collapse:collapse;
-                    text-align:center;
-                '
-            >
-
-                <tr style='
-                    background:#ddd;
-                    font-weight:bold;
-                '>
-
-                    <td>ASIGNATURA</td>
-
-                    <td>F</td>
-                    <td>M</td>
-                    <td>A</td>
-                    <td>T1</td>
-
-                    <td>M</td>
-                    <td>J</td>
-                    <td>J</td>
-                    <td>T2</td>
-
-                    <td>A</td>
-                    <td>S</td>
-                    <td>O</td>
-                    <td>T3</td>
-
-                    <td>FIN</td>
-
-                </tr>
-
-                {"".join(filas)}
-
-            </table>
-
-            <br><br><br>
-
-            <div style='
-                display:flex;
-                justify-content:space-between;
-                align-items:end;
-                padding:0 50px;
-            '>
-
-                <div style='
-                    text-align:center;
-                    width:30%;
-                '>
-
-                    <div style='
-                        border-top:1px solid black;
-                        width:100%;
-                    '>
-                        Orientador
-                    </div>
-
-                </div>
-
-                <div style='text-align:center;'>
-                    {hs}
-                </div>
-
-                <div style='
-                    text-align:center;
-                    width:30%;
-                '>
-
-                    <div style='
-                        border-top:1px solid black;
-                        width:100%;
-                    '>
-                        Dirección
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-        """
-
-        components.html(
-            f"""
-            <html>
-                <body>
-
-                    {html}
-
-                    <br>
-
-                    <button
-                        onclick="window.print()"
-                    >
-                        🖨️ IMPRIMIR BOLETA
-                    </button>
-
-                    <style>
-                        @media print {{
-                            button {{
-                                display:none;
-                            }}
-                        }}
-                    </style>
-
-                </body>
-            </html>
-            """,
-            height=600,
-            scrolling=True
-        )

@@ -1,5 +1,6 @@
 import random
 import sys
+from abc import ABC
 from datetime import datetime, timedelta
 
 from firebase_admin import firestore
@@ -12,6 +13,78 @@ from academic_config import (
 )
 from auth import generar_hash
 from firebase_demo_service import conectar_firebase_demo
+
+
+class _(ABC):
+    """Wrapper útil para ejecutar la DEMO de EduManager."""
+
+    def __init__(self, db=None):
+        self.db = db
+
+    def conectar(self):
+        if self.db is None:
+            self.db, _ = conectar_firebase_demo()
+        return self.db
+
+    def validar(self):
+        self.conectar()
+        confirmar_entorno(self.db)
+        return self.db
+
+    def crear(self):
+        self.validar()
+
+        print()
+        print("Creando EduManager DEMO...")
+        print()
+
+        crear_configuracion(self.db)
+        crear_usuarios(self.db)
+        crear_docentes(self.db)
+
+        alumnos = crear_alumnos(self.db)
+        crear_carga_academica(self.db)
+        crear_notas(self.db, alumnos)
+        crear_asistencia(self.db, alumnos)
+        crear_finanzas(self.db, alumnos)
+        crear_bitacora(self.db, alumnos)
+
+        return alumnos
+
+    def ejecutar(self):
+        alumnos = self.crear()
+
+        print()
+        print("=" * 65)
+        print("EDUMANAGER DEMO CREADO CORRECTAMENTE")
+        print("=" * 65)
+        print(f"Institución : {NOMBRE_INSTITUCION}")
+        print(f"Ciclo       : {CICLO}")
+        print(f"Proyecto    : {self.db.project}")
+        print()
+        print("Usuario administrador:")
+        print("  admin.demo")
+        print("  Demo2027!")
+        print()
+        print("Usuario docente:")
+        print("  docente.demo")
+        print("  Demo2027!")
+        print()
+        print(
+            "Todos los nombres, teléfonos, NIE y "
+            "movimientos son ficticios."
+        )
+        print("=" * 65)
+
+        return {
+            "db": self.db,
+            "alumnos": alumnos,
+            "institucion": NOMBRE_INSTITUCION,
+            "ciclo": CICLO,
+        }
+
+    def __call__(self):
+        return self.ejecutar()
 
 
 # ============================================================
@@ -855,7 +928,7 @@ def crear_bitacora(db, alumnos):
 
 def main():
 
-    db = conectar_firebase_demo()
+    db, _ = conectar_firebase_demo()
 
     confirmar_entorno(db)
 

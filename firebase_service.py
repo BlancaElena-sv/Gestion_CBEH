@@ -4,12 +4,14 @@ import firebase_admin
 
 from firebase_admin import credentials, firestore, storage
 
+from config import FIREBASE_PROJECT_ID
+
 
 @st.cache_resource
 def conectar_firebase():
     """
-    Inicializa Firebase Admin SDK y devuelve
-    una conexión a Firestore.
+    Inicializa Firebase Admin SDK para PRODUCCIÓN
+    y devuelve una conexión a Firestore.
     """
 
     try:
@@ -22,7 +24,7 @@ def conectar_firebase():
             firebase_admin.initialize_app(
                 cred,
                 {
-                    "storageBucket": "gestioncbeh.firebasestorage.app"
+                    "storageBucket": f"{FIREBASE_PROJECT_ID}.firebasestorage.app"
                 }
             )
 
@@ -36,8 +38,7 @@ def conectar_firebase():
 
 def obtener_credenciales():
     """
-    Busca las credenciales de Firebase según
-    el entorno donde se ejecute EduManager.
+    Busca las credenciales de Firebase para PRODUCCIÓN.
     """
 
     if os.path.exists("credenciales.json"):
@@ -47,9 +48,12 @@ def obtener_credenciales():
         return credentials.Certificate("credenciales")
 
     if "firebase_key" in st.secrets:
-        return credentials.Certificate(
-            dict(st.secrets["firebase_key"])
-        )
+        credenciales_dict = dict(st.secrets["firebase_key"])
+        if "private_key" in credenciales_dict:
+            credenciales_dict["private_key"] = (
+                credenciales_dict["private_key"].replace("\\n", "\n")
+            )
+        return credentials.Certificate(credenciales_dict)
 
     return None
 

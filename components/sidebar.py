@@ -1,6 +1,7 @@
 import streamlit as st
 
-from config import LOGO_INSTITUCIONAL
+from config import COLEGIO_NOMBRE, LOGO_INSTITUCIONAL
+
 
 def mostrar_sidebar(nombre_usuario, rol_usuario):
     """
@@ -25,7 +26,7 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
         except Exception:
             pass
 
-        st.markdown("### EduManager")
+        st.markdown(f"### {COLEGIO_NOMBRE}")
         st.caption("Gestión Académica Institucional")
 
         st.markdown(

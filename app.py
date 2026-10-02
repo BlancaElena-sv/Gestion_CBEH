@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 from firebase_admin import firestore
-from firebase_demo_service import (
-    conectar_firebase_demo as conectar_firebase,
-    subir_archivo_demo as subir_archivo,
+from firebase_selector import (
+    conectar_firebase,
+    subir_archivo,
 )
 from datetime import datetime, date, timedelta
 import base64

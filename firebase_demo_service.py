@@ -22,27 +22,64 @@ def conectar_firebase_demo():
     Conecta exclusivamente con el proyecto Firebase
     utilizado para EduManager DEMO.
 
-    Por seguridad, verifica que las credenciales pertenezcan
-    exactamente al proyecto edumanager-demo.
+    Fuentes de credenciales (en orden de prioridad):
+    1. Archivo local 'credenciales_demo.json' (desarrollo)
+    2. Secrets de Streamlit Cloud, sección [firebase_demo] (producción)
     """
 
     # --------------------------------------------------------
-    # 1. Verificar que exista el archivo de credenciales DEMO
+    # 1. Intentar con archivo local
     # --------------------------------------------------------
 
-    if not os.path.exists(ARCHIVO_CREDENCIALES):
+    cred = None
+
+    if os.path.exists(ARCHIVO_CREDENCIALES):
+        cred = credentials.Certificate(ARCHIVO_CREDENCIALES)
+
+    # --------------------------------------------------------
+    # 2. Si no hay archivo, intentar con Secrets de Streamlit
+    # --------------------------------------------------------
+
+    elif "firebase_demo" in st.secrets:
+        credenciales_dict = dict(st.secrets["firebase_demo"])
+
+        # Firebase necesita saltos de línea reales en private_key
+        if "private_key" in credenciales_dict:
+            credenciales_dict["private_key"] = (
+                credenciales_dict["private_key"].replace("\\n", "\n")
+            )
+
+        cred = credentials.Certificate(credenciales_dict)
+
+    # --------------------------------------------------------
+    # 3. Si no hay ni archivo ni secrets, error claro
+    # --------------------------------------------------------
+
+    else:
         raise FileNotFoundError(
-            f"No se encontró {ARCHIVO_CREDENCIALES}.\n"
-            "No se puede iniciar la conexión DEMO."
+            "No se encontraron credenciales para la DEMO.\n"
+            "En local: agrega credenciales_demo.json en la raíz.\n"
+            "En Streamlit Cloud: agrega la sección [firebase_demo] "
+            "en los Secrets de la app."
         )
 
     # --------------------------------------------------------
-    # 2. Leer credenciales
+    # 4. Validar que sea el proyecto DEMO
     # --------------------------------------------------------
 
-    cred = credentials.Certificate(ARCHIVO_CREDENCIALES)
-
     project_id = cred.project_id
+
+    if project_id != PROJECT_ID_DEMO:
+        raise RuntimeError(
+            "\n"
+            "====================================================\n"
+            "OPERACIÓN CANCELADA POR SEGURIDAD\n"
+            "====================================================\n"
+            f"Proyecto detectado: {project_id}\n"
+            f"Proyecto permitido: {PROJECT_ID_DEMO}\n\n"
+            "Las credenciales NO pertenecen a EduManager DEMO.\n"
+            "===================================================="
+        )
 
     # --------------------------------------------------------
     # 3. PROTECCIÓN CRÍTICA

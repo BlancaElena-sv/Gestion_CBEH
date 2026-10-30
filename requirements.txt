@@ -1,6 +1,8 @@
 streamlit
-firebase-admin
+supabase
 pandas
 openpyxl
 pytz
 bcrypt
+Pillow
+requests

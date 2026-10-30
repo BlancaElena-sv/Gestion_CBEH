@@ -1,8 +1,8 @@
+import json
 import time
 
 import pandas as pd
 import streamlit as st
-
 
 MAPA_PROMOCION = {
     "Kinder 4": "Kinder 5",
@@ -26,128 +26,73 @@ def mostrar_promocion(
     ciclo_origen=2026,
     ciclo_destino=2027,
 ):
-
-    st.title(
-        "🎓 Promoción y Cierre de Ciclo"
-    )
-
+    st.title("🎓 Promoción y Cierre de Ciclo")
     st.info(
-        f"Proceso de cierre académico {ciclo_origen} "
-        f"y apertura del ciclo {ciclo_destino}."
+        f"Proceso de cierre académico {ciclo_origen} y apertura del ciclo {ciclo_destino}."
     )
 
     c1, c2 = st.columns(2)
-
-    c1.metric(
-        "Ciclo origen",
-        ciclo_origen,
-    )
-
-    c2.metric(
-        "Ciclo destino",
-        ciclo_destino,
-    )
+    c1.metric("Ciclo origen", ciclo_origen)
+    c2.metric("Ciclo destino", ciclo_destino)
 
     # ==================================================
     # SELECCIÓN DEL GRADO
     # ==================================================
-
-    grados_disponibles = list(
-        MAPA_PROMOCION.keys()
-    )
-
-    grado_origen = st.selectbox(
-        "Grado a procesar",
-        grados_disponibles,
-    )
-
-    grado_destino = MAPA_PROMOCION[
-        grado_origen
-    ]
+    grados_disponibles = list(MAPA_PROMOCION.keys())
+    grado_origen = st.selectbox("Grado a procesar", grados_disponibles)
+    grado_destino = MAPA_PROMOCION[grado_origen]
 
     if grado_destino == "Graduado":
-
         st.warning(
-            "En Noveno Grado, los alumnos promovidos "
-            "serán marcados como GRADUADOS. "
-            "Los no promovidos permanecerán en "
-            f"Noveno Grado para el ciclo {ciclo_destino}."
+            "En Noveno Grado, los alumnos promovidos serán marcados como GRADUADOS. "
+            f"Los no promovidos permanecerán en Noveno Grado para el ciclo {ciclo_destino}."
         )
-
     else:
-
         st.success(
-            f"Promoción automática: "
-            f"{grado_origen} → "
-            f"{grado_destino} · "
-            f"Ciclo {ciclo_destino}"
+            f"Promoción automática: {grado_origen} → {grado_destino} · Ciclo {ciclo_destino}"
         )
 
     # ==================================================
-    # CARGAR ALUMNOS
+    # CARGAR ALUMNOS (SUPABASE)
     # ==================================================
-
-    alumnos_docs = (
-        db.collection("alumnos")
-        .where(
-            "grado_actual",
-            "==",
-            grado_origen
-        )
-        .where(
-            "estado",
-            "==",
-            "Activo"
-        )
-        .stream()
+    res_alumnos = (
+        db.table("alumnos")
+        .select("*")
+        .eq("grado_actual", grado_origen)
+        .eq("estado", "Activo")
+        .execute()
     )
+    alumnos_docs = res_alumnos.data if res_alumnos.data else []
 
     alumnos = []
 
-    for doc in alumnos_docs:
-
-        data = doc.to_dict()
-
-        # ----------------------------------------------
+    for data in alumnos_docs:
         # Solo alumnos pertenecientes al ciclo origen
-        # ----------------------------------------------
-
-        ciclo_alumno = data.get(
-            "ciclo_lectivo",
-            ciclo_origen
-        )
-
+        ciclo_alumno = data.get("ciclo_lectivo", ciclo_origen)
         try:
-            ciclo_alumno = int(
-                ciclo_alumno
-            )
+            if int(ciclo_alumno) != ciclo_origen:
+                continue
         except (TypeError, ValueError):
-            pass
-
-        if ciclo_alumno != ciclo_origen:
             continue
 
-        # ----------------------------------------------
         # Evitar procesamiento duplicado
-        # ----------------------------------------------
+        # 1. Obtener el historial de forma segura
+        historial = data.get("historial_academico")
 
-        historial = data.get(
-            "historial_academico",
-            []
-        )
+        # 2. Si es None (nulo) o no es lista, lo inicializamos vacío
+        if historial is None:
+            historial = []
+        elif isinstance(historial, str):
+            try:
+                historial = json.loads(historial)
+                if not isinstance(historial, list):
+                    historial = []
+            except:
+                historial = []
 
         ya_procesado = any(
-
-            registro.get("ciclo")
-            == ciclo_origen
-
-            and registro.get("resultado")
-            in [
-                "Promovido",
-                "No promovido",
-                "Graduado",
-            ]
-
+            registro.get("ciclo") == ciclo_origen
+            and registro.get("resultado") in ["Promovido", "No promovido", "Graduado"]
             for registro in historial
         )
 
@@ -156,53 +101,26 @@ def mostrar_promocion(
 
         alumnos.append(
             {
-                "id": doc.id,
-
-                "NIE": str(
-                    data.get(
-                        "nie",
-                        doc.id
-                    )
-                ),
-
-                "Alumno": (
-                    f"{data.get('apellidos', '')} "
-                    f"{data.get('nombres', '')}"
-                ).strip(),
-
+                "id": data.get("nie"),  # En Supabase el ID es el campo 'id'
+                "NIE": str(data.get("nie", "")),
+                "Alumno": f"{data.get('apellidos', '')} {data.get('nombres', '')}".strip(),
                 "Resultado": "Promover",
-
                 "data": data,
             }
         )
 
-    alumnos.sort(
-        key=lambda x: x["Alumno"]
-    )
+    alumnos.sort(key=lambda x: x["Alumno"])
 
     if not alumnos:
-
-        st.warning(
-            "No hay alumnos pendientes de procesar "
-            "en este grado."
-        )
-
+        st.warning("No hay alumnos pendientes de procesar en este grado.")
         return
 
-    st.write(
-        f"**Alumnos pendientes:** "
-        f"{len(alumnos)}"
-    )
-
-    st.caption(
-        "Seleccione el resultado de cierre "
-        "para cada alumno."
-    )
+    st.write(f"**Alumnos pendientes:** {len(alumnos)}")
+    st.caption("Seleccione el resultado de cierre para cada alumno.")
 
     # ==================================================
     # TABLA DE RESULTADOS
     # ==================================================
-
     df = pd.DataFrame(
         [
             {
@@ -219,526 +137,229 @@ def mostrar_promocion(
         hide_index=True,
         width="stretch",
         column_config={
-            "NIE": (
-                st.column_config.TextColumn(
-                    "NIE",
-                    disabled=True,
-                )
+            "NIE": st.column_config.TextColumn("NIE", disabled=True),
+            "Alumno": st.column_config.TextColumn(
+                "Alumno", disabled=True, width="large"
             ),
-
-            "Alumno": (
-                st.column_config.TextColumn(
-                    "Alumno",
-                    disabled=True,
-                    width="large",
-                )
-            ),
-
-            "Resultado": (
-                st.column_config.SelectboxColumn(
-                    "Resultado",
-                    options=[
-                        "Promover",
-                        "No promovido",
-                        "No procesar",
-                    ],
-                    required=True,
-                )
+            "Resultado": st.column_config.SelectboxColumn(
+                "Resultado",
+                options=["Promover", "No promovido", "No procesar"],
+                required=True,
             ),
         },
-        key=(
-            f"editor_promocion_"
-            f"{grado_origen}_"
-            f"{ciclo_origen}"
-        ),
+        key=f"editor_promocion_{grado_origen}_{ciclo_origen}",
     )
 
     # ==================================================
     # RESUMEN
     # ==================================================
-
-    cantidad_promover = len(
-        editor[
-            editor["Resultado"]
-            == "Promover"
-        ]
-    )
-
-    cantidad_repetir = len(
-        editor[
-            editor["Resultado"]
-            == "No promovido"
-        ]
-    )
-
-    cantidad_ignorar = len(
-        editor[
-            editor["Resultado"]
-            == "No procesar"
-        ]
-    )
+    cantidad_promover = len(editor[editor["Resultado"] == "Promover"])
+    cantidad_repetir = len(editor[editor["Resultado"] == "No promovido"])
+    cantidad_ignorar = len(editor[editor["Resultado"] == "No procesar"])
 
     st.divider()
-
     r1, r2, r3 = st.columns(3)
+    r1.metric("✅ Promover", cantidad_promover)
+    r2.metric("🔁 No promovidos", cantidad_repetir)
+    r3.metric("⏸️ No procesar", cantidad_ignorar)
 
-    r1.metric(
-        "✅ Promover",
-        cantidad_promover,
-    )
-
-    r2.metric(
-        "🔁 No promovidos",
-        cantidad_repetir,
-    )
-
-    r3.metric(
-        "⏸️ No procesar",
-        cantidad_ignorar,
-    )
-
-    if (
-        cantidad_promover
-        + cantidad_repetir
-        == 0
-    ):
-
-        st.warning(
-            "No hay alumnos seleccionados "
-            "para procesar."
-        )
-
+    if cantidad_promover + cantidad_repetir == 0:
+        st.warning("No hay alumnos seleccionados para procesar.")
         return
 
     # ==================================================
-    # ADVERTENCIAS
+    # ADVERTENCIAS Y CONFIRMACIÓN
     # ==================================================
-
     if grado_destino == "Graduado":
-
         st.warning(
-            f"Los alumnos marcados como Promover "
-            f"serán graduados. Los marcados como "
-            f"No promovido permanecerán en "
-            f"Noveno Grado para {ciclo_destino}."
+            f"Los alumnos marcados como Promover serán graduados. Los marcados como No promovido permanecerán en Noveno Grado para {ciclo_destino}."
         )
-
     else:
-
         st.info(
-            f"Los promovidos pasarán a "
-            f"{grado_destino}. "
-            f"Los no promovidos permanecerán "
-            f"en {grado_origen}. "
-            f"Todos iniciarán el ciclo "
-            f"{ciclo_destino}."
+            f"Los promovidos pasarán a {grado_destino}. Los no promovidos permanecerán en {grado_origen}. Todos iniciarán el ciclo {ciclo_destino}."
         )
 
-    # ==================================================
-    # CONFIRMACIÓN
-    # ==================================================
+    confirmacion = st.text_input("Para confirmar escriba: PROMOVER")
+    confirmar = st.checkbox("Confirmo que revisé los resultados de todos los alumnos.")
 
-    confirmacion = st.text_input(
-        "Para confirmar escriba: PROMOVER"
-    )
-
-    confirmar = st.checkbox(
-        "Confirmo que revisé los resultados "
-        "de todos los alumnos."
-    )
-
-    if not st.button(
-        "🎓 EJECUTAR CIERRE DE CICLO",
-        type="primary",
-        width="stretch",
-    ):
+    if not st.button("🎓 EJECUTAR CIERRE DE CICLO", type="primary", width="stretch"):
         return
 
-    if (
-        confirmacion
-        .strip()
-        .upper()
-        != "PROMOVER"
-    ):
-
-        st.error(
-            "Debe escribir PROMOVER "
-            "para confirmar."
-        )
-
+    if confirmacion.strip().upper() != "PROMOVER":
+        st.error("Debe escribir PROMOVER para confirmar.")
         return
 
     if not confirmar:
-
-        st.error(
-            "Debe marcar la casilla "
-            "de confirmación."
-        )
-
+        st.error("Debe marcar la casilla de confirmación.")
         return
 
     # ==================================================
     # PROCESAMIENTO
     # ==================================================
-
     promovidos = 0
     no_promovidos = 0
     graduados = 0
     errores = []
 
-    fecha = (
-        obtener_fecha_hoy()
-        .strftime("%d/%m/%Y")
-    )
-
-    usuario = (
-        st.session_state.get(
-            "user_name",
-            "Administrador",
-        )
-    )
+    fecha = obtener_fecha_hoy().strftime("%d/%m/%Y")
+    usuario = st.session_state.get("user_name", "Administrador")
 
     # Mapa rápido por NIE
-    mapa_alumnos = {
-        alumno["NIE"]: alumno
-        for alumno in alumnos
-    }
+    mapa_alumnos = {alumno["NIE"]: alumno for alumno in alumnos}
 
-    with st.spinner(
-        "Procesando cierre de ciclo..."
-    ):
-
+    with st.spinner("Procesando cierre de ciclo..."):
         for _, fila in editor.iterrows():
-
-            resultado = fila[
-                "Resultado"
-            ]
-
+            resultado = fila["Resultado"]
             if resultado == "No procesar":
                 continue
 
-            nie = str(
-                fila["NIE"]
-            )
-
-            alumno = mapa_alumnos.get(
-                nie
-            )
+            nie = str(fila["NIE"])
+            alumno = mapa_alumnos.get(nie)
 
             if not alumno:
-
-                errores.append(
-                    f"{nie}: alumno no encontrado."
-                )
-
+                errores.append(f"{nie}: alumno no encontrado.")
                 continue
 
             data = alumno["data"]
             documento_id = alumno["id"]
 
             try:
+                # Cargar historial existente
+                historial = data.get("historial_academico")
+                if historial is None:
+                    historial = []
+                elif isinstance(historial, str):
+                    try:
+                        historial = json.loads(historial)
+                    except:
+                        historial = []
+                if not isinstance(historial, list):
+                    historial = list(historial)
+                    historial = []
 
-                historial = list(
-                    data.get(
-                        "historial_academico",
-                        []
-                    )
-                )
-
-                turno_actual = data.get(
-                    "turno",
-                    "Matutino"
-                )
+                turno_actual = data.get("turno", "Matutino")
 
                 # ======================================
                 # NO PROMOVIDO
                 # ======================================
-
                 if resultado == "No promovido":
-
                     historial.append(
                         {
                             "ciclo": ciclo_origen,
                             "grado": grado_origen,
-                            "resultado": (
-                                "No promovido"
-                            ),
-                            "grado_destino": (
-                                grado_origen
-                            ),
-                            "ciclo_destino": (
-                                ciclo_destino
-                            ),
-                            "turno_origen": (
-                                turno_actual
-                            ),
-                            "turno_destino": (
-                                turno_actual
-                            ),
+                            "resultado": "No promovido",
+                            "grado_destino": grado_origen,
+                            "ciclo_destino": ciclo_destino,
+                            "turno_origen": turno_actual,
+                            "turno_destino": turno_actual,
                             "fecha": fecha,
                             "usuario": usuario,
                         }
                     )
 
                     update_data = {
-                        "grado_anterior": (
-                            grado_origen
-                        ),
-
-                        "grado_actual": (
-                            grado_origen
-                        ),
-
-                        "ciclo_lectivo": (
-                            ciclo_destino
-                        ),
-
+                        "grado_anterior": grado_origen,
+                        "grado_actual": grado_origen,
+                        "ciclo_lectivo": ciclo_destino,
                         "turno": turno_actual,
-
                         "estado": "Activo",
-
                         "activo": True,
-
-                        "fecha_promocion": (
-                            fecha
-                        ),
-
-                        "promovido_por": (
-                            usuario
-                        ),
-
-                        "resultado_cierre": (
-                            "No promovido"
-                        ),
-
-                        "historial_academico": (
-                            historial
-                        ),
+                        "fecha_promocion": fecha,
+                        "promovido_por": usuario,
+                        "resultado_cierre": "No promovido",
+                        "historial_academico": historial,  # Supabase lo guarda como JSONB
                     }
-
                     no_promovidos += 1
 
                 # ======================================
                 # NOVENO → GRADUADO
                 # ======================================
-
-                elif (
-                    grado_destino
-                    == "Graduado"
-                ):
-
+                elif grado_destino == "Graduado":
                     historial.append(
                         {
-                            "ciclo": (
-                                ciclo_origen
-                            ),
-                            "grado": (
-                                grado_origen
-                            ),
-                            "resultado": (
-                                "Graduado"
-                            ),
+                            "ciclo": ciclo_origen,
+                            "grado": grado_origen,
+                            "resultado": "Graduado",
                             "fecha": fecha,
                             "usuario": usuario,
                         }
                     )
 
                     update_data = {
-                        "estado": (
-                            "Graduado"
-                        ),
-
+                        "estado": "Graduado",
                         "activo": False,
-
-                        "fecha_baja": (
-                            fecha
-                        ),
-
-                        "fecha_graduacion": (
-                            fecha
-                        ),
-
-                        "motivo_baja": (
-                            "Graduación"
-                        ),
-
-                        "baja_realizada_por": (
-                            usuario
-                        ),
-
-                        "ciclo_lectivo": (
-                            ciclo_origen
-                        ),
-
-                        "resultado_cierre": (
-                            "Graduado"
-                        ),
-
-                        "historial_academico": (
-                            historial
-                        ),
+                        "fecha_baja": fecha,
+                        "fecha_graduacion": fecha,
+                        "motivo_baja": "Graduación",
+                        "baja_realizada_por": usuario,
+                        "ciclo_lectivo": ciclo_origen,
+                        "resultado_cierre": "Graduado",
+                        "historial_academico": historial,
                     }
-
                     graduados += 1
 
                 # ======================================
                 # PROMOVIDO NORMAL
                 # ======================================
-
                 else:
-
-                    nuevo_turno = (
-                        turno_actual
-                    )
-
-                    # Cuarto → Quinto
-                    # cambia automáticamente
-                    # a turno vespertino.
-                    if (
-                        grado_origen
-                        == "Cuarto Grado"
-                    ):
-
-                        nuevo_turno = (
-                            "Vespertino"
-                        )
+                    nuevo_turno = turno_actual
+                    # Cuarto → Quinto cambia automáticamente a turno vespertino.
+                    if grado_origen == "Cuarto Grado":
+                        nuevo_turno = "Vespertino"
 
                     historial.append(
                         {
-                            "ciclo": (
-                                ciclo_origen
-                            ),
-
-                            "grado": (
-                                grado_origen
-                            ),
-
-                            "resultado": (
-                                "Promovido"
-                            ),
-
-                            "grado_destino": (
-                                grado_destino
-                            ),
-
-                            "ciclo_destino": (
-                                ciclo_destino
-                            ),
-
-                            "turno_origen": (
-                                turno_actual
-                            ),
-
-                            "turno_destino": (
-                                nuevo_turno
-                            ),
-
+                            "ciclo": ciclo_origen,
+                            "grado": grado_origen,
+                            "resultado": "Promovido",
+                            "grado_destino": grado_destino,
+                            "ciclo_destino": ciclo_destino,
+                            "turno_origen": turno_actual,
+                            "turno_destino": nuevo_turno,
                             "fecha": fecha,
-
                             "usuario": usuario,
                         }
                     )
 
                     update_data = {
-                        "grado_anterior": (
-                            grado_origen
-                        ),
-
-                        "grado_actual": (
-                            grado_destino
-                        ),
-
-                        "ciclo_lectivo": (
-                            ciclo_destino
-                        ),
-
+                        "grado_anterior": grado_origen,
+                        "grado_actual": grado_destino,
+                        "ciclo_lectivo": ciclo_destino,
                         "turno": nuevo_turno,
-
                         "estado": "Activo",
-
                         "activo": True,
-
-                        "fecha_promocion": (
-                            fecha
-                        ),
-
-                        "promovido_por": (
-                            usuario
-                        ),
-
-                        "resultado_cierre": (
-                            "Promovido"
-                        ),
-
-                        "historial_academico": (
-                            historial
-                        ),
+                        "fecha_promocion": fecha,
+                        "promovido_por": usuario,
+                        "resultado_cierre": "Promovido",
+                        "historial_academico": historial,
                     }
-
                     promovidos += 1
 
                 # ======================================
-                # ACTUALIZAR FIRESTORE
+                # ACTUALIZAR EN SUPABASE
                 # ======================================
-
-                (
-                    db.collection(
-                        "alumnos"
-                    )
-                    .document(
-                        documento_id
-                    )
-                    .update(
-                        update_data
-                    )
-                )
+                db.table("alumnos").update(update_data).eq(
+                    "nie", documento_id
+                ).execute()
 
             except Exception as error:
-
-                errores.append(
-                    f"{nie}: {error}"
-                )
+                errores.append(f"{nie}: {error}")
 
     # ==================================================
     # RESULTADO
     # ==================================================
-
-    st.success(
-        "✅ Proceso de cierre finalizado."
-    )
-
+    st.success("✅ Proceso de cierre finalizado.")
     c1, c2, c3 = st.columns(3)
-
-    c1.metric(
-        "✅ Promovidos",
-        promovidos,
-    )
-
-    c2.metric(
-        "🔁 No promovidos",
-        no_promovidos,
-    )
-
-    c3.metric(
-        "🎓 Graduados",
-        graduados,
-    )
+    c1.metric("✅ Promovidos", promovidos)
+    c2.metric("🔁 No promovidos", no_promovidos)
+    c3.metric("🎓 Graduados", graduados)
 
     if errores:
-
-        st.error(
-            f"Se encontraron "
-            f"{len(errores)} errores."
-        )
-
+        st.error(f"Se encontraron {len(errores)} errores.")
         for error in errores:
             st.write(error)
-
     else:
-
-        st.success(
-            "No se reportaron errores."
-        )
+        st.success("No se reportaron errores.")
 
     time.sleep(2)
     st.rerun()

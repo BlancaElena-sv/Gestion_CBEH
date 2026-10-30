@@ -1,8 +1,9 @@
-import pandas as pd
-import streamlit as st
 from datetime import datetime
 
-from config import CICLO_LECTIVO, TZ_SV
+import pandas as pd
+import streamlit as st
+
+from config import CICLO_LECTIVO
 
 
 def mostrar_asistencia_global(
@@ -12,61 +13,44 @@ def mostrar_asistencia_global(
 ):
     st.title("📅 Reporte de Asistencia Global")
 
-    st.caption(
-        f"📅 Ciclo lectivo actual: {CICLO_LECTIVO}"
-    )
+    st.caption(f"📅 Ciclo lectivo actual: {CICLO_LECTIVO}")
 
     c1, c2, c3 = st.columns(3)
 
-    grado = c1.selectbox(
-        "Grado",
-        lista_grados
-    )
+    grado = c1.selectbox("Grado", lista_grados)
 
-    fecha_inicio = c2.date_input(
-        "Desde:",
-        obtener_fecha_hoy()
-    )
+    fecha_inicio = c2.date_input("Desde:", obtener_fecha_hoy())
 
-    fecha_fin = c3.date_input(
-        "Hasta:",
-        obtener_fecha_hoy()
-    )
+    fecha_fin = c3.date_input("Hasta:", obtener_fecha_hoy())
 
-    if not st.button(
-        "Generar Reporte",
-        type="primary"
-    ):
+    if not st.button("Generar Reporte", type="primary"):
         return
 
     if fecha_inicio > fecha_fin:
-        st.error(
-            "La fecha inicial no puede ser mayor que la fecha final."
-        )
+        st.error("La fecha inicial no puede ser mayor que la fecha final.")
         return
 
     # ==========================================
-    # ALUMNOS ACTIVOS
+    # ALUMNOS ACTIVOS (ADAPTADO A SUPABASE)
     # ==========================================
-
-    alumnos_docs = (
-        db.collection("alumnos")
-        .where("grado_actual", "==", grado)
-        .where("estado", "==", "Activo")
-        .stream()
+    response_alumnos = (
+        db.table("alumnos")
+        .select("nie, nombres, apellidos")
+        .eq("grado_actual", grado)
+        .eq("estado", "Activo")
+        .execute()
     )
+
+    alumnos_data = response_alumnos.data if response_alumnos.data else []
 
     stats = {}
 
-    for alumno in alumnos_docs:
-        datos = alumno.to_dict()
-
+    for datos in alumnos_data:
         nie = datos["nie"]
 
         stats[nie] = {
             "Nombre": (
-                f"{datos.get('apellidos', '')} "
-                f"{datos.get('nombres', '')}"
+                f"{datos.get('apellidos', '')} {datos.get('nombres', '')}"
             ).strip(),
             "P": 0,
             "A": 0,
@@ -76,92 +60,84 @@ def mostrar_asistencia_global(
         }
 
     if not stats:
-        st.warning(
-            "No hay alumnos activos en este grado."
-        )
+        st.warning("No hay alumnos activos en este grado.")
         return
 
     # ==========================================
-    # REGISTROS DE ASISTENCIA
+    # REGISTROS DE ASISTENCIA (ADAPTADO A SUPABASE)
     # ==========================================
-
-    docs = (
-        db.collection("asistencia")
-        .where("grado", "==", grado)
-        .stream()
+    response_asistencia = (
+        db.table("asistencia").select("*").eq("grado", grado).execute()
     )
+
+    docs_asistencia = response_asistencia.data if response_asistencia.data else []
 
     total_dias = 0
 
-    for documento in docs:
-        data_doc = documento.to_dict()
-
+    for data_doc in docs_asistencia:
         # Ignorar otros ciclos
-        ciclo_doc = data_doc.get(
-            "ciclo_lectivo",
-            2026
-        )
+        ciclo_doc = data_doc.get("ciclo_lectivo", CICLO_LECTIVO)
 
-        if ciclo_doc != CICLO_LECTIVO:
+        # En Supabase puede venir como string o int, lo forzamos a int para comparar
+        try:
+            if int(ciclo_doc) != CICLO_LECTIVO:
+                continue
+        except (ValueError, TypeError):
+            pass
+
+        fecha_doc_str = data_doc.get("fecha")
+        if not fecha_doc_str:
             continue
 
-        fecha_doc = data_doc.get("fecha")
-
-        if not fecha_doc:
+        # Convertir el string de Supabase a objeto date de Python
+        try:
+            # Si la fecha viene como "2026-02-15" o "2026-02-15T00:00:00"
+            fecha_str_limpia = str(fecha_doc_str).split("T")[0]
+            fecha_obj = datetime.strptime(fecha_str_limpia, "%Y-%m-%d").date()
+        except Exception:
             continue
 
-        if isinstance(fecha_doc, datetime):
-            fecha_obj = (
-                fecha_doc
-                .astimezone(TZ_SV)
-                .date()
-            )
-        else:
-            fecha_obj = datetime.fromtimestamp(
-                fecha_doc.timestamp(),
-                TZ_SV
-            ).date()
-
-        if not (
-            fecha_inicio
-            <= fecha_obj
-            <= fecha_fin
-        ):
+        if not (fecha_inicio <= fecha_obj <= fecha_fin):
             continue
 
         total_dias += 1
 
-        registros = data_doc.get(
-            "registros",
-            {}
-        )
+        registros = data_doc.get("registros", {})
+        observaciones = data_doc.get("observaciones", {})
 
-        observaciones = data_doc.get(
-            "observaciones",
-            {}
-        )
+        # En Supabase las columnas JSONB a veces vuelven como texto, hay que asegurarse
+        if isinstance(registros, str):
+            import json
+
+            try:
+                registros = json.loads(registros)
+            except:
+                registros = {}
+
+        if isinstance(observaciones, str):
+            import json
+
+            try:
+                observaciones = json.loads(observaciones)
+            except:
+                observaciones = {}
 
         for nie, estado in registros.items():
-
             if nie not in stats:
                 continue
 
             if estado == "Presente":
                 stats[nie]["P"] += 1
-
             elif estado == "Ausente":
                 stats[nie]["A"] += 1
-
             elif estado == "Tardanza":
                 stats[nie]["T"] += 1
-
             elif estado == "Permiso":
                 stats[nie]["Permiso"] += 1
 
             if observaciones.get(nie):
                 stats[nie]["Obs"].append(
-                    f"{fecha_obj.strftime('%d/%m')}: "
-                    f"{observaciones[nie]}"
+                    f"{fecha_obj.strftime('%d/%m')}: {observaciones[nie]}"
                 )
 
     # ==========================================
@@ -169,19 +145,13 @@ def mostrar_asistencia_global(
     # ==========================================
 
     if total_dias == 0:
-        st.info(
-            "No hay tomas de asistencia registradas "
-            "para este periodo."
-        )
+        st.info("No hay tomas de asistencia registradas para este periodo.")
         return
 
     filas = []
 
     for datos in stats.values():
-
-        porcentaje = (
-            datos["P"] / total_dias
-        ) * 100
+        porcentaje = (datos["P"] / total_dias) * 100
 
         filas.append(
             {
@@ -190,22 +160,13 @@ def mostrar_asistencia_global(
                 "Faltas": datos["A"],
                 "Tardanzas": datos["T"],
                 "Permisos": datos["Permiso"],
-                "% Asist.": (
-                    f"{porcentaje:.0f}%"
-                ),
-                "Observaciones": ", ".join(
-                    datos["Obs"]
-                ),
+                "% Asist.": (f"{porcentaje:.0f}%"),
+                "Observaciones": ", ".join(datos["Obs"]),
             }
         )
 
     df = pd.DataFrame(filas)
 
-    st.dataframe(
-        df,
-        width="stretch"
-    )
+    st.dataframe(df, width="stretch")
 
-    st.caption(
-        f"Días con asistencia registrada: {total_dias}"
-    )
+    st.caption(f"Días con asistencia registrada: {total_dias}")

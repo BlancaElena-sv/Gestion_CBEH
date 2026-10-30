@@ -6,7 +6,7 @@ from config import CICLO_LECTIVO
 
 def _normalizar_ciclo(valor):
     if valor is None:
-        return 2026
+        return CICLO_LECTIVO
     try:
         return int(valor)
     except (TypeError, ValueError):
@@ -15,9 +15,15 @@ def _normalizar_ciclo(valor):
 
 def _obtener_nombre_alumno(db, nie):
     try:
-        doc = db.collection("alumnos").document(str(nie)).get()
-        if doc.exists:
-            datos = doc.to_dict()
+        # SUPABASE: Buscar alumno por NIE
+        res = (
+            db.table("alumnos")
+            .select("nombres, apellidos")
+            .eq("nie", str(nie))
+            .execute()
+        )
+        if res.data:
+            datos = res.data[0]
             nombre = f"{datos.get('apellidos', '')} {datos.get('nombres', '')}".strip()
             if nombre:
                 return nombre
@@ -43,21 +49,24 @@ def _calcular_promedios(notas_materia, redondear_mined):
             notas_materia.get("Febrero", 0)
             + notas_materia.get("Marzo", 0)
             + notas_materia.get("Abril", 0)
-        ) / 3
+        )
+        / 3
     )
     t2 = redondear_mined(
         (
             notas_materia.get("Mayo", 0)
             + notas_materia.get("Junio", 0)
             + notas_materia.get("Julio", 0)
-        ) / 3
+        )
+        / 3
     )
     t3 = redondear_mined(
         (
             notas_materia.get("Agosto", 0)
             + notas_materia.get("Septiembre", 0)
             + notas_materia.get("Octubre", 0)
-        ) / 3
+        )
+        / 3
     )
     final = redondear_mined((t1 + t2 + t3) / 3)
     return t1, t2, t3, final
@@ -101,19 +110,17 @@ def mostrar_notas_historicas(
         return
 
     try:
-        notas_docs = (
-            db.collection("notas")
-            .where("grado", "==", grado_seleccionado)
-            .stream()
+        # SUPABASE: Obtener todas las notas de ese grado
+        res_notas = (
+            db.table("notas").select("*").eq("grado", grado_seleccionado).execute()
         )
-
         notas_ciclo = []
 
-        for documento in notas_docs:
-            datos = documento.to_dict()
-            ciclo_nota = _normalizar_ciclo(datos.get("ciclo_lectivo"))
-            if ciclo_nota == ciclo_seleccionado:
-                notas_ciclo.append(datos)
+        if res_notas.data:
+            for datos in res_notas.data:
+                ciclo_nota = _normalizar_ciclo(datos.get("ciclo_lectivo"))
+                if ciclo_nota == ciclo_seleccionado:
+                    notas_ciclo.append(datos)
 
     except Exception as error:
         st.error(f"No fue posible consultar las notas históricas: {error}")
@@ -142,9 +149,7 @@ def mostrar_notas_historicas(
         mapa_alumnos[nie][materia][mes] = valor
 
     if not mapa_alumnos:
-        st.warning(
-            "Los registros encontrados no contienen información suficiente."
-        )
+        st.warning("Los registros encontrados no contienen información suficiente.")
         return
 
     opciones_alumnos = {}
@@ -170,25 +175,21 @@ def mostrar_notas_historicas(
     maestro_guia = "No Asignado"
 
     try:
-        guias = (
-            db.collection("carga_academica")
-            .where("grado", "==", grado_seleccionado)
-            .where("es_guia", "==", True)
-            .stream()
+        # SUPABASE: Buscar maestro guía
+        res_guia = (
+            db.table("carga_academica")
+            .select("*")
+            .eq("grado", grado_seleccionado)
+            .eq("es_guia", True)
+            .execute()
         )
 
-        for documento in guias:
-            datos_guia = documento.to_dict()
-            ciclo_guia = _normalizar_ciclo(
-                datos_guia.get("ciclo_lectivo")
-            )
-
-            if ciclo_guia == ciclo_seleccionado:
-                maestro_guia = datos_guia.get(
-                    "nombre_docente",
-                    "No Asignado",
-                )
-                break
+        if res_guia.data:
+            for datos_guia in res_guia.data:
+                ciclo_guia = _normalizar_ciclo(datos_guia.get("ciclo_lectivo"))
+                if ciclo_guia == ciclo_seleccionado:
+                    maestro_guia = datos_guia.get("nombre_docente", "No Asignado")
+                    break
     except Exception:
         pass
 
@@ -279,17 +280,17 @@ def mostrar_notas_historicas(
             filas_html += f"""
             <tr>
                 <td style="text-align:left;padding-left:5px;">{materia}</td>
-                <td>{notas.get('Febrero', '-')}</td>
-                <td>{notas.get('Marzo', '-')}</td>
-                <td>{notas.get('Abril', '-')}</td>
+                <td>{notas.get("Febrero", "-")}</td>
+                <td>{notas.get("Marzo", "-")}</td>
+                <td>{notas.get("Abril", "-")}</td>
                 <td class="trimestre">{t1}</td>
-                <td>{notas.get('Mayo', '-')}</td>
-                <td>{notas.get('Junio', '-')}</td>
-                <td>{notas.get('Julio', '-')}</td>
+                <td>{notas.get("Mayo", "-")}</td>
+                <td>{notas.get("Junio", "-")}</td>
+                <td>{notas.get("Julio", "-")}</td>
                 <td class="trimestre">{t2}</td>
-                <td>{notas.get('Agosto', '-')}</td>
-                <td>{notas.get('Septiembre', '-')}</td>
-                <td>{notas.get('Octubre', '-')}</td>
+                <td>{notas.get("Agosto", "-")}</td>
+                <td>{notas.get("Septiembre", "-")}</td>
+                <td>{notas.get("Octubre", "-")}</td>
                 <td class="trimestre">{t3}</td>
                 <td class="final">{final}</td>
             </tr>

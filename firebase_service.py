@@ -1,7 +1,7 @@
 import os
-import streamlit as st
-import firebase_admin
 
+import firebase_admin
+import streamlit as st
 from firebase_admin import credentials, firestore, storage
 
 
@@ -20,10 +20,7 @@ def conectar_firebase():
                 return None, "No se encontraron credenciales de Firebase."
 
             firebase_admin.initialize_app(
-                cred,
-                {
-                    "storageBucket": "gestioncbeh.firebasestorage.app"
-                }
+                cred, {"storageBucket": "gestioncbeh.firebasestorage.app"}
             )
 
         db = firestore.client()
@@ -55,22 +52,16 @@ def obtener_credenciales():
     # ----------------------------------------
 
     if "firebase_key" in st.secrets:
-
-        credenciales_dict = dict(
-            st.secrets["firebase_key"]
-        )
+        credenciales_dict = dict(st.secrets["firebase_key"])
 
         # Firebase necesita saltos de línea reales
         # dentro de la clave privada.
         if "private_key" in credenciales_dict:
-            credenciales_dict["private_key"] = (
-                credenciales_dict["private_key"]
-                .replace("\\n", "\n")
+            credenciales_dict["private_key"] = credenciales_dict["private_key"].replace(
+                "\\n", "\n"
             )
 
-        return credentials.Certificate(
-            credenciales_dict
-        )
+        return credentials.Certificate(credenciales_dict)
 
     return None
 
@@ -85,8 +76,10 @@ def obtener_bucket():
     except Exception:
         return None
 
-import uuid
+
 import urllib.parse
+import uuid
+
 
 def subir_archivo(archivo, ruta):
     """
@@ -109,9 +102,7 @@ def subir_archivo(archivo, ruta):
 
         token = str(uuid.uuid4())
 
-        blob.metadata = {
-            "firebaseStorageDownloadTokens": token
-        }
+        blob.metadata = {"firebaseStorageDownloadTokens": token}
 
         blob.patch()
 

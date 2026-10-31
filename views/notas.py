@@ -6,7 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from config import CICLO_LECTIVO
-from views.notas_historicas import mostrar_notas_historicas
+from views.notas_historicas import leer_notas_grado, mostrar_notas_historicas
 
 
 def mostrar_notas(
@@ -336,15 +336,11 @@ def mostrar_notas(
                     alumnos_list.sort(key=lambda x: x["nombre"])
                     materias_reporte = mapa_curricular.get(grado_reporte, [])
 
-                    res_notas = (
-                        db.table("notas")
-                        .select("*")
-                        .eq("grado", grado_reporte)
-                        .execute()
-                    )
+                    notas_del_grado = leer_notas_grado(db, grado_reporte)
+                    st.caption(f"Registros de notas leídos: {len(notas_del_grado)}")
                     data_anual = {}
-                    if res_notas.data:
-                        for nota in res_notas.data:
+                    if notas_del_grado:
+                        for nota in notas_del_grado:
                             try:
                                 if (
                                     int(nota.get("ciclo_lectivo", CICLO_LECTIVO))
@@ -480,12 +476,10 @@ def mostrar_notas(
                         except:
                             pass
 
-                res_notas = (
-                    db.table("notas").select("*").eq("grado", grado_lote).execute()
-                )
+                notas_del_grado = leer_notas_grado(db, grado_lote)
                 mapa_notas_global = {}
-                if res_notas.data:
-                    for nota in res_notas.data:
+                if notas_del_grado:
+                    for nota in notas_del_grado:
                         try:
                             if (
                                 int(nota.get("ciclo_lectivo", CICLO_LECTIVO))

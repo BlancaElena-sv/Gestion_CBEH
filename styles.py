@@ -3,329 +3,373 @@ import streamlit as st
 
 def aplicar_estilos():
     """
-    Aplica la identidad visual general de EduManager.
+    Aplica estilos globales a toda la aplicación EduManager.
+    IMPORTANTE: Excluye el sidebar para preservar su diseño.
     """
 
     st.markdown(
         """
-        <style>
-
-        /* ========================================
-           CONFIGURACIÓN GENERAL
-        ======================================== */
-
-        .stApp {
-            background-color: #f5f7fb;
-        }
-
-        html, body, [class*="css"] {
-            font-family: "Segoe UI", Arial, sans-serif;
-        }
-
-
-        /* ========================================
-           CONTENIDO PRINCIPAL
-        ======================================== */
-
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 3rem;
-            max-width: 1400px;
-        }
-
-
-        /* ========================================
-           TÍTULOS
-        ======================================== */
-
-        h1 {
-            color: #16366f;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-
-        h2, h3 {
-            color: #243b64;
-        }
-
-
-        /* ========================================
-           SIDEBAR
-        ======================================== */
-
-        section[data-testid="stSidebar"] {
-            background-color: #102a56;
-        }
-
-        section[data-testid="stSidebar"] * {
-            color: #ffffff;
-        }
-
-        section[data-testid="stSidebar"] hr {
-            border-color: rgba(255,255,255,0.15);
-        }
-
-
-        /* ========================================
-           BOTONES
-        ======================================== */
-
-        .stButton > button,
-        .stFormSubmitButton > button {
-            border-radius: 8px;
-            font-weight: 600;
-            border: none;
-            transition: 0.2s ease;
-        }
-
-        .stButton > button:hover,
-        .stFormSubmitButton > button:hover {
-            transform: translateY(-1px);
-        }
-
-
-        /* ========================================
-           INPUTS
-        ======================================== */
-
-        div[data-baseweb="input"] > div,
-        div[data-baseweb="select"] > div,
-        textarea {
-            border-radius: 8px !important;
-        }
-
-
-        /* ========================================
-           CONTENEDORES
-        ======================================== */
-
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 12px;
-        }
-
-
-        /* ========================================
-           MÉTRICAS
-        ======================================== */
-
-        div[data-testid="stMetric"] {
-            background-color: white;
-            padding: 18px;
-            border-radius: 12px;
-            border: 1px solid #e5e9f2;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        }
-
-        div[data-testid="stMetricLabel"] {
-            font-weight: 600;
-            color: #596b88;
-        }
-
-        div[data-testid="stMetricValue"] {
-            color: #16366f;
-            font-weight: 700;
-        }
-
-
-        /* ========================================
-           TABLAS
-        ======================================== */
-
-        div[data-testid="stDataFrame"] {
-            background-color: white;
-            border-radius: 10px;
-        }
-
-
-        /* ========================================
-           ALERTAS
-        ======================================== */
-
-        div[data-testid="stAlert"] {
-            border-radius: 10px;
-        }
-
-
-        /* ========================================
-           OCULTAR ELEMENTOS VISUALES DE STREAMLIT
-        ======================================== */
-
-        #MainMenu {
-            visibility: hidden;
-        }
-
-        footer {
-            visibility: hidden;
-        }
-
-        /* ========================================
-            CABECERA DEL DASHBOARD
-        ======================================== */
-
-    .dashboard-header {
-        background: white;
-        padding: 24px 28px;
-        border-radius: 14px;
-        border: 1px solid #e5e9f2;
-        margin-bottom: 22px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    <style>
+    /* ==========================================
+       VARIABLES CSS (PALETA INSTITUCIONAL)
+    ========================================== */
+    :root {
+        --azul-primario: #1e40af;
+        --azul-oscuro: #1e3a8a;
+        --azul-claro: #3b82f6;
+        --azul-muy-claro: #dbeafe;
+        --gris-fondo: #f8fafc;
+        --gris-borde: #e2e8f0;
+        --gris-texto: #334155;
+        --gris-secundario: #64748b;
+        --blanco: #ffffff;
+        --rojo: #ef4444;
+        --verde: #10b981;
+        --amarillo: #f59e0b;
+        --sombra-suave: 0 2px 8px rgba(0, 0, 0, 0.06);
+        --sombra-media: 0 4px 16px rgba(0, 0, 0, 0.1);
+        --sombra-fuerte: 0 8px 24px rgba(0, 0, 0, 0.15);
+        --radio-borde: 12px;
+        --transicion: all 0.25s ease;
     }
 
-    .dashboard-eyebrow {
-        font-size: 13px;
-        color: #718096;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+    /* ==========================================
+       FONDO GENERAL DE LA APP (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] {
+        background-color: var(--gris-fondo) !important;
     }
 
-    .dashboard-title {
-        font-size: 28px;
-        color: #16366f;
-        font-weight: 700;
-        margin-top: 4px;
+    /* ==========================================
+       TIPOGRAFÍA GLOBAL (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] h1,
+    [data-testid="stMain"] h2,
+    [data-testid="stMain"] h3,
+    [data-testid="stMain"] h4 {
+        color: var(--azul-oscuro) !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.5px;
     }
 
-    .dashboard-subtitle {
-        color: #718096;
-        margin-top: 5px;
-        font-size: 15px;
+    [data-testid="stMain"] h1 {
+        font-size: 2.2rem !important;
+        margin-bottom: 1rem !important;
     }
 
-    /* ========================================
-   SIDEBAR PROFESIONAL
-======================================== */
+    [data-testid="stMain"] h2 {
+        font-size: 1.8rem !important;
+        margin-bottom: 0.8rem !important;
+    }
 
-.menu-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.55);
-    letter-spacing: 1px;
-    margin-top: 18px;
-    margin-bottom: 6px;
-}
+    [data-testid="stMain"] h3 {
+        font-size: 1.4rem !important;
+        margin-bottom: 0.6rem !important;
+    }
 
-/* ========================================
-   SIDEBAR - MENÚ COMPACTO Y ALINEADO
-======================================== */
+    [data-testid="stMain"] p,
+    [data-testid="stMain"] label,
+    [data-testid="stMain"] span {
+        color: var(--gris-texto) !important;
+    }
 
-/* Títulos de categoría */
-.menu-section-title {
-    font-size: 10px;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.55);
-    letter-spacing: 1.2px;
+    /* ==========================================
+       TARJETAS Y CONTENEDORES (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stContainer"] {
+        background: var(--blanco) !important;
+        border-radius: var(--radio-borde) !important;
+        padding: 20px !important;
+        box-shadow: var(--sombra-suave) !important;
+        border: 1px solid var(--gris-borde) !important;
+        transition: var(--transicion) !important;
+    }
 
-    margin-top: 22px;
-    margin-bottom: 9px;
+    [data-testid="stMain"] [data-testid="stContainer"]:hover {
+        box-shadow: var(--sombra-media) !important;
+    }
 
-    padding-left: 2px;
-}
+    /* Contenedores con borde (border=True) */
+    [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] {
+        background: var(--blanco) !important;
+        border-radius: var(--radio-borde) !important;
+        padding: 16px !important;
+        box-shadow: var(--sombra-suave) !important;
+        border: 1px solid var(--gris-borde) !important;
+    }
 
-/* Contenedor de botones */
-section[data-testid="stSidebar"] .stButton {
-    margin-bottom: 2px;
-}
+    /* ==========================================
+       MÉTRICAS DEL DASHBOARD (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stMetric"] {
+        background: var(--blanco) !important;
+        border-radius: var(--radio-borde) !important;
+        padding: 20px !important;
+        box-shadow: var(--sombra-suave) !important;
+        border: 1px solid var(--gris-borde) !important;
+        transition: var(--transicion) !important;
+    }
 
-/* Botones inactivos */
-section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
-    background: transparent !important;
-    color: rgba(255, 255, 255, 0.92) !important;
+    [data-testid="stMain"] [data-testid="stMetric"]:hover {
+        box-shadow: var(--sombra-media) !important;
+        transform: translateY(-2px) !important;
+    }
 
-    border: none !important;
-    border-radius: 7px !important;
+    [data-testid="stMain"] [data-testid="stMetricLabel"] {
+        color: var(--gris-secundario) !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+    }
 
-    min-height: 34px !important;
-    padding: 6px 10px !important;
+    [data-testid="stMain"] [data-testid="stMetricValue"] {
+        color: var(--azul-oscuro) !important;
+        font-size: 2rem !important;
+        font-weight: 800 !important;
+    }
 
-    justify-content: flex-start !important;
-    text-align: left !important;
+    [data-testid="stMain"] [data-testid="stMetric"] {
+        border-top: 4px solid var(--azul-primario) !important;
+    }
 
-    font-size: 14px !important;
-    font-weight: 500 !important;
+    /* ==========================================
+       TABLAS (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stDataFrame"] {
+        border-radius: var(--radio-borde) !important;
+        overflow: hidden !important;
+        box-shadow: var(--sombra-suave) !important;
+    }
 
-    width: 100% !important;
-}
+    [data-testid="stMain"] [data-testid="stDataFrame"] table {
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
 
-/* Texto interno del botón */
-section[data-testid="stSidebar"] .stButton > button p {
-    width: 100% !important;
-    text-align: left !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
+    [data-testid="stMain"] [data-testid="stDataFrame"] thead tr {
+        background: var(--azul-primario) !important;
+    }
 
-/* Hover */
-section[data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
-}
+    [data-testid="stMain"] [data-testid="stDataFrame"] thead th {
+        color: var(--blanco) !important;
+        font-weight: 700 !important;
+        padding: 12px 16px !important;
+        border: none !important;
+    }
 
-/* Botón activo */
-section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: rgba(255, 255, 255, 0.12) !important;
-    color: #ffffff !important;
+    [data-testid="stMain"] [data-testid="stDataFrame"] tbody tr {
+        transition: var(--transicion) !important;
+    }
 
-    border: none !important;
-    border-left: 3px solid #ff5252 !important;
-    border-radius: 7px !important;
+    [data-testid="stMain"] [data-testid="stDataFrame"] tbody tr:hover {
+        background: var(--azul-muy-claro) !important;
+    }
 
-    min-height: 34px !important;
-    padding: 6px 10px !important;
+    [data-testid="stMain"] [data-testid="stDataFrame"] tbody td {
+        padding: 10px 16px !important;
+        border-bottom: 1px solid var(--gris-borde) !important;
+    }
 
-    justify-content: flex-start !important;
-    text-align: left !important;
+    /* ==========================================
+       FORMULARIOS E INPUTS (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stForm"] {
+        background: var(--blanco) !important;
+        border-radius: var(--radio-borde) !important;
+        padding: 24px !important;
+        box-shadow: var(--sombra-suave) !important;
+        border: 1px solid var(--gris-borde) !important;
+    }
 
-    font-size: 14px !important;
-    font-weight: 600 !important;
+    [data-testid="stMain"] input[type="text"],
+    [data-testid="stMain"] input[type="password"],
+    [data-testid="stMain"] input[type="number"],
+    [data-testid="stMain"] input[type="email"],
+    [data-testid="stMain"] textarea {
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+        border: 1px solid var(--gris-borde) !important;
+        transition: var(--transicion) !important;
+        font-size: 14px !important;
+    }
 
-    width: 100% !important;
-}
+    [data-testid="stMain"] input:focus,
+    [data-testid="stMain"] textarea:focus {
+        border-color: var(--azul-claro) !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        outline: none !important;
+    }
 
-/* Hover del activo */
-section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-    background: rgba(255, 255, 255, 0.18) !important;
-}
+    [data-testid="stMain"] label {
+        font-weight: 600 !important;
+        color: var(--gris-texto) !important;
+        margin-bottom: 6px !important;
+    }
 
-/* Separación entre grupos */
-section[data-testid="stSidebar"] .menu-section-title + div {
-    margin-top: 2px;
-}
+    /* ==========================================
+       BOTONES (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] button[kind="primary"] {
+        background: linear-gradient(135deg, var(--azul-primario), var(--azul-claro)) !important;
+        color: var(--blanco) !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+        font-weight: 600 !important;
+        transition: var(--transicion) !important;
+        box-shadow: var(--sombra-suave) !important;
+    }
 
-/* ========================================
-   FORZAR ALINEACIÓN IZQUIERDA REAL
-======================================== */
+    [data-testid="stMain"] button[kind="primary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--sombra-media) !important;
+    }
 
-/* Contenido interno de todos los botones del sidebar */
-section[data-testid="stSidebar"] .stButton > button {
-    justify-content: flex-start !important;
-    text-align: left !important;
-}
+    [data-testid="stMain"] button[kind="secondary"] {
+        background: var(--blanco) !important;
+        color: var(--gris-texto) !important;
+        border: 1px solid var(--gris-borde) !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+        font-weight: 600 !important;
+        transition: var(--transicion) !important;
+    }
 
-/* Contenedor que Streamlit crea dentro del botón */
-section[data-testid="stSidebar"] .stButton > button > div {
-    width: 100% !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-}
+    [data-testid="stMain"] button[kind="secondary"]:hover {
+        background: var(--gris-fondo) !important;
+        border-color: var(--gris-secundario) !important;
+    }
 
-/* Contenedor Markdown interno */
-section[data-testid="stSidebar"]
-.stButton > button
-div[data-testid="stMarkdownContainer"] {
-    width: 100% !important;
-    text-align: left !important;
-}
+    /* ==========================================
+       ALERTAS Y MENSAJES (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stAlert"] {
+        border-radius: var(--radio-borde) !important;
+        padding: 16px 20px !important;
+        border: none !important;
+        box-shadow: var(--sombra-suave) !important;
+    }
 
-/* Párrafo del texto */
-section[data-testid="stSidebar"]
-.stButton > button
-div[data-testid="stMarkdownContainer"] p {
-    width: 100% !important;
-    text-align: left !important;
-    margin: 0 !important;
-}
+    [data-testid="stMain"] [data-testid="stAlert"] [data-testid="stAlertContent"] {
+        font-size: 14px !important;
+    }
 
-        </style>
-        """,
-        unsafe_allow_html=True
+    /* ==========================================
+       SELECTBOX Y MULTISELECT (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stSelectbox"],
+    [data-testid="stMain"] [data-testid="stMultiSelect"] {
+        background: var(--blanco) !important;
+        border-radius: 8px !important;
+    }
+
+    [data-testid="stMain"] [data-testid="stSelectbox"] div,
+    [data-testid="stMain"] [data-testid="stMultiSelect"] div {
+        border-radius: 8px !important;
+        border: 1px solid var(--gris-borde) !important;
+    }
+
+    /* ==========================================
+       EXPANDERS (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stExpander"] {
+        border-radius: var(--radio-borde) !important;
+        border: 1px solid var(--gris-borde) !important;
+        background: var(--blanco) !important;
+        box-shadow: var(--sombra-suave) !important;
+    }
+
+    [data-testid="stMain"] [data-testid="stExpander"] summary {
+        font-weight: 600 !important;
+        color: var(--azul-oscuro) !important;
+    }
+
+    /* ==========================================
+       DIVIDERS (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] hr {
+        border-color: var(--gris-borde) !important;
+        margin: 24px 0 !important;
+        opacity: 0.6;
+    }
+
+    /* ==========================================
+       TABS (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stTabs"] button {
+        border-radius: 8px 8px 0 0 !important;
+        font-weight: 600 !important;
+        transition: var(--transicion) !important;
+    }
+
+    [data-testid="stMain"] [data-testid="stTabs"] button[aria-selected="true"] {
+        background: var(--azul-primario) !important;
+        color: var(--blanco) !important;
+    }
+
+    /* ==========================================
+       FILE UPLOADER (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] [data-testid="stFileUploader"] {
+        border-radius: var(--radio-borde) !important;
+        border: 2px dashed var(--gris-borde) !important;
+        background: var(--gris-fondo) !important;
+        padding: 20px !important;
+        transition: var(--transicion) !important;
+    }
+
+    [data-testid="stMain"] [data-testid="stFileUploader"]:hover {
+        border-color: var(--azul-claro) !important;
+        background: var(--azul-muy-claro) !important;
+    }
+
+    /* ==========================================
+       IMÁGENES (SOLO CONTENIDO PRINCIPAL)
+    ========================================== */
+    [data-testid="stMain"] img {
+        border-radius: 8px !important;
+    }
+
+    /* ==========================================
+       TEXTO BLANCO SOBRE FONDOS AZULES
+       (botones primarios y etiquetas del multiselect).
+       Las reglas de arriba pintan todos los p/span de gris;
+       estas son más específicas y recuperan el blanco.
+    ========================================== */
+    [data-testid="stMain"] button[kind^="primary"],
+    [data-testid="stMain"] button[kind^="primary"] *,
+    [data-testid="stMain"] [data-testid^="stBaseButton-primary"],
+    [data-testid="stMain"] [data-testid^="stBaseButton-primary"] * {
+        color: var(--blanco) !important;
+        -webkit-text-fill-color: var(--blanco) !important;
+    }
+
+    [data-testid="stMain"] [data-baseweb="tag"],
+    [data-testid="stMain"] [data-baseweb="tag"] * {
+        color: var(--blanco) !important;
+        -webkit-text-fill-color: var(--blanco) !important;
+    }
+
+    /* ==========================================
+       SCROLLBAR PERSONALIZADO
+    ========================================== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--gris-fondo);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--gris-secundario);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--azul-claro);
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
     )

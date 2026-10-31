@@ -4,6 +4,33 @@ import streamlit.components.v1 as components
 from config import CICLO_LECTIVO
 
 
+def leer_notas_grado(db, grado, tamano_bloque=1000):
+    """
+    Trae TODAS las notas de un grado, pidiéndolas por bloques.
+
+    Supabase devuelve como máximo 1000 filas por consulta; si hay más, las que
+    sobran se pierden sin avisar. Aquí seguimos pidiendo bloques hasta que no
+    quede nada. Se usa también desde views/notas.py.
+    """
+    filas = []
+    inicio = 0
+    while True:
+        respuesta = (
+            db.table("notas")
+            .select("*")
+            .eq("grado", grado)
+            .order("id")  # orden fijo: los bloques no se repiten ni se saltan filas
+            .range(inicio, inicio + tamano_bloque - 1)
+            .execute()
+        )
+        bloque = respuesta.data or []
+        if not bloque:
+            break
+        filas.extend(bloque)
+        inicio += len(bloque)
+    return filas
+
+
 def _normalizar_ciclo(valor):
     if valor is None:
         return CICLO_LECTIVO
@@ -111,13 +138,11 @@ def mostrar_notas_historicas(
 
     try:
         # SUPABASE: Obtener todas las notas de ese grado
-        res_notas = (
-            db.table("notas").select("*").eq("grado", grado_seleccionado).execute()
-        )
+        todas_las_notas = leer_notas_grado(db, grado_seleccionado)
         notas_ciclo = []
 
-        if res_notas.data:
-            for datos in res_notas.data:
+        if todas_las_notas:
+            for datos in todas_las_notas:
                 ciclo_nota = _normalizar_ciclo(datos.get("ciclo_lectivo"))
                 if ciclo_nota == ciclo_seleccionado:
                     notas_ciclo.append(datos)

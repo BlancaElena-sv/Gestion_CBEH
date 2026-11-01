@@ -207,20 +207,29 @@ def login():
         st.info(
             "¿Olvidó su credencial? Solicite restablecimiento con la Administración."
         )
-        st.info(
-            "Para poder acceder a todas las funcionalidades de la demostración del sistema "
-            "docentes y administradores deben iniciar sesión con sus credenciales. "
-            "usuario: docente.demo, contraseña: Demo2027!. Administrador: admin.demo, contraseña: Demo2027!."
-        )
+    st.info(
+        """
+    Para poder acceder a todas las funcionalidades de la demostración del sistema,
+    los usuarios deben iniciar sesión con sus credenciales correspondientes:
 
-        st.markdown(
-            "<div style='text-align: center; color: grey; "
-            "font-size: 11px; margin-top: 40px;'>"
-            "<p>© 2026 It solutions El Salvador | "
-            "Todos los derechos reservados.</p>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+    * **Docente:**
+      * **Usuario:** `docente.demo`
+      * **Contraseña:** `Demo2027!`
+
+    * **Administrador:**
+      * **Usuario:** `admin.demo`
+      * **Contraseña:** `Demo2027!`
+    """
+    )
+
+    st.markdown(
+        "<div style='text-align: center; color: grey; "
+        "font-size: 11px; margin-top: 40px;'>"
+        "<p>© 2026 It solutions El Salvador | "
+        "Todos los derechos reservados.</p>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def logout():

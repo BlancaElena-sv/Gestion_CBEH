@@ -1,0 +1,86 @@
+[
+  {
+    "case": "desktop-login-filled",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "desktop-admin-filled",
+    "changed_pixels_percent": 0.000764,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "desktop-docente-filled",
+    "changed_pixels_percent": 0.000764,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "desktop-admin-empty",
+    "changed_pixels_percent": 0.000764,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "desktop-docente-empty",
+    "changed_pixels_percent": 0.000764,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "desktop-admin-error",
+    "changed_pixels_percent": 0.000764,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "desktop-docente-error",
+    "changed_pixels_percent": 0.000764,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "mobile-login-filled",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "mobile-admin-filled",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "mobile-docente-filled",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "mobile-admin-empty",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "mobile-docente-empty",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "mobile-admin-error",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  },
+  {
+    "case": "mobile-docente-error",
+    "changed_pixels_percent": 0.0,
+    "geometry_style_differences": {},
+    "overflow_demo": false
+  }
+]

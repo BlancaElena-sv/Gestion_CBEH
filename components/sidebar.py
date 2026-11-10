@@ -3,6 +3,7 @@ import html
 import streamlit as st
 
 from navigation import modules_for_role
+from config import APP_NAME, CICLO_LECTIVO, LOGO_INSTITUCIONAL
 
 
 def mostrar_sidebar(nombre_usuario, rol_usuario):
@@ -67,6 +68,11 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
         }}
 
         /* ---------- Marca ---------- */
+        section[data-testid="stSidebar"] [data-testid="stImage"] img,
+        section[data-testid="stSidebar"] [data-testid="stImageContainer"] img {{
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+        }}
         section[data-testid="stSidebar"] [data-testid="stImage"] img {{
             filter: drop-shadow(0 6px 12px rgba(0,0,0,0.35));
         }}
@@ -228,7 +234,7 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
         _, col_logo, _ = st.columns([1, 2, 1])
         with col_logo:
             try:
-                st.image("logo.png", use_container_width=True)
+                st.image(LOGO_INSTITUCIONAL, use_container_width=True)
             except Exception:
                 st.markdown(
                     "<div style='text-align:center;font-size:55px;'>🎓</div>",
@@ -236,8 +242,8 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
                 )
 
         st.markdown(
-            """
-            <div class="edu-brand-title">EduManager</div>
+            f"""
+            <div class="edu-brand-title">{html.escape(APP_NAME)}</div>
             <div class="edu-brand-subtitle">Gestión Académica Institucional</div>
             """,
             unsafe_allow_html=True,
@@ -297,10 +303,10 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
             return "__logout__"
 
         st.markdown(
-            """
+            f"""
             <div class="edu-footer">
                 © 2026 David Fuentes - EduManager<br>
-                Ciclo lectivo 2026
+                Ciclo lectivo {CICLO_LECTIVO} · DEMO
             </div>
             """,
             unsafe_allow_html=True,

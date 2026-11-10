@@ -8,7 +8,7 @@ def conectar_firebase():
     Retorna: (db, error)
     """
     try:
-        cred = credentials.Certificate("credenciales.json")
+        cred = credentials.Certificate("credenciales_demo.json")
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
         db = firestore.client()

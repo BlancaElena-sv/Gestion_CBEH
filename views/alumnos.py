@@ -207,7 +207,7 @@ def mostrar_consulta_alumnos(
             )
 
             st.info(
-                f"👨‍🏫 **Maestro Guía:** {maestro_guia}"
+                f"👨‍ **Maestro Guía:** {maestro_guia}"
             )
 
         with c3:
@@ -236,7 +236,7 @@ def mostrar_consulta_alumnos(
         "📊 Boleta de Notas",
         "⚙️ Edición Expediente",
         "📒 Bitácora",
-        "🛡️ Estado y Baja",
+        "️ Estado y Baja",
         "📚 Historial Académico",
     ]
 )
@@ -253,21 +253,21 @@ def mostrar_consulta_alumnos(
 
             st.write(
                 f"**Responsable:** "
-                f"{a.get('encargado', {}).get('nombre')}"
+                f"{a.get('encargado', {}).get('nombre', '')}"
             )
 
             st.write(
                 f"**Teléfono:** "
-                f"{a.get('encargado', {}).get('telefono')}"
+                f"{a.get('encargado', {}).get('telefono', '')}"
             )
 
             st.write(
                 f"**Dirección:** "
-                f"{a.get('encargado', {}).get('direccion')}"
+                f"{a.get('encargado', {}).get('direccion', '')}"
             )
 
         with col_d2:
-            st.subheader("📂 Documentos")
+            st.subheader(" Documentos")
 
             documentos = a.get("documentos", {})
             docs = list(documentos.get("doc_urls", []))

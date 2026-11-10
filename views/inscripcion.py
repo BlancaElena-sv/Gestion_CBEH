@@ -15,7 +15,7 @@ def mostrar_inscripcion(
     Vista para registrar nuevos alumnos en EduManager.
     """
 
-    st.title("📝 Inscripción 2026")
+    st.title(f" Inscripción {CICLO_LECTIVO}")
 
     with st.form("form_inscripcion"):
         c1, c2 = st.columns(2)
@@ -78,7 +78,7 @@ def mostrar_inscripcion(
             )
 
         guardar = st.form_submit_button(
-            "💾 Guardar inscripción",
+            " Guardar inscripción",
             width="stretch"
         )
 
@@ -93,19 +93,19 @@ def mostrar_inscripcion(
 
             if not nie:
                 st.error(
-                    "El NIE es obligatorio."
+                    "NIE, Nombres y Apellidos son obligatorios."
                 )
                 return
 
             if not nombres:
                 st.error(
-                    "Los nombres son obligatorios."
+                    "NIE, Nombres y Apellidos son obligatorios."
                 )
                 return
 
             if not apellidos:
                 st.error(
-                    "Los apellidos son obligatorios."
+                    "NIE, Nombres y Apellidos son obligatorios."
                 )
                 return
 

@@ -1,0 +1,386 @@
+[
+  {
+    "case": "alumnos-desktop-data",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.064097
+  },
+  {
+    "case": "alumnos-desktop-edit",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "alumnos-desktop-empty",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "alumnos-desktop-not-found",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "alumnos-desktop-profile",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.064097
+  },
+  {
+    "case": "alumnos-mobile-data",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "alumnos-mobile-edit",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "alumnos-mobile-empty",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "alumnos-mobile-not-found",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "alumnos-mobile-profile",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "asistencia-desktop-admin-empty",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "asistencia-desktop-admin-initial",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "asistencia-desktop-admin-invalid-range",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "asistencia-desktop-admin-no-records",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "asistencia-desktop-admin-report",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "asistencia-desktop-teacher-editor",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "asistencia-desktop-teacher-empty",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "asistencia-mobile-admin-empty",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "asistencia-mobile-admin-initial",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "asistencia-mobile-admin-invalid-range",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "asistencia-mobile-admin-no-records",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "asistencia-mobile-admin-report",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "asistencia-mobile-teacher-editor",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "asistencia-mobile-teacher-empty",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "inscripcion-desktop-duplicate-bottom",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "inscripcion-desktop-duplicate",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "inscripcion-desktop-initial",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "inscripcion-desktop-required-bottom",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "inscripcion-desktop-required",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "inscripcion-mobile-duplicate-bottom",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "inscripcion-mobile-duplicate",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "inscripcion-mobile-initial",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "inscripcion-mobile-required-bottom",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "inscripcion-mobile-required",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "maestros-desktop-edit",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "maestros-desktop-empty-loads",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "maestros-desktop-loads",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "maestros-desktop-new",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "maestros-desktop-no-subject",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "maestros-desktop-profile",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "maestros-desktop-required",
+    "viewport": [
+      1440,
+      1000
+    ],
+    "changed_pixels_percent": 0.000764
+  },
+  {
+    "case": "maestros-mobile-edit",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "maestros-mobile-empty-loads",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "maestros-mobile-loads",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "maestros-mobile-new",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "maestros-mobile-no-subject",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "maestros-mobile-profile",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  },
+  {
+    "case": "maestros-mobile-required",
+    "viewport": [
+      390,
+      844
+    ],
+    "changed_pixels_percent": 0.0
+  }
+]

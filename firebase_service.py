@@ -1,112 +1,31 @@
-import os
-import streamlit as st
 import firebase_admin
-
-from firebase_admin import credentials, firestore, storage
-
-from config import FIREBASE_PROJECT_ID
+from firebase_admin import credentials, firestore
 
 
-@st.cache_resource
 def conectar_firebase():
     """
-    Inicializa Firebase Admin SDK para PRODUCCIÓN
-    y devuelve una conexión a Firestore.
+    Conecta con Firebase Firestore.
+    Retorna: (db, error)
     """
-
     try:
+        cred = credentials.Certificate("credenciales.json")
         if not firebase_admin._apps:
-            cred = obtener_credenciales()
-
-            if cred is None:
-                return None, "No se encontraron credenciales de Firebase."
-
-            firebase_admin.initialize_app(
-                cred,
-                {
-                    "storageBucket": f"{FIREBASE_PROJECT_ID}.firebasestorage.app"
-                }
-            )
-
+            firebase_admin.initialize_app(cred)
         db = firestore.client()
-
         return db, None
+    except Exception as e:
+        return None, str(e)
 
-    except Exception as error:
-        return None, str(error)
 
-
-def obtener_credenciales():
+def obtener_usuario(usuario):
     """
-    Busca las credenciales de Firebase para PRODUCCIÓN.
+    Obtiene un usuario de la colección 'usuarios' en Firebase.
     """
-
-    if os.path.exists("credenciales.json"):
-        return credentials.Certificate("credenciales.json")
-
-    if os.path.exists("credenciales"):
-        return credentials.Certificate("credenciales")
-
-    if "firebase_key" in st.secrets:
-        credenciales_dict = dict(st.secrets["firebase_key"])
-        if "private_key" in credenciales_dict:
-            credenciales_dict["private_key"] = (
-                credenciales_dict["private_key"].replace("\\n", "\n")
-            )
-        return credentials.Certificate(credenciales_dict)
-
-    return None
-
-
-def obtener_bucket():
-    """
-    Devuelve el bucket de Firebase Storage.
-    """
-
     try:
-        return storage.bucket()
+        db, _ = conectar_firebase()
+        doc = db.collection("usuarios").document(usuario).get()
+        if doc.exists:
+            return doc.to_dict()
+        return None
     except Exception:
-        return None
-
-import uuid
-import urllib.parse
-
-def subir_archivo(archivo, ruta):
-    """
-    Sube un archivo a Firebase Storage
-    y devuelve su URL de acceso.
-    """
-
-    if not archivo:
-        return None
-
-    try:
-        bucket = storage.bucket()
-
-        nombre_archivo = archivo.name.replace(" ", "_")
-        blob_name = f"{ruta}/{nombre_archivo}"
-
-        blob = bucket.blob(blob_name)
-
-        blob.upload_from_file(archivo)
-
-        token = str(uuid.uuid4())
-
-        blob.metadata = {
-            "firebaseStorageDownloadTokens": token
-        }
-
-        blob.patch()
-
-        url = (
-            f"https://firebasestorage.googleapis.com/v0/b/"
-            f"{bucket.name}/o/"
-            f"{urllib.parse.quote(blob_name, safe='')}"
-            f"?alt=media&token={token}"
-        )
-
-        return url
-
-    except Exception as error:
-        st.error(f"Error al subir archivo: {error}")
         return None

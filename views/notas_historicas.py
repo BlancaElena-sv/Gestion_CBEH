@@ -1,3 +1,5 @@
+from authorization import protected
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -67,6 +69,7 @@ def _calcular_promedios(notas_materia, redondear_mined):
     return t1, t2, t3, final
 
 
+@protected('Notas')
 def mostrar_notas_historicas(
     db,
     lista_grados_notas,

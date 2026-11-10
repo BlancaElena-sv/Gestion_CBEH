@@ -1,3 +1,5 @@
+from authorization import protected
+
 import time
 
 import pandas as pd
@@ -12,6 +14,7 @@ from config import(
 )
 
 
+@protected('Notas')
 def mostrar_notas(
     db,
     lista_grados_notas,

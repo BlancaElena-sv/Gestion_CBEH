@@ -1,3 +1,5 @@
+from authorization import protected
+
 import pandas as pd
 import streamlit as st
 from datetime import datetime
@@ -5,6 +7,7 @@ from datetime import datetime
 from config import CICLO_LECTIVO, TZ_SV
 
 
+@protected('Asistencia Global')
 def mostrar_asistencia_global(
     db,
     lista_grados,

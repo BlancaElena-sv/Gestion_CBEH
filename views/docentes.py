@@ -1,3 +1,5 @@
+from authorization import protected
+
 import time
 
 import pandas as pd
@@ -6,6 +8,7 @@ from firebase_admin import firestore
 from config import CICLO_LECTIVO
 
 
+@protected('Maestros')
 def mostrar_maestros(
     db,
     lista_grados,

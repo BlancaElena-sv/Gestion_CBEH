@@ -1,3 +1,5 @@
+from authorization import protected
+
 import time
 
 import pandas as pd
@@ -8,6 +10,7 @@ from views.configuracion_dashboard import (
 )
 
 
+@protected('Configuración (Usuarios)')
 def mostrar_configuracion(
     db,
     generar_hash,

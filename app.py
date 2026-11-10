@@ -5,6 +5,8 @@ import streamlit as st
 from components.sidebar import mostrar_sidebar
 from config import APP_NAME, TZ_SV
 from styles import aplicar_estilos
+from authorization import AccessDenied, authorize
+from view_dispatch import render_module
 from views.dashboard import (
     mostrar_dashboard_admin,
     mostrar_dashboard_docente,
@@ -358,7 +360,7 @@ def login():
                 if not usuario_data:
                     st.error("❌ Usuario no encontrado.")
                     return
-                if not usuario_data.get("activo", True):
+                if usuario_data.get("activo") is not True:
                     st.error(
                         "⛔ Este usuario se encuentra inactivo. Contacte a la Administración."
                     )
@@ -374,6 +376,9 @@ def login():
                 password_valida = verificar_password(password, password_hash)
                 if not password_valida:
                     st.error("❌ Contraseña incorrecta.")
+                    return
+                if usuario_data.get("rol") not in ("admin", "docente"):
+                    st.error("Usuario sin un rol autorizado.")
                     return
                 st.session_state["logged_in"] = True
                 st.session_state["user_role"] = usuario_data.get("rol")
@@ -415,16 +420,7 @@ def login():
 # 5. FUNCIÓN LOGOUT
 # ==========================================
 def logout():
-    keys_to_delete = [
-        "logged_in",
-        "user_role",
-        "user_name",
-        "user_id",
-        "alum_view",
-    ]
-    for key in keys_to_delete:
-        if key in st.session_state:
-            del st.session_state[key]
+    st.session_state.clear()
     st.rerun()
 
 
@@ -433,6 +429,14 @@ def logout():
 # ==========================================
 if not st.session_state["logged_in"]:
     login()
+    st.stop()
+
+try:
+    principal = authorize(db, "Inicio")
+    st.session_state["user_name"] = principal.name
+except AccessDenied as error:
+    st.session_state.clear()
+    st.error(str(error))
     st.stop()
 
 # ==========================================
@@ -448,15 +452,9 @@ if opcion_seleccionada == "__logout__":
 # ==========================================
 # 8. CONTENIDO PRINCIPAL
 # ==========================================
-if opcion_seleccionada == "Inicio":
-    if st.session_state["user_role"] == "admin" and db:
-        mostrar_dashboard_admin(
-            db=db,
-            nombre_usuario=limpiar_nombre(st.session_state["user_name"]),
-        )
-    elif st.session_state["user_role"] == "docente" and db:
-        mostrar_dashboard_docente(
-            db=db,
-            nombre_usuario=st.session_state["user_name"],
-            limpiar_nombre=limpiar_nombre,
-        )
+try:
+    render_module(db, opcion_seleccionada)
+except AccessDenied as error:
+    st.error(str(error))
+except Exception:
+    st.error("No se pudo completar la operación. Revise la conexión DEMO y vuelva a intentarlo.")

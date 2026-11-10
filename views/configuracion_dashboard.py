@@ -1,3 +1,5 @@
+from authorization import protected
+
 from datetime import date
 
 import streamlit as st
@@ -6,6 +8,7 @@ from firebase_admin import firestore
 from config import CICLO_LECTIVO
 
 
+@protected('Configuración (Usuarios)')
 def mostrar_configuracion_dashboard(db):
     st.subheader(
         "🖥️ Configuración del Dashboard"

@@ -1,8 +1,11 @@
+from authorization import protected
+
 import streamlit as st
 from firebase_admin import firestore
 from config import CICLO_LECTIVO
 
 
+@protected('Inscripción')
 def mostrar_inscripcion(
     db,
     lista_grados,

@@ -1,3 +1,5 @@
+from authorization import protected
+
 import time
 
 import pandas as pd
@@ -38,6 +40,7 @@ def _es_alumno_graduado(data):
         or bool(data.get("fecha_graduacion"))
     )
 
+@protected('Consulta Alumnos')
 def mostrar_consulta_alumnos(
     db,
     lista_grados,

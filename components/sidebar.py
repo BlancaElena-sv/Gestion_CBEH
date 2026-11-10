@@ -2,6 +2,8 @@ import html
 
 import streamlit as st
 
+from navigation import modules_for_role
+
 
 def mostrar_sidebar(nombre_usuario, rol_usuario):
     """
@@ -274,87 +276,15 @@ def mostrar_sidebar(nombre_usuario, rol_usuario):
                 st.session_state["menu_actual"] = pagina
                 st.rerun()
 
-        # ------ MENÚ ADMINISTRADOR ------
-        if es_admin:
-            seccion("Principal")
-            opcion_menu(":material/home:  Inicio", "Inicio", "menu_inicio_admin")
-
-            seccion("Gestión académica")
-            opcion_menu(
-                ":material/how_to_reg:  Inscripción", "Inscripción", "menu_inscripcion"
-            )
-            opcion_menu(
-                ":material/manage_search:  Consulta Alumnos",
-                "Consulta Alumnos",
-                "menu_alumnos",
-            )
-            opcion_menu(":material/co_present:  Maestros", "Maestros", "menu_maestros")
-            opcion_menu(
-                ":material/event_available:  Asistencia Global",
-                "Asistencia Global",
-                "menu_asistencia",
-            )
-            opcion_menu(":material/grading:  Notas", "Notas", "menu_notas")
-
-            seccion("Administración")
-            opcion_menu(":material/payments:  Finanzas", "Finanzas", "menu_finanzas")
-            opcion_menu(
-                ":material/trending_up:  Promoción de Grado",
-                "Promoción de Grado",
-                "menu_promocion",
-            )
-
-            seccion("Sistema")
-            opcion_menu(
-                ":material/settings:  Configuración",
-                "Configuración (Usuarios)",
-                "menu_configuracion",
-            )
-            opcion_menu(
-                ":material/account_circle:  Mi Perfil", "Mi Perfil", "menu_perfil_admin"
-            )
-
-        # ------ MENÚ DOCENTE ------
-        else:
-            seccion("Principal")
-            opcion_menu(":material/home:  Inicio", "Inicio", "menu_inicio_docente")
-
-            seccion("Académico")
-            opcion_menu(
-                ":material/checklist:  Mis Listados", "Mis Listados", "menu_listados"
-            )
-            opcion_menu(
-                ":material/event_available:  Tomar Asistencia",
-                "Tomar Asistencia",
-                "menu_tomar_asistencia",
-            )
-            opcion_menu(
-                ":material/edit_note:  Cargar Notas",
-                "Cargar Notas",
-                "menu_cargar_notas",
-            )
-            opcion_menu(
-                ":material/library_books:  Ver Mis Cargas",
-                "Ver Mis Cargas",
-                "menu_mis_cargas",
-            )
-            opcion_menu(
-                ":material/folder_open:  Expediente Alumnos",
-                "Expediente Alumnos",
-                "menu_expediente_docente",
-            )
-            opcion_menu(
-                ":material/description:  Boletas de Notas",
-                "Boletas de Notas",
-                "menu_boletas_docente",
-            )
-
-            seccion("Cuenta")
-            opcion_menu(
-                ":material/account_circle:  Mi Perfil",
-                "Mi Perfil",
-                "menu_perfil_docente",
-            )
+        seccion_actual = None
+        for modulo in modules_for_role(rol_usuario):
+            seccion_modulo = modulo.section
+            if modulo.name == "Mi Perfil" and es_admin:
+                seccion_modulo = "Sistema"
+            if seccion_modulo != seccion_actual:
+                seccion(seccion_modulo)
+                seccion_actual = seccion_modulo
+            opcion_menu(modulo.label, modulo.name, modulo.key)
 
         st.markdown("---")
         cerrar_sesion = st.button(

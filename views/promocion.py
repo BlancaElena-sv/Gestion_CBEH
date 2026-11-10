@@ -1,3 +1,5 @@
+from authorization import protected
+
 import time
 
 import pandas as pd
@@ -20,6 +22,7 @@ MAPA_PROMOCION = {
 }
 
 
+@protected('Promoción de Grado')
 def mostrar_promocion(
     db,
     obtener_fecha_hoy,

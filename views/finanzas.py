@@ -1,3 +1,5 @@
+from authorization import protected
+
 import time
 from datetime import datetime, timedelta
 
@@ -13,6 +15,7 @@ from config import(
     LOGO_INSTITUCIONAL,
 )
 
+@protected('Finanzas')
 def mostrar_finanzas(
     db,
     lista_grados,
@@ -70,6 +73,7 @@ def mostrar_finanzas(
     )
 
 
+@protected('Finanzas')
 def mostrar_corte_caja(
     db,
     tab,
@@ -260,6 +264,7 @@ def _ciclo_movimiento(data, fecha_actual=None):
     return None
 
 
+@protected('Finanzas')
 def mostrar_cobros_alumnos(
     db,
     tab,
@@ -680,6 +685,7 @@ def mostrar_cobros_alumnos(
                 st.rerun()
 
 
+@protected('Finanzas')
 def mostrar_gastos(
     db,
     tab,
@@ -953,6 +959,7 @@ def mostrar_gastos(
                 st.rerun()
 
 
+@protected('Finanzas')
 def mostrar_reportes(
     db,
     tab,

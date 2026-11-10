@@ -1,3 +1,6 @@
+from authorization import authorize, AccessDenied
+from teacher_store import TeacherStore
+
 import time
 from datetime import datetime
 
@@ -25,6 +28,24 @@ def mostrar_panel_docente(
     obtener_fecha_hoy,
     obtener_hora_actual,
 ):
+
+    principal = authorize(db, opcion_seleccionada)
+    if principal.role != "docente":
+        raise AccessDenied("Este panel es exclusivo del rol docente.")
+    from academic_config import LISTA_GRADOS_TODO, LISTA_GRADOS_NOTAS, LISTA_MESES, MAPA_CURRICULAR
+    db = TeacherStore(db, principal, opcion_seleccionada)
+    lista_grados = [grado for grado in LISTA_GRADOS_TODO if grado in principal.grades]
+    lista_grados_notas = [grado for grado in LISTA_GRADOS_NOTAS if grado in principal.grades]
+    lista_meses = LISTA_MESES
+    mapa_curricular = {
+        grado: [materia for materia in materias if (grado, materia) in principal.assignments]
+        for grado, materias in MAPA_CURRICULAR.items() if grado in principal.grades
+    }
+    if opcion_seleccionada != "Ver Mis Cargas" and not (
+        lista_grados_notas if opcion_seleccionada == "Cargar Notas" else lista_grados
+    ):
+        st.info("No tiene asignaciones habilitadas para este módulo y ciclo.")
+        return
 
     if opcion_seleccionada == "Mis Listados":
         st.title("🖨️ Imprimir Listas")
@@ -406,7 +427,8 @@ def mostrar_panel_docente(
                     },
                 )
 
-            db.collection("notas_mensuales").document(id_nuevo).set(
+            batch.set(
+                db.collection("notas_mensuales").document(id_nuevo),
                 {
                     "ciclo_lectivo": CICLO_LECTIVO,
                     "grado": grado,

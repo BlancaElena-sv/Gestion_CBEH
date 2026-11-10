@@ -1,27 +1,8 @@
-"""
-Selector de servicio Firebase según el entorno.
+"""Imports compatibles: esta rama nunca selecciona un backend de producción.
 
-- ENTORNO=demo       → usa firebase_demo_service
-- ENTORNO=produccion → usa firebase_service
-
-Este módulo es lo único que app.py necesita importar.
+La validación de ENTORNO ocurre al conectar o subir un archivo.
 """
 
-from config import ES_DEMO
+from firebase_service import conectar_firebase, obtener_usuario, subir_archivo
 
-
-if ES_DEMO:
-    # Entorno DEMO
-    from firebase_demo_service import (
-        conectar_firebase_demo as conectar_firebase,
-        subir_archivo_demo as subir_archivo,
-    )
-    print("[Firebase] Modo DEMO activo (edumanager-demo)")
-
-else:
-    # Entorno PRODUCCIÓN
-    from firebase_service import (
-        conectar_firebase,
-        subir_archivo,
-    )
-    print("[Firebase] Modo PRODUCCIÓN activo (gestioncbeh)")
+__all__ = ["conectar_firebase", "obtener_usuario", "subir_archivo"]

@@ -2,13 +2,11 @@ from datetime import datetime
 
 import streamlit as st
 
-from auth import generar_hash, verificar_password
+from auth import generar_hash
 from components.sidebar import mostrar_sidebar
 from config import (
     APP_NAME,
     CICLO_LECTIVO,
-    COLEGIO_NOMBRE,
-    LOGO_INSTITUCIONAL,
     TZ_SV,
 )
 from firebase_selector import (
@@ -88,148 +86,264 @@ def limpiar_nombre(nombre):
 
 
 def login():
-    col_izq, col_centro, col_der = st.columns([1, 2, 1])
-
-    with col_centro:
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-
-        try:
-            sc1, sc2, sc3 = st.columns([1, 1, 1])
-
-            with sc2:
-                st.image(LOGO_INSTITUCIONAL, use_container_width=True)
-
-        except Exception:
-            st.warning("⚠️")
-
-        st.markdown(
-            "<h1 style='text-align: center; color: #1E3A8A;'>EduManager</h1>",
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            f"""
-            <h4 style='text-align: center; color: #555;'>
-            {COLEGIO_NOMBRE}
-            </h4>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.write("")
-
-        with st.form("login_form"):
-            user = st.text_input("Usuario")
-            password = st.text_input("Contraseña", type="password")
-
-            submitted = st.form_submit_button(
-                "INICIAR SESIÓN", type="primary", use_container_width=True
-            )
-
-        if submitted:
-            # ------------------------------------------
-            # VALIDACIONES BÁSICAS
-            # ------------------------------------------
-
-            if not user.strip():
-                st.error("❌ Ingrese su usuario.")
-                return
-
-            if not password:
-                st.error("❌ Ingrese su contraseña.")
-                return
-
-            if not db:
-                st.error("⚠️ Sin conexión con la base de datos.")
-                return
-
-            try:
-                # --------------------------------------
-                # BUSCAR USUARIO
-                # --------------------------------------
-
-                doc = db.collection("usuarios").document(user.strip()).get()
-
-                if not doc.exists:
-                    st.error("❌ Usuario no encontrado.")
-                    return
-
-                d = doc.to_dict()
-
-                # --------------------------------------
-                # COMPROBAR ESTADO
-                # --------------------------------------
-
-                if not d.get("activo", True):
-                    st.error(
-                        "⛔ Este usuario se encuentra inactivo. "
-                        "Contacte a la Administración."
-                    )
-                    return
-
-                # --------------------------------------
-                # COMPROBAR CONTRASEÑA HASH
-                # --------------------------------------
-
-                password_hash = d.get("password_hash")
-
-                if not password_hash:
-                    st.error(
-                        "⚠️ La cuenta no posee una credencial válida. "
-                        "Contacte a la Administración."
-                    )
-                    return
-
-                password_valida = verificar_password(password, password_hash)
-
-                if not password_valida:
-                    st.error("❌ Contraseña incorrecta.")
-                    return
-
-                # --------------------------------------
-                # LOGIN CORRECTO
-                # --------------------------------------
-
-                st.session_state["logged_in"] = True
-                st.session_state["user_role"] = d.get("rol")
-                st.session_state["user_name"] = d.get("nombre", user)
-                st.session_state["user_id"] = user.strip()
-
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"❌ Error al iniciar sesión: {e}")
-
-            else:
-                st.error("⚠️ Sin conexión.")
-
-        st.info(
-            "¿Olvidó su credencial? Solicite restablecimiento con la Administración."
-        )
-    st.info(
-        """
-    Para poder acceder a todas las funcionalidades de la demostración del sistema,
-    los usuarios deben iniciar sesión con sus credenciales correspondientes:
-
-    * **Docente:**
-      * **Usuario:** `docente.demo`
-      * **Contraseña:** `Demo2027!`
-
-    * **Administrador:**
-      * **Usuario:** `admin.demo`
-      * **Contraseña:** `Demo2027!`
-    """
-    )
-
+    # ==========================================
+    # CSS DEL LOGIN MODERNO (VERSIÓN DEMO)
+    # ==========================================
     st.markdown(
-        "<div style='text-align: center; color: grey; "
-        "font-size: 11px; margin-top: 40px;'>"
-        "<p>© 2026 It solutions El Salvador | "
-        "Todos los derechos reservados.</p>"
-        "</div>",
+        """
+    <style>
+        /* ==========================================
+           1. FONDO INSTITUCIONAL
+        ========================================== */
+        .stApp {
+            background:
+                radial-gradient(
+                    circle at 85% 15%,
+                    rgba(59, 130, 246, 0.22),
+                    transparent 35%
+                ),
+                linear-gradient(
+                    135deg,
+                    #142B4F 0%,
+                    #193B70 55%,
+                    #2457A6 100%
+                ) !important;
+            background-attachment: fixed !important;
+            min-height: 100vh;
+        }
+
+        /* Contenedores intermedios transparentes */
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"] {
+            background: transparent !important;
+        }
+
+        /* Ocultar encabezado Streamlit */
+        header[data-testid="stHeader"] {
+            display: none !important;
+        }
+
+        /* Eliminar espacios superiores innecesarios */
+        .block-container {
+            padding-top: 2rem !important;
+            padding-bottom: 1rem !important;
+        }
+
+        /* ==========================================
+           2. TARJETA DE ACCESO
+        ========================================== */
+        .stForm {
+            background: #F8FAFC !important;
+            border: 1px solid rgba(255,255,255,0.65) !important;
+            border-radius: 22px !important;
+            padding: 35px 32px !important;
+            box-shadow:
+                0 20px 55px rgba(0,0,0,0.25),
+                0 0 0 1px rgba(255,255,255,0.08) !important;
+            max-width: 450px !important;
+            margin: 0 auto !important;
+            animation: slideUp 0.6s ease-out !important;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(25px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ==========================================
+           3. LOGO INSTITUCIONAL
+        ========================================== */
+        .stImage img {
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.25)) !important;
+            animation: fadeIn 0.9s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.92);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* ==========================================
+           4. TÍTULO EDUMANAGER
+        ========================================== */
+        h1 {
+            color: #FFFFFF !important;
+            background: none !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+            font-size: 2.8rem !important;
+            font-weight: 800 !important;
+            text-align: center !important;
+            letter-spacing: -0.8px !important;
+            text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35) !important;
+            margin-top: 12px !important;
+            margin-bottom: 5px !important;
+        }
+
+        .login-subtitle {
+            color: #FFFFFF !important;
+            text-align: center;
+            font-size: 19px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+            margin-top: 8px;
+            margin-bottom: 25px;
+        }
+
+        .login-divider {
+            width: 55px;
+            height: 3px;
+            background: #F2B544;
+            border-radius: 5px;
+            margin: 12px auto 22px auto;
+        }
+
+        /* ==========================================
+           5. CAMPOS DE TEXTO
+        ========================================== */
+        .stTextInput input {
+            background: #FFFFFF !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 10px !important;
+            padding: 13px 15px !important;
+            color: #142B4F !important;
+            font-size: 15px !important;
+            transition: all 0.25s ease !important;
+        }
+
+        .stTextInput input:focus {
+            border-color: #2457A6 !important;
+            box-shadow: 0 0 0 3px rgba(36,87,166,0.13) !important;
+            outline: none !important;
+        }
+
+        .stTextInput label {
+            color: #334155 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+        }
+
+        /* ==========================================
+           6. BOTÓN INICIAR SESIÓN
+        ========================================== */
+        .stForm button[kind="primary"] {
+            background: linear-gradient(135deg, #E34B4B 0%, #C92F3B 100%) !important;
+            color: #FFFFFF !important;
+            border: none !important;
+            border-radius: 10px !important;
+            padding: 13px 20px !important;
+            font-size: 15px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.4px !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 5px 15px rgba(201,47,59,0.25) !important;
+            width: 100% !important;
+        }
+
+        .stForm button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #EF5555 0%, #B91C35 100%) !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 20px rgba(201,47,59,0.35) !important;
+        }
+
+        /* ==========================================
+           7. MENSAJES DE ALERTA
+        ========================================== */
+        .stAlert {
+            border-radius: 10px !important;
+            border: none !important;
+            padding: 12px 15px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        }
+
+        /* ==========================================
+           8. RECUPERACIÓN DE CREDENCIALES
+        ========================================== */
+        .login-recovery {
+            text-align: center;
+            color: #E2EAF6;
+            font-size: 13px;
+            margin-top: 24px;
+            line-height: 1.6;
+        }
+
+        .login-recovery strong {
+            color: #F2B544;
+            font-weight: 600;
+        }
+
+        /* ==========================================
+           9. INFORMACIÓN DE BASE DE DATOS
+        ========================================== */
+        .login-info {
+            text-align: center;
+            color: #E2EAF6;
+            font-size: 12px;
+            line-height: 1.6;
+            margin-top: 18px;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(242,181,68,0.35);
+            border-radius: 10px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .login-info strong {
+            color: #F2B544;
+        }
+
+        /* ==========================================
+           10. FOOTER
+        ========================================== */
+        .login-footer {
+            text-align: center;
+            color: rgba(226,234,246,0.65);
+            font-size: 11px;
+            margin-top: 30px;
+            padding-bottom: 10px;
+        }
+
+        /* ==========================================
+           11. RESPONSIVE
+        ========================================== */
+        @media (max-width: 640px) {
+            .stForm {
+                padding: 25px 20px !important;
+                border-radius: 18px !important;
+            }
+
+            h1 {
+                font-size: 1.9rem !important;
+            }
+
+            .login-subtitle {
+                font-size: 14px;
+            }
+
+            .block-container {
+                padding-top: 1rem !important;
+            }
+        }
+    </style>
+    """,
         unsafe_allow_html=True,
     )
+
+    # ... resto de tu función login() con Firebase ...
 
 
 def logout():

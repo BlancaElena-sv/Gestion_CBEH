@@ -1,11 +1,14 @@
 from authorization import protected
 
 import time
+import math
+from html import escape
 
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from views.notas_historicas import mostrar_notas_historicas
+from components.academic_reports import mostrar_respaldo_mensual
 
 from config import(
     COLEGIO_NOMBRE,
@@ -120,7 +123,7 @@ def mostrar_notas(
 
                 lista.append(
                     {
-                        "NIE": datos["nie"],
+                        "NIE": str(datos["nie"]).strip(),
                         "Nombre": (
                             f"{datos.get('apellidos', '')} "
                             f"{datos.get('nombres', '')}"
@@ -188,6 +191,10 @@ def mostrar_notas(
                     id_doc = id_nuevo
                     doc_ref = doc_nuevo
 
+                if doc_ref.exists and str(doc_ref.to_dict().get("ciclo_lectivo", CICLO_LECTIVO)) != str(CICLO_LECTIVO):
+                    st.error("El registro mensual pertenece a otro ciclo; operación cancelada.")
+                    return
+
                 # ============================================
                 # COLUMNAS
                 # ============================================
@@ -210,58 +217,44 @@ def mostrar_notas(
                 # CARGAR DATOS EXISTENTES
                 # ============================================
 
-                if doc_ref.exists:
-
-                    detalles = (
-                        doc_ref
-                        .to_dict()
-                        .get(
-                            "detalles",
-                            {},
-                        )
+                detalles = doc_ref.to_dict().get("detalles", {}) if doc_ref.exists else {}
+                detalles = {str(nie).strip(): row if isinstance(row, dict) else {}
+                            for nie, row in (detalles or {}).items()}
+                promedios_reconstruidos = {}
+                for columna in columnas_notas:
+                    df[columna] = df["NIE"].map(
+                        lambda nie, c=columna: detalles.get(str(nie).strip(), {}).get(c, 0.0)
                     )
-
-                    for columna in columnas_notas:
-                        df[columna] = (
-                            df["NIE"].map(
-                                lambda nie: (
-                                    detalles
-                                    .get(nie, {})
-                                    .get(
-                                        columna,
-                                        0.0,
-                                    )
-                                )
-                            )
-                        )
-
+                if detalles:
+                    st.info("✅ Datos cargados desde notas_mensuales")
                 else:
+                    individuales = (db.collection("notas").where("grado", "==", grado)
+                                    .where("materia", "==", materia).where("mes", "==", mes).stream())
+                    for documento in individuales:
+                        nota = documento.to_dict()
+                        # Sin ciclo explícito no se atribuye un registro al ciclo DEMO.
+                        if str(nota.get("ciclo_lectivo")) != str(CICLO_LECTIVO):
+                            continue
+                        nie_nota = str(nota.get("nie", "")).strip()
+                        if nie_nota:
+                            promedios_reconstruidos[nie_nota] = nota.get("promedio_final", 0.0)
+                    if promedios_reconstruidos:
+                        df["Promedio"] = df["NIE"].map(
+                            lambda nie: promedios_reconstruidos.get(str(nie).strip(), 0.0))
+                        st.warning("⚠️ Los datos detallados no están disponibles. Solo se muestra el promedio final guardado.")
+                    else:
+                        st.info("No hay notas registradas para este mes.")
 
-                    for columna in columnas_notas:
-                        df[columna] = 0.0
-
-                # ============================================
-                # PROMEDIO
-                # ============================================
-
-                if materia == "Conducta":
-
-                    df["Promedio"] = (
-                        df[columnas_notas[0]]
-                    )
-
-                else:
-
-                    df["Promedio"] = (
-                        (
-                            df["Act1 (25%)"] * 0.25
-                            + df["Act2 (25%)"] * 0.25
-                            + df["Alt1 (10%)"] * 0.10
-                            + df["Alt2 (10%)"] * 0.10
+                # Fórmula existente, sin alterar pesos ni redondeo.
+                if "Promedio" not in df.columns:
+                    if materia == "Conducta":
+                        df["Promedio"] = df[columnas_notas[0]]
+                    else:
+                        df["Promedio"] = (
+                            df["Act1 (25%)"] * 0.25 + df["Act2 (25%)"] * 0.25
+                            + df["Alt1 (10%)"] * 0.10 + df["Alt2 (10%)"] * 0.10
                             + df["Examen (30%)"] * 0.30
-                        )
-                        .apply(redondear_mined)
-                    )
+                        ).apply(redondear_mined)
 
                 # ============================================
                 # CONFIGURACIÓN EDITOR
@@ -304,6 +297,8 @@ def mostrar_notas(
                     key=f"editor_{id_doc}",
                 )
 
+                st.caption(f"Registro leído desde: {id_doc}")
+
                 # ============================================
                 # GUARDAR
                 # ============================================
@@ -311,8 +306,19 @@ def mostrar_notas(
                 if st.button(
                     "💾 Guardar Notas",
                     type="primary",
+                    key="doc_guardar_notas_admin",
                 ):
 
+                    try:
+                        valores_validos = all(
+                            math.isfinite(float(valor)) and 0 <= float(valor) <= 10
+                            for columna in columnas_notas for valor in editor[columna]
+                        )
+                    except (TypeError, ValueError, OverflowError):
+                        valores_validos = False
+                    if not valores_validos:
+                        st.error("Las calificaciones deben ser números entre 0 y 10.")
+                        return
                     batch = db.batch()
 
                     detalles = {}
@@ -353,10 +359,10 @@ def mostrar_notas(
                             )
                         )
 
-                        nie = fila["NIE"]
+                        nie = str(fila["NIE"]).strip()
 
                         detalles[nie] = {
-                            columna: fila[columna]
+                            columna: float(fila[columna])
                             for columna
                             in columnas_notas
                         }
@@ -368,9 +374,14 @@ def mostrar_notas(
                         ref_nota = (
                             db.collection("notas")
                             .document(
-                                f"{nie}_{id_doc}"
+                                f"{nie}_{id_nuevo}"
                             )
                         )
+
+                        existente = ref_nota.get()
+                        if existente.exists and str(existente.to_dict().get("ciclo_lectivo")) != str(CICLO_LECTIVO):
+                            st.error("Una nota existente pertenece a otro ciclo; operación cancelada.")
+                            return
 
                         batch.set(
                             ref_nota,
@@ -388,11 +399,8 @@ def mostrar_notas(
                             },
                         )
 
-                    db.collection(
-                        "notas_mensuales"
-                    ).document(
-                        id_doc
-                    ).set(
+                    batch.set(
+                        db.collection("notas_mensuales").document(id_nuevo),
                         {
                             "ciclo_lectivo": (
                                 CICLO_LECTIVO
@@ -412,6 +420,11 @@ def mostrar_notas(
 
                     time.sleep(1)
                     st.rerun()
+
+                mostrar_respaldo_mensual(
+                    editor, columnas_notas, grado, materia, mes, redondear_mined,
+                    get_base64, solo_promedios=bool(promedios_reconstruidos) and not detalles,
+                )
 
     # ========================================================
     # 2. REPORTE ANUAL POR GRADO
@@ -513,9 +526,11 @@ def mostrar_notas(
                         .stream()
                     )
 
+                    registros_leidos = 0
                     data_anual = {}
 
                     for nota_doc in notas_ref:
+                        registros_leidos += 1
 
                         nota = nota_doc.to_dict()
 
@@ -549,6 +564,8 @@ def mostrar_notas(
                         data_anual[nie][
                             materia
                         ][mes_nota] = valor
+
+                    st.caption(f"Registros de notas leídos: {registros_leidos}")
 
                     # ----------------------------------------
                     # HTML
@@ -646,7 +663,7 @@ def mostrar_notas(
                                     f"</td>"
                                     f"<td rowspan='{len(materias_reporte)}' "
                                     f"style='text-align:left;'>"
-                                    f"{alumno['nombre']}"
+                                    f"{escape(str(alumno['nombre']))}"
                                     f"</td>"
                                 )
 
@@ -660,7 +677,7 @@ def mostrar_notas(
                                     text-align:left;
                                     font-size:10px;
                                 ">
-                                    {materia}
+                                    {escape(str(materia))}
                                 </td>
 
                                 <td>{notas_materia.get('Febrero', '-')}</td>
@@ -721,7 +738,7 @@ def mostrar_notas(
                             {imagen_logo}
 
                             <h2>
-                                {COLEGIO_NOMBRE.upper()}
+                                {escape(COLEGIO_NOMBRE.upper())}
                             </h2>
 
                             <h3>
@@ -732,7 +749,7 @@ def mostrar_notas(
 
                             <p>
                                 <b>GRADO:</b>
-                                {grado_reporte.upper()}
+                                {escape(str(grado_reporte).upper())}
                             </p>
 
                         </div>
@@ -783,6 +800,7 @@ def mostrar_notas(
                     components.html(
                         f"""
                         <html>
+                            <head><style>@media print {{ button {{ display:none; }} }}</style></head>
                             <body>
                                 {html_reporte}
 
@@ -1108,7 +1126,7 @@ def mostrar_notas(
                                 text-align:left;
                                 padding-left:5px;
                             ">
-                                {materia}
+                                {escape(str(materia))}
                             </td>
 
                             <td>{notas.get('Febrero', '-')}</td>
@@ -1160,7 +1178,7 @@ def mostrar_notas(
                                     margin:0;
                                     font-size:16px;
                                 ">
-                                    {COLEGIO_NOMBRE.upper()}
+                                    {escape(COLEGIO_NOMBRE.upper())}
                                 </h2>
 
                                 <h4 style="
@@ -1184,25 +1202,25 @@ def mostrar_notas(
                             <tr>
                                 <td>
                                     <b>ALUMNO:</b>
-                                    {alumno.get('apellidos', '')}
-                                    {alumno.get('nombres', '')}
+                                    {escape(str(alumno.get('apellidos', '')))}
+                                    {escape(str(alumno.get('nombres', '')))}
                                 </td>
 
                                 <td style="text-align:right;">
                                     <b>GRADO:</b>
-                                    {grado_lote}
+                                    {escape(str(grado_lote))}
                                 </td>
                             </tr>
 
                             <tr>
                                 <td>
                                     <b>NIE:</b>
-                                    {alumno.get('nie')}
+                                    {escape(str(alumno.get('nie')))}
                                 </td>
 
                                 <td style="text-align:right;">
                                     <b>GUÍA:</b>
-                                    {maestro_guia}
+                                    {escape(str(maestro_guia))}
                                 </td>
                             </tr>
 

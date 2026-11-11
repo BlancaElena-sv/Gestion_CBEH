@@ -1,5 +1,7 @@
 from authorization import protected
 
+from html import escape
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -285,7 +287,7 @@ def mostrar_notas_historicas(
 
             filas_html += f"""
             <tr>
-                <td style="text-align:left;padding-left:5px;">{materia}</td>
+                <td style="text-align:left;padding-left:5px;">{escape(str(materia))}</td>
                 <td>{notas.get('Febrero', '-')}</td>
                 <td>{notas.get('Marzo', '-')}</td>
                 <td>{notas.get('Abril', '-')}</td>
@@ -354,22 +356,22 @@ def mostrar_notas_historicas(
             <div class="encabezado">
                 {imagen_logo}
                 <div class="titulo">
-                    <h2>{COLEGIO_NOMBRE.upper()}</h2>
+                    <h2>{escape(COLEGIO_NOMBRE.upper())}</h2>
                     <h4>INFORME HISTÓRICO DE RENDIMIENTO ACADÉMICO</h4>
                     <strong>CICLO {ciclo_seleccionado}</strong>
                 </div>
             </div>
 
             <p>
-                <b>Alumno:</b> {nombre_alumno}
+                <b>Alumno:</b> {escape(str(nombre_alumno))}
                 &nbsp;&nbsp;&nbsp;
-                <b>NIE:</b> {nie_seleccionado}
+                <b>NIE:</b> {escape(str(nie_seleccionado))}
             </p>
 
             <p>
-                <b>Grado cursado:</b> {grado_seleccionado}
+                <b>Grado cursado:</b> {escape(str(grado_seleccionado))}
                 &nbsp;&nbsp;&nbsp;
-                <b>Maestro guía:</b> {maestro_guia}
+                <b>Maestro guía:</b> {escape(str(maestro_guia))}
             </p>
 
             <table>

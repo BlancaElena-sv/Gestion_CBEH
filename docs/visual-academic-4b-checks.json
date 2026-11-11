@@ -1,0 +1,298 @@
+{
+  "metodo": "Chromium local, vistas main y DEMO con servicios simulados y datos ficticios; identidad DEMO normalizada en referencia",
+  "viewport": {
+    "escritorio": [
+      1440,
+      1000
+    ],
+    "movil": [
+      390,
+      844
+    ]
+  },
+  "pares_capturas": 34,
+  "pdf_ficticios": 16,
+  "equivalencia_completa": false,
+  "resultados": {
+    "notas": [
+      {
+        "size": "desktop",
+        "role": "admin",
+        "variant": "reference",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      },
+      {
+        "size": "desktop",
+        "role": "admin",
+        "variant": "demo",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      },
+      {
+        "size": "desktop",
+        "role": "docente",
+        "variant": "reference",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      },
+      {
+        "size": "desktop",
+        "role": "docente",
+        "variant": "demo",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      },
+      {
+        "size": "mobile",
+        "role": "admin",
+        "variant": "reference",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      },
+      {
+        "size": "mobile",
+        "role": "admin",
+        "variant": "demo",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      },
+      {
+        "size": "mobile",
+        "role": "docente",
+        "variant": "reference",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      },
+      {
+        "size": "mobile",
+        "role": "docente",
+        "variant": "demo",
+        "report": true,
+        "printInvoked": true,
+        "printButtonHidden": true
+      }
+    ],
+    "historicos": [
+      {
+        "size": "desktop",
+        "variant": "reference",
+        "cycle": 2026,
+        "final": 6,
+        "printInvoked": true,
+        "pdf": true
+      },
+      {
+        "size": "desktop",
+        "variant": "demo",
+        "cycle": 2026,
+        "final": 6,
+        "printInvoked": true,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "reference",
+        "cycle": 2026,
+        "final": 6,
+        "printInvoked": true,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "demo",
+        "cycle": 2026,
+        "final": 6,
+        "printInvoked": true,
+        "pdf": true
+      }
+    ],
+    "boletas": [
+      {
+        "size": "desktop",
+        "variant": "reference",
+        "report": "annual",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": false,
+        "pdf": true
+      },
+      {
+        "size": "desktop",
+        "variant": "reference",
+        "report": "batch",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "desktop",
+        "variant": "reference",
+        "report": "individual",
+        "average": 9,
+        "cycleLabel": false,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "desktop",
+        "variant": "demo",
+        "report": "annual",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "desktop",
+        "variant": "demo",
+        "report": "batch",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "desktop",
+        "variant": "demo",
+        "report": "individual",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "reference",
+        "report": "annual",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": false,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "reference",
+        "report": "batch",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "reference",
+        "report": "individual",
+        "average": 9,
+        "cycleLabel": false,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "demo",
+        "report": "annual",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "demo",
+        "report": "batch",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      },
+      {
+        "size": "mobile",
+        "variant": "demo",
+        "report": "individual",
+        "average": 9,
+        "cycleLabel": true,
+        "printInvoked": true,
+        "printButtonHidden": true,
+        "pdf": true
+      }
+    ],
+    "privacidad": [
+      {
+        "size": "desktop",
+        "guide": false,
+        "module": "Expediente Alumnos",
+        "blocked": true,
+        "personalDataExposed": false
+      },
+      {
+        "size": "desktop",
+        "guide": false,
+        "module": "Boletas de Notas",
+        "blocked": true,
+        "personalDataExposed": false
+      },
+      {
+        "size": "desktop",
+        "guide": true,
+        "module": "Expediente Alumnos",
+        "blocked": true,
+        "personalDataExposed": false
+      },
+      {
+        "size": "desktop",
+        "guide": true,
+        "module": "Boletas de Notas",
+        "blocked": true,
+        "personalDataExposed": false
+      },
+      {
+        "size": "mobile",
+        "guide": false,
+        "module": "Expediente Alumnos",
+        "blocked": true,
+        "personalDataExposed": false
+      },
+      {
+        "size": "mobile",
+        "guide": false,
+        "module": "Boletas de Notas",
+        "blocked": true,
+        "personalDataExposed": false
+      },
+      {
+        "size": "mobile",
+        "guide": true,
+        "module": "Expediente Alumnos",
+        "blocked": true,
+        "personalDataExposed": false
+      },
+      {
+        "size": "mobile",
+        "guide": true,
+        "module": "Boletas de Notas",
+        "blocked": true,
+        "personalDataExposed": false
+      }
+    ]
+  }
+}

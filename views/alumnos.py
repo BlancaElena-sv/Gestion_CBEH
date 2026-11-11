@@ -1,4 +1,5 @@
 from authorization import protected
+from html import escape
 
 import time
 
@@ -8,6 +9,7 @@ import streamlit.components.v1 as components
 
 from config import(
     COLEGIO_NOMBRE,
+    CICLO_LECTIVO,
     SELLO_INSTITUCIONAL,
     LOGO_INSTITUCIONAL,
 ) 
@@ -170,7 +172,10 @@ def mostrar_consulta_alumnos(
     maestro_guia = "No Asignado"
 
     for d in q_guia:
-        maestro_guia = d.to_dict()["nombre_docente"]
+        guia = d.to_dict()
+        if str(guia.get("ciclo_lectivo", 2026)) == str(a.get("ciclo_lectivo", CICLO_LECTIVO)):
+            maestro_guia = guia.get("nombre_docente", "No Asignado")
+            break
 
     st.markdown("---")
 
@@ -648,6 +653,7 @@ def mostrar_consulta_alumnos(
 
     with tabs[2]:
         st.subheader("Boleta Oficial")
+        ciclo_actual_alumno = str(a.get("ciclo_lectivo", CICLO_LECTIVO))
 
         notas = (
             db.collection("notas")
@@ -659,6 +665,9 @@ def mostrar_consulta_alumnos(
 
         for doc in notas:
             dd = doc.to_dict()
+            # Mismo filtro de ciclo que producción; nunca mezclar años del NIE.
+            if str(dd.get("ciclo_lectivo", "")) != ciclo_actual_alumno:
+                continue
 
             if dd["materia"] not in nm:
                 nm[dd["materia"]] = {}
@@ -710,7 +719,7 @@ def mostrar_consulta_alumnos(
                     f"""
                     <tr>
                         <td style="text-align:left">
-                            {mat}
+                            {escape(str(mat))}
                         </td>
 
                         <td>{n.get('Febrero', '-')}</td>
@@ -778,29 +787,29 @@ def mostrar_consulta_alumnos(
 
                 <div style="margin-left:20px">
                     <h2>
-                        {COLEGIO_NOMBRE.upper()}
+                        {escape(COLEGIO_NOMBRE.upper())}
                     </h2>
 
                     <h4>
-                        INFORME DE NOTAS
+                        INFORME DE NOTAS · CICLO {escape(ciclo_actual_alumno)}
                     </h4>
                 </div>
             </div>
 
             <p>
                 <b>Alumno:</b>
-                {a.get('apellidos', '')}
-                {a.get('nombres', '')}
+                {escape(str(a.get('apellidos', '')))}
+                {escape(str(a.get('nombres', '')))}
 
                 |
 
                 <b>Grado:</b>
-                {a['grado_actual']}
+                {escape(str(a['grado_actual']))}
 
                 |
 
                 <b>Guía:</b>
-                {maestro_guia}
+                {escape(str(maestro_guia))}
             </p>
 
             <table

@@ -1,5 +1,6 @@
 from authorization import authorize, AccessDenied
 from teacher_store import TeacherStore
+from components.academic_reports import mostrar_respaldo_mensual
 
 import time
 from datetime import datetime
@@ -105,10 +106,6 @@ def mostrar_panel_docente(
 
         st.info(
             f"📅 Ciclo lectivo activo: {CICLO_LECTIVO}"
-        )
-        st.caption(
-            "Las calificaciones académicas aplican únicamente "
-            "de Primero a Noveno Grado."
         )
 
         c1, c2, c3 = st.columns(3)
@@ -376,7 +373,6 @@ def mostrar_panel_docente(
             key=f"doc_editor_{CICLO_LECTIVO}_{grado}_{materia}_{mes}",
         )
 
-        st.caption(f"Registro leído desde: {id_origen}")
 
         # ======================================================
         # GUARDAR SIEMPRE EN FORMATO CANÓNICO CON CICLO
@@ -443,6 +439,12 @@ def mostrar_panel_docente(
             st.success("✅ Notas guardadas correctamente.")
             time.sleep(1)
             st.rerun()
+
+        mostrar_respaldo_mensual(
+            editor, columnas_notas, grado, materia, mes, redondear_mined, get_base64,
+            solo_promedios=not detalles and bool(promedios_guardados),
+            button_key="doc_pdf_cuadro_mes",
+        )
 
     elif opcion_seleccionada == "Ver Mis Cargas":
         st.title("📋 Mi Carga Académica")

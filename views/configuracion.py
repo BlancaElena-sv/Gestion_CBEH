@@ -1,4 +1,5 @@
 from authorization import protected
+from integrity_service import mutate_user
 
 import time
 
@@ -246,26 +247,10 @@ def mostrar_configuracion(
                                 )
 
                             else:
-                                db.collection(
-                                    "usuarios"
-                                ).document(
-                                    usuario_id
-                                ).update(
-                                    {
-                                        "activo": False,
-                                        "fecha_baja": (
-                                            time.strftime(
-                                                "%d/%m/%Y"
-                                            )
-                                        ),
-                                        "baja_realizada_por": (
-                                            st.session_state.get(
-                                                "user_name",
-                                                "Administrador"
-                                            )
-                                        ),
-                                    }
-                                )
+                                mutate_user(db, usuario_id, 'deactivate', {
+                                    'fecha_baja': time.strftime('%d/%m/%Y'),
+                                    'baja_realizada_por': st.session_state.get('user_name', 'Administrador'),
+                                })
 
                                 st.success(
                                     "✅ Usuario dado de baja."
@@ -297,17 +282,7 @@ def mostrar_configuracion(
                             key=f"reactivar_user_{usuario_id}"
                         ):
 
-                            db.collection(
-                                "usuarios"
-                            ).document(
-                                usuario_id
-                            ).update(
-                                {
-                                    "activo": True,
-                                    "fecha_baja": None,
-                                    "baja_realizada_por": None,
-                                }
-                            )
+                            mutate_user(db, usuario_id, 'reactivate')
 
                             st.success(
                                 "✅ Usuario reactivado."
@@ -378,11 +353,7 @@ def mostrar_configuracion(
                             )
 
                         else:
-                            db.collection(
-                                "usuarios"
-                            ).document(
-                                usuario_id
-                            ).delete()
+                            mutate_user(db, usuario_id, 'delete')
 
                             st.success(
                                 "✅ Usuario eliminado "
@@ -517,35 +488,12 @@ def mostrar_configuracion(
                         )
                     )
 
-                    doc_actual = (
-                        db.collection("usuarios")
-                        .document(usuario)
-                        .get()
-                    )
-
-                    datos_usuario = {
-                        "usuario": usuario,
-                        "password_hash": password_hash,
-                        "rol": rol,
-                        "nombre": nombre,
-                    }
-
-                    if not doc_actual.exists:
-                        datos_usuario["activo"] = True
-
-                    db.collection("usuarios").document(usuario).set(
-                        datos_usuario,
-                        merge=True,
-                    )
-
-                    db.collection(
-                        "usuarios"
-                    ).document(
-                        usuario
-                    ).set(
-                        datos_usuario,
-                        merge=True,
-                    )
+                    mutate_user(db, usuario, 'save', {
+                        'usuario': usuario,
+                        'password_hash': password_hash,
+                        'rol': rol,
+                        'nombre': nombre,
+                    })
 
                     st.success(
                         "✅ Usuario creado "

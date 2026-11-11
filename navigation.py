@@ -29,7 +29,7 @@ MODULES = (
     Module("Ver Mis Cargas", ("docente",), "Académico", ":material/library_books:  Ver Mis Cargas", "menu_mis_cargas", "views.docente_panel:mostrar_panel_docente"),
     Module("Expediente Alumnos", ("docente",), "Académico", ":material/folder_open:  Expediente Alumnos", "menu_expediente_docente", blocked="Pendiente separar los datos personales y autorizar el alcance de bitácora por maestro guía."),
     Module("Boletas de Notas", ("docente",), "Académico", ":material/description:  Boletas de Notas", "menu_boletas_docente", blocked="Pendiente adaptar la lectura de todas las materias exclusivamente para maestros guía."),
-    Module("Mi Perfil", ("admin", "docente"), "Cuenta", ":material/account_circle:  Mi Perfil", "menu_perfil", blocked="La vista Firebase aún no está adaptada."),
+    Module("Mi Perfil", ("admin", "docente"), "Cuenta", ":material/account_circle:  Mi Perfil", "menu_perfil", target="views.perfil:mostrar_perfil"),
 )
 BY_NAME = {module.name: module for module in MODULES}
 

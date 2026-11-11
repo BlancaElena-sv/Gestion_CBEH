@@ -1,4 +1,9 @@
 from authorization import protected
+from finance_service import record_movement
+from html import escape
+import hashlib
+import json
+import uuid
 
 import time
 from datetime import datetime, timedelta
@@ -14,6 +19,21 @@ from config import(
     TZ_SV,
     LOGO_INSTITUCIONAL,
 )
+
+def _record_form_movement(db, data):
+    # La misma intención conserva su ID si el commit perdió la confirmación.
+    intent = {key: value for key, value in data.items()
+              if key not in {'fecha', 'fecha_legible', 'id_short', 'grado_alumno'}}
+    intent['dia'] = str(data.get('fecha_legible', ''))[:10]
+    fingerprint = hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()
+    pending = st.session_state.get('_financial_pending')
+    if not pending or pending['fingerprint'] != fingerprint:
+        pending = {'fingerprint': fingerprint, 'id': uuid.uuid4().hex}
+        st.session_state['_financial_pending'] = pending
+    result = record_movement(db, data, operation_id=pending['id'])
+    st.session_state.pop('_financial_pending', None)
+    return result
+
 
 @protected('Finanzas')
 def mostrar_finanzas(
@@ -178,7 +198,7 @@ def mostrar_corte_caja(
             ">
                 <div style="text-align:center;">
                     {hi}<br>
-                    <b>{COLEGIO_NOMBRE.upper()}</b><br>
+                    <b>{escape(str(COLEGIO_NOMBRE.upper()))}</b><br>
                     CORTE DE CAJA
                 </div>
 
@@ -211,7 +231,7 @@ def mostrar_corte_caja(
 
             components.html(
                 f"""
-                <html>
+                <html><head><style>@media print {{ button {{ display:none; }} }}</style></head>
                     <body>
                         {html_corte}
                         <br>
@@ -300,13 +320,14 @@ def mostrar_cobros_alumnos(
                 "Buscar por NIE",
                 key="fin_btn_buscar_nie",
             ) and n_input:
-                documento = (
-                    db.collection("alumnos")
-                    .document(n_input.strip())
-                    .get()
-                )
+                coincidencias = list(db.collection('alumnos').where('nie', '==', n_input.strip()).stream())
+                if len(coincidencias) > 1:
+                    st.error("El NIE no identifica un alumno único; cobro bloqueado.")
+                    st.session_state.pop('pago_alum', None)
+                    return
+                documento = coincidencias[0] if coincidencias else None
 
-                if not documento.exists:
+                if documento is None or not documento.exists:
                     st.error("No encontrado")
                     st.session_state.pop("pago_alum", None)
                 else:
@@ -547,11 +568,11 @@ def mostrar_cobros_alumnos(
                                 "id_short": str(int(time.time()))[-6:],
                             }
 
-                            db.collection(
-                                "finanzas"
-                            ).add(
-                                recibo_data
-                            )
+                            try:
+                                recibo_data = _record_form_movement(db, recibo_data)
+                            except Exception as error:
+                                st.error(f"No se confirmó el movimiento: {error}")
+                                return
 
                             st.session_state[
                                 "recibo_temp"
@@ -590,10 +611,10 @@ def mostrar_cobros_alumnos(
                         <td width="20%">{hi}</td>
                         <td width="60%" align="center">
                             <h3 style="margin:0;">
-                                {COLEGIO_NOMBRE.upper()}
+                                {escape(str(COLEGIO_NOMBRE.upper()))}
                             </h3>
                             <p style="margin:5px;font-size:12px;">
-                                San Felipe, San Bartolo, Ilopango
+                                Institución de demostración
                             </p>
                             <p style="margin:0;font-size:12px;">
                                 <b>COMPROBANTE DE INGRESO</b>
@@ -601,10 +622,10 @@ def mostrar_cobros_alumnos(
                         </td>
                         <td width="20%" align="right">
                             <h4 style="margin:0;color:#d32f2f;">
-                                NO. {r.get('id_short', '000')}
+                                NO. {escape(str(r.get('id_short', '000')))}
                             </h4>
                             <p style="font-size:12px;">
-                                {r.get('fecha_legible', '')}
+                                {escape(str(r.get('fecha_legible', '')))}
                             </p>
                         </td>
                     </tr>
@@ -615,7 +636,7 @@ def mostrar_cobros_alumnos(
                 <div style="padding:10px;">
                     <p>
                         <b>RECIBIMOS DE:</b>
-                        {r.get('nombre_persona', '')}
+                        {escape(str(r.get('nombre_persona', '')))}
                     </p>
 
                     <p>
@@ -627,15 +648,15 @@ def mostrar_cobros_alumnos(
 
                     <p>
                         <b>POR CONCEPTO DE:</b>
-                        {r.get('descripcion', '')}
+                        {escape(str(r.get('descripcion', '')))}
                     </p>
 
                     <p>
                         <b>PERÍODO ACADÉMICO:</b>
-                        {r.get('ciclo_lectivo', '-')}
+                        {escape(str(r.get('ciclo_lectivo', '-')))}
                         &nbsp; | &nbsp;
                         <b>GRADO REGISTRADO:</b>
-                        {r.get('grado_alumno', '-')}
+                        {escape(str(r.get('grado_alumno', '-')))}
                     </p>
                 </div>
 
@@ -659,7 +680,7 @@ def mostrar_cobros_alumnos(
 
             components.html(
                 f"""
-                <html>
+                <html><head><style>@media print {{ button {{ display:none; }} }}</style></head>
                     <body>
                         {html_recibo}
                         <br>
@@ -836,11 +857,11 @@ def mostrar_gastos(
                                 "docente_id"
                             ] = maestro_seleccionado
 
-                        db.collection(
-                            "finanzas"
-                        ).add(
-                            gasto_data
-                        )
+                        try:
+                            gasto_data = _record_form_movement(db, gasto_data)
+                        except Exception as error:
+                            st.error(f"No se confirmó el movimiento: {error}")
+                            return
 
                         st.session_state[
                             "gasto_temp"
@@ -873,7 +894,7 @@ def mostrar_gastos(
                         <td width="20%">{hi}</td>
                         <td width="60%" align="center">
                             <h3 style="margin:0;">
-                                {COLEGIO_NOMBRE.upper()}
+                                {escape(str(COLEGIO_NOMBRE.upper()))}
                             </h3>
                             <p style="margin:0;font-size:12px;">
                                 <b>COMPROBANTE DE EGRESO (GASTO)</b>
@@ -881,10 +902,10 @@ def mostrar_gastos(
                         </td>
                         <td width="20%" align="right">
                             <h4 style="margin:0;color:#d32f2f;">
-                                NO. {r.get('id_short', '000')}
+                                NO. {escape(str(r.get('id_short', '000')))}
                             </h4>
                             <p style="font-size:12px;">
-                                {r.get('fecha_legible', '')}
+                                {escape(str(r.get('fecha_legible', '')))}
                             </p>
                         </td>
                     </tr>
@@ -895,7 +916,7 @@ def mostrar_gastos(
                 <div style="padding:10px;">
                     <p>
                         <b>PAGADO A:</b>
-                        {r.get('nombre_persona', '')}
+                        {escape(str(r.get('nombre_persona', '')))}
                     </p>
                     <p>
                         <b>LA CANTIDAD DE:</b>
@@ -905,11 +926,11 @@ def mostrar_gastos(
                     </p>
                     <p>
                         <b>POR CONCEPTO DE:</b>
-                        {r.get('descripcion', '')}
+                        {escape(str(r.get('descripcion', '')))}
                     </p>
                     <p>
                         <b>CICLO ADMINISTRATIVO:</b>
-                        {r.get('ciclo_lectivo', '-')}
+                        {escape(str(r.get('ciclo_lectivo', '-')))}
                     </p>
                 </div>
 
@@ -933,7 +954,7 @@ def mostrar_gastos(
 
             components.html(
                 f"""
-                <html>
+                <html><head><style>@media print {{ button {{ display:none; }} }}</style></head>
                     <body>
                         {html_gasto}
                         <br>
@@ -1334,11 +1355,11 @@ def mostrar_reportes(
 
                 filas_html += f"""
                 <tr style="background:{color_fila};">
-                    <td>{item.get('fecha_legible', '')}</td>
-                    <td>{item.get('ciclo_reporte', '-')}</td>
-                    <td>{item.get('grado_reporte', '-')}</td>
-                    <td>{item.get('nombre_persona', '')}</td>
-                    <td>{item.get('descripcion', '')}</td>
+                    <td>{escape(str(item.get('fecha_legible', '')))}</td>
+                    <td>{escape(str(item.get('ciclo_reporte', '-')))}</td>
+                    <td>{escape(str(item.get('grado_reporte', '-')))}</td>
+                    <td>{escape(str(item.get('nombre_persona', '')))}</td>
+                    <td>{escape(str(item.get('descripcion', '')))}</td>
                     <td align="right">
                         ${float(item.get('monto', 0)):.2f}
                     </td>
@@ -1383,11 +1404,11 @@ def mostrar_reportes(
 
                         <div>
                             <h2 style="margin:0;">
-                                {COLEGIO_NOMBRE.upper()}
+                                {escape(str(COLEGIO_NOMBRE.upper()))}
                             </h2>
 
                             <p style="margin:0;">
-                                {titulo_reporte}
+                                {escape(str(titulo_reporte))}
                             </p>
                         </div>
                     </div>
@@ -1506,7 +1527,7 @@ def mostrar_reportes(
 
             components.html(
                 f"""
-                <html>
+                <html><head><style>@media print {{ button {{ display:none; }} }}</style></head>
                     <body>
                         {html_reporte}
                         <br>

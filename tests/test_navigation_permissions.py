@@ -161,7 +161,7 @@ class PermissionTests(unittest.TestCase):
 
     def test_unknown_and_blocked_modules_denied_before_dispatch_import(self):
         from view_dispatch import render_module
-        for module in ("otra", "Mi Perfil", "Boletas de Notas", "Expediente Alumnos", "Finanzas"):
+        for module in ("otra", "Boletas de Notas", "Expediente Alumnos", "Finanzas"):
             with patch("view_dispatch.import_module") as loader:
                 with self.assertRaises(AccessDenied):
                     render_module(self.db, module)

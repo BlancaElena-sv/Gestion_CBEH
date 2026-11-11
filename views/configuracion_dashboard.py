@@ -1,4 +1,6 @@
 from authorization import protected
+from integrity_service import IntegrityError, run_transaction
+import uuid
 
 from datetime import date
 
@@ -6,6 +8,28 @@ import streamlit as st
 from firebase_admin import firestore
 
 from config import CICLO_LECTIVO
+
+
+def _write_dashboard(db, action, key='dashboard', data=None):
+    if action not in {'config', 'add', 'toggle', 'delete'} or '/' in key:
+        raise IntegrityError('Operación de configuración no válida.')
+    collection = 'configuracion' if action == 'config' else 'agenda'
+    if action == 'config' and key != 'dashboard':
+        raise IntegrityError('Solo se permite configurar la presentación del dashboard.')
+    ref = db.collection(collection).document(key)
+
+    def change(tx, actor):
+        doc = ref.get(transaction=tx)
+        current = doc.to_dict() if doc.exists else {}
+        if action == 'delete':
+            tx.delete(ref)
+        elif action == 'toggle':
+            if not doc.exists:
+                raise IntegrityError('La actividad ya no existe.')
+            tx.update(ref, {'activo': not current.get('activo', True)})
+        else:
+            tx.set(ref, dict(current, **data))
+    return run_transaction(db, 'Configuración (Usuarios)', change)
 
 
 @protected('Configuración (Usuarios)')
@@ -103,19 +127,16 @@ def mostrar_configuracion_dashboard(db):
             )
 
             if guardar:
-                ref.set(
-                    {
-                        "titulo_admin": titulo_admin.strip(),
-                        "titulo_docente": titulo_docente.strip(),
-                        "estado_sistema": estado_sistema.strip(),
-                        "aviso_activo": aviso_activo,
-                        "aviso_titulo": aviso_titulo.strip(),
-                        "aviso_mensaje": aviso_mensaje.strip(),
-                        "ciclo_lectivo": CICLO_LECTIVO,
-                        "actualizado_en": firestore.SERVER_TIMESTAMP,
-                    },
-                    merge=True,
-                )
+                _write_dashboard(db, 'config', data={
+                    'titulo_admin': titulo_admin.strip(),
+                    'titulo_docente': titulo_docente.strip(),
+                    'estado_sistema': estado_sistema.strip(),
+                    'aviso_activo': aviso_activo,
+                    'aviso_titulo': aviso_titulo.strip(),
+                    'aviso_mensaje': aviso_mensaje.strip(),
+                    'ciclo_lectivo': CICLO_LECTIVO,
+                    'actualizado_en': firestore.SERVER_TIMESTAMP,
+                })
 
                 st.success(
                     "✅ Configuración actualizada."
@@ -179,20 +200,16 @@ def mostrar_configuracion_dashboard(db):
                         "Debe ingresar un título."
                     )
                 else:
-                    db.collection(
-                        "agenda"
-                    ).add(
-                        {
-                            "fecha": fecha.isoformat(),
-                            "titulo": titulo.strip(),
-                            "descripcion": descripcion.strip(),
-                            "audiencia": audiencia,
-                            "estado": estado,
-                            "activo": True,
-                            "ciclo_lectivo": CICLO_LECTIVO,
-                            "creado_en": firestore.SERVER_TIMESTAMP,
-                        }
-                    )
+                    _write_dashboard(db, 'add', uuid.uuid4().hex, {
+                        'fecha': fecha.isoformat(),
+                        'titulo': titulo.strip(),
+                        'descripcion': descripcion.strip(),
+                        'audiencia': audiencia,
+                        'estado': estado,
+                        'activo': True,
+                        'ciclo_lectivo': CICLO_LECTIVO,
+                        'creado_en': firestore.SERVER_TIMESTAMP,
+                    })
 
                     st.success(
                         "✅ Actividad agregada."
@@ -283,15 +300,7 @@ def mostrar_configuracion_dashboard(db):
                             f"{actividad['id']}"
                         ),
                     ):
-                        db.collection(
-                            "agenda"
-                        ).document(
-                            actividad["id"]
-                        ).update(
-                            {
-                                "activo": not activo
-                            }
-                        )
+                        _write_dashboard(db, 'toggle', actividad['id'])
 
                         st.rerun()
 
@@ -303,10 +312,6 @@ def mostrar_configuracion_dashboard(db):
                             f"{actividad['id']}"
                         ),
                     ):
-                        db.collection(
-                            "agenda"
-                        ).document(
-                            actividad["id"]
-                        ).delete()
+                        _write_dashboard(db, 'delete', actividad['id'])
 
                         st.rerun()

@@ -97,6 +97,54 @@ class EmulatorIntegrityTests(unittest.TestCase):
         self.assertEqual(len(history), 3)
         self.assertEqual({row['ciclo'] for row in history}, {2025, 2026, 2027})
 
+    def test_commercial_financial_concurrent_duplicate(self):
+        from datetime import datetime
+        from uuid import uuid4
+        from config import TZ_SV
+        from finance_service import record_movement
+        self.student.update({'nie': 'integrity-1'})
+        data = dict(tipo='ingreso', monto=25.5, alumno_nie='integrity-1',
+                    descripcion='Cobro ficticio '+uuid4().hex, fecha=datetime.now(TZ_SV),
+                    fecha_legible=datetime.now(TZ_SV).strftime('%d/%m/%Y %H:%M'), ciclo_lectivo=2027)
+        def record():
+            try:
+                record_movement(self.db, data, session=session())
+                return True
+            except IntegrityError:
+                return False
+        with ThreadPoolExecutor(2) as pool:
+            self.assertEqual(sum(pool.map(lambda _: record(), range(2))), 1)
+        records=list(self.db.collection('finanzas').where('descripcion', '==', data['descripcion']).stream())
+        self.assertEqual(len(records),1)
+        self.assertEqual(records[0].to_dict()['grado_alumno'],'Primer Grado')
+        record_movement(self.db, records[0].to_dict(), session=session(), operation_id=records[0].id)
+        self.assertEqual(len(list(self.db.collection('finanzas').where('descripcion', '==', data['descripcion']).stream())), 1)
+
+    def test_commercial_profile_personal_and_password(self):
+        from auth import generar_hash, verificar_password
+        from profile_service import save_profile
+        actor='integrity-teacher'
+        self.db.collection('usuarios').document(actor).set(dict(rol='docente', activo=True, nombre='Docente Ficticio', password_hash=generar_hash('Ficticia123!')))
+        self.db.collection('maestros_perfil').document(actor).set(dict(nombre='Docente Ficticio', activo=True))
+        teacher_session=dict(logged_in=True,user_id=actor,user_role='docente')
+        save_profile(self.db,'personal',{'nombre':'Nombre nuevo'},session=teacher_session)
+        save_profile(self.db,'password',current_password='Ficticia123!',new_password='NuevaFicticia123!',session=teacher_session)
+        row=self.db.collection('usuarios').document(actor).get().to_dict()
+        self.assertEqual(row['id_docente'],actor)
+        self.assertTrue(verificar_password('NuevaFicticia123!',row['password_hash']))
+        self.assertEqual(row['rol'],'docente')
+
+    def test_commercial_dashboard_notice_and_agenda(self):
+        from unittest.mock import patch
+        from views.configuracion_dashboard import _write_dashboard
+        with patch('integrity_service.st.session_state',session()):
+            _write_dashboard(self.db,'config',data=dict(aviso_activo=True,aviso_titulo='Ficticio local'))
+            _write_dashboard(self.db,'add','integrity-event',dict(titulo='Actividad ficticia',activo=True))
+            _write_dashboard(self.db,'toggle','integrity-event')
+            self.assertFalse(self.db.collection('agenda').document('integrity-event').get().to_dict()['activo'])
+            _write_dashboard(self.db,'delete','integrity-event')
+        self.assertFalse(self.db.collection('agenda').document('integrity-event').get().exists)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,0 +1,424 @@
+{
+  "metodo": "Chromium local; main y DEMO con información ficticia y servicios simulados. Sin consultas a producción.",
+  "resoluciones": {
+    "escritorio": [
+      1440,
+      1000
+    ],
+    "movil": [
+      390,
+      844
+    ]
+  },
+  "pruebas": {
+    "suite": 199,
+    "previas_conservadas": 178,
+    "nuevas": 21,
+    "emulador": 9,
+    "emulador_previas": 6,
+    "omisiones": 0
+  },
+  "capturas": {
+    "pares_principales": 48,
+    "pares_vacios": 6,
+    "foto_simulada_adicional": 1,
+    "pdf_ficticios": 16
+  },
+  "pixel_a_pixel": false,
+  "comparacion": [
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Finanzas",
+      "role": "admin",
+      "cash": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      },
+      "receipt": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      },
+      "expense": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      },
+      "report": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      }
+    },
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Configuración (Usuarios)",
+      "role": "admin"
+    },
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Promoción de Grado",
+      "role": "admin",
+      "executed": true
+    },
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Mi Perfil",
+      "role": "admin"
+    },
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Mi Perfil",
+      "role": "docente"
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Finanzas",
+      "role": "admin",
+      "cash": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      },
+      "receipt": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      },
+      "expense": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      },
+      "report": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      }
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Configuración (Usuarios)",
+      "role": "admin"
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Promoción de Grado",
+      "role": "admin",
+      "executed": true
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Mi Perfil",
+      "role": "admin"
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Mi Perfil",
+      "role": "docente"
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Finanzas",
+      "role": "admin",
+      "cash": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      },
+      "receipt": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      },
+      "expense": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      },
+      "report": {
+        "printed": true,
+        "buttonHidden": false,
+        "content": true
+      }
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Configuración (Usuarios)",
+      "role": "admin"
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Promoción de Grado",
+      "role": "admin",
+      "executed": true
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Mi Perfil",
+      "role": "admin"
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Mi Perfil",
+      "role": "docente"
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Finanzas",
+      "role": "admin",
+      "cash": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      },
+      "receipt": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      },
+      "expense": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      },
+      "report": {
+        "printed": true,
+        "buttonHidden": true,
+        "content": true
+      }
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Configuración (Usuarios)",
+      "role": "admin"
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Promoción de Grado",
+      "role": "admin",
+      "executed": true
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Mi Perfil",
+      "role": "admin"
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Mi Perfil",
+      "role": "docente"
+    }
+  ],
+  "recorrido": [
+    {
+      "role": "admin",
+      "module": "Inicio",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Inscripción",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Consulta Alumnos",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Maestros",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Asistencia Global",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Notas",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Finanzas",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Promoción de Grado",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Configuración",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "module": "Mi Perfil",
+      "render": true
+    },
+    {
+      "role": "admin",
+      "login": true,
+      "invalidPasswordDenied": true,
+      "logout": true
+    },
+    {
+      "role": "teacher",
+      "module": "Inicio",
+      "render": true
+    },
+    {
+      "role": "teacher",
+      "module": "Mis Listados",
+      "render": true
+    },
+    {
+      "role": "teacher",
+      "module": "Tomar Asistencia",
+      "render": true
+    },
+    {
+      "role": "teacher",
+      "module": "Cargar Notas",
+      "render": true
+    },
+    {
+      "role": "teacher",
+      "module": "Ver Mis Cargas",
+      "render": true
+    },
+    {
+      "role": "teacher",
+      "module": "Mi Perfil",
+      "render": true
+    },
+    {
+      "role": "teacher",
+      "module": "Expediente Alumnos",
+      "blocked": true
+    },
+    {
+      "role": "teacher",
+      "module": "Boletas de Notas",
+      "blocked": true
+    },
+    {
+      "role": "teacher",
+      "login": true,
+      "invalidPasswordDenied": true,
+      "logout": true
+    }
+  ],
+  "vacios_y_foto": [
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Finanzas",
+      "empty": true
+    },
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Configuración (Usuarios)",
+      "empty": true
+    },
+    {
+      "size": "desktop",
+      "variant": "reference",
+      "module": "Promoción de Grado",
+      "empty": true
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Finanzas",
+      "empty": true
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Configuración (Usuarios)",
+      "empty": true
+    },
+    {
+      "size": "desktop",
+      "variant": "demo",
+      "module": "Promoción de Grado",
+      "empty": true
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Finanzas",
+      "empty": true
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Configuración (Usuarios)",
+      "empty": true
+    },
+    {
+      "size": "mobile",
+      "variant": "reference",
+      "module": "Promoción de Grado",
+      "empty": true
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Finanzas",
+      "empty": true
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Configuración (Usuarios)",
+      "empty": true
+    },
+    {
+      "size": "mobile",
+      "variant": "demo",
+      "module": "Promoción de Grado",
+      "empty": true
+    },
+    {
+      "module": "Mi Perfil",
+      "role": "docente",
+      "photoUploadSimulated": true,
+      "verifiedTeacherOnly": true
+    }
+  ],
+  "diferencias_observadas": [
+    "Identidad institucional DEMO",
+    "La DEMO oculta botones al imprimir; main los conserva visibles",
+    "La DEMO mantiene el resultado parcial de promoción; main lo descarta al reejecutar",
+    "Los controles de seguridad y las funciones docentes bloqueadas se conservan"
+  ]
+}

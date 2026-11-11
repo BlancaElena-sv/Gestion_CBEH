@@ -1,5 +1,10 @@
 # Bloque 4A — Homologación académica
 
+**Actualización posterior:** la salvedad de ubicación descrita en este informe
+quedó resuelta mediante la corrección puntual autorizada después de ff3a520.
+Ver docs/CORRECCION_ESTADO_ALUMNOS.md. El resto de este documento conserva los
+resultados y límites originales del bloque 4A.
+
 Base: 2ac4131. Referencia visual: main en c6b48c0.
 Rama: refactor/demo-homologacion.
 
